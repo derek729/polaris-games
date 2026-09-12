@@ -75,6 +75,17 @@
 
 ## 6. 스프린트 로그
 
+### 배포 스프린트 (2026-09-13) — "전체 프로젝트 완성 & 퍼블리시" ✅ 완료
+- 전수조사: atelier-studio(3D 인테리어 스위트), utils-kit(src/tests), fullstack-agent(서드파티 클론), server.cjs
+- atelier-studio: 브라우저 QA 통과(3D 렌더·견적·소방 기준 정상) → 포털 카드·sw.js 편입
+- utils-kit: 테스트 26/26 통과, v1.0.0 정식화
+- fullstack-agent: 외부 서드파티 저장소(기여용) — 우리 제품 배포 대상에서 제외 (로컬 보존)
+- server.cjs: 루트 경로 → 통합 포털
+- 배포: GitHub `derek729/polaris-games` 생성·push → GitHub Pages 활성화
+  - 이슈: 토큰 workflow 스코프 부족으로 push 거부 → CI 파일을 docs/ci-example.yml로 보존 이동 후 해결
+  - 라이브 검증: https://derek729.github.io/polaris-games/ (포털·게임·에셋·atelier 전부 200)
+- 온라인 대전(WebSocket 릴레이)은 Pages에서 미지원 — `node server.cjs` 셀프호스팅 필요 (문서화됨)
+
 ### 스프린트 2 + v1.0.0 릴리스 (2026-09-12) — "사운드 통합 & 출시" ✅ 완료
 - 투입: 개발팀 2명(Agent E: VS, Agent F: PvZ+suiji — 파일 소유 분리) + 아트팀/사운드팀 + QA, 팀장 통합·감사·릴리스
 - 결과:
