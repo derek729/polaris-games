@@ -10,6 +10,7 @@ const PRECACHE = [
   'vampire-survivors.html',
   'plants-vs-zombies.html',
   'beatcraft.html',
+  'atelier-studio/index.html',
   // 두마당 보드게임 스위트
   'suiji-index.html',
   'suiji-go.html',
