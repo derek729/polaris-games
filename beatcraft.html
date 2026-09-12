@@ -228,12 +228,22 @@ body.fx-off .bg-shape,body.fx-off .logo-shine::after,body.fx-off .hero-arrow,bod
       </div>
       <div class="mod-body" id="mod-body">
         <div class="mod-row">
-          <span class="mod-label">속도</span>
+          <span class="mod-label">배속</span>
           <button class="mod-chip" data-speed="0.5" onclick="setSpeed(0.5)">0.5×</button>
           <button class="mod-chip" data-speed="0.75" onclick="setSpeed(0.75)">0.75×</button>
           <button class="mod-chip sel" data-speed="1" onclick="setSpeed(1)">1×</button>
           <button class="mod-chip" data-speed="1.25" onclick="setSpeed(1.25)">1.25×</button>
           <button class="mod-chip" data-speed="1.5" onclick="setSpeed(1.5)">1.5×</button>
+          <span style="font-size:12px;opacity:.6;margin-left:4px">음악·채보 밀도가 빨라집니다</span>
+        </div>
+        <div class="mod-row">
+          <span class="mod-label">스크롤</span>
+          <button class="mod-chip sel" data-scroll="1" onclick="setScroll(1)">1.0×</button>
+          <button class="mod-chip" data-scroll="1.5" onclick="setScroll(1.5)">1.5×</button>
+          <button class="mod-chip" data-scroll="2" onclick="setScroll(2)">2.0×</button>
+          <button class="mod-chip" data-scroll="3" onclick="setScroll(3)">3.0×</button>
+          <button class="mod-chip" data-scroll="4" onclick="setScroll(4)">4.0×</button>
+          <span style="font-size:12px;opacity:.6;margin-left:4px">노트 낙하 속도만 조정 (판정 불변)</span>
         </div>
         <div class="mod-row">
           <span class="mod-label">오프셋</span>
@@ -322,9 +332,10 @@ body.fx-off .bg-shape,body.fx-off .logo-shine::after,body.fx-off .hero-arrow,bod
       <div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:8px 4px;text-align:center"><div style="font-size:9px;font-weight:700;opacity:.7">MISS</div><div id="res-miss" class="font-display" style="font-size:20px;opacity:.5">0</div></div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%;max-width:480px">
-      <div style="background:rgba(255,255,255,.06);border-radius:12px;padding:10px;text-align:center"><div style="font-size:10px;opacity:.6;text-transform:uppercase;letter-spacing:.06em">Max Combo</div><div id="res-combo" class="font-display" style="font-size:26px;color:var(--yellow)">0</div></div>
+      <div style="position:relative;background:rgba(255,255,255,.06);border-radius:12px;padding:10px;text-align:center"><div id="res-fc" style="display:none;position:absolute;top:6px;right:8px;font-family:'Fredoka',sans-serif;font-weight:700;font-size:11px;line-height:1;padding:3px 8px;border-radius:8px;border:1.5px solid;background:rgba(5,8,22,.6)">PFC</div><div style="font-size:10px;opacity:.6;text-transform:uppercase;letter-spacing:.06em">Max Combo</div><div id="res-combo" class="font-display" style="font-size:26px;color:var(--yellow)">0</div></div>
       <div style="background:rgba(255,255,255,.06);border-radius:12px;padding:10px;text-align:center"><div style="font-size:10px;opacity:.6;text-transform:uppercase;letter-spacing:.06em">Accuracy</div><div id="res-acc" class="font-display" style="font-size:26px;color:var(--green)">0%</div></div>
     </div>
+    <div id="res-timing" style="display:none;font-size:12px;opacity:.75;text-align:center;width:100%;max-width:480px"></div>
     <div id="res-new-ach" style="display:none;width:100%;max-width:480px;background:rgba(255,210,63,.1);border:2px solid var(--yellow);border-radius:14px;padding:10px;text-align:center">
       <div style="font-size:11px;font-weight:700;color:var(--yellow);margin-bottom:4px">🏆 도전과제 해제!</div>
       <div id="res-ach-list" style="font-size:13px"></div>
@@ -432,6 +443,7 @@ const G = {
   unlocked:[1],
   highScores:{},
   grades:{},
+  fcs:{},
   achievements:[],
   infScores:[],
   audioOn:true,
@@ -440,6 +452,7 @@ const G = {
   isDaily:false,
   // modifiers
   speed:1,
+  scroll:1,
   mirror:false,
   nofail:false,
   practice:false,
@@ -554,7 +567,7 @@ const LANE_COLORS=['#FF6B6B','#FFD23F','#4ADE80','#38BDF8'];
 const LANE_KEYS=['d','f','j','k'];
 const LANE_CODES={KeyD:0,KeyF:1,KeyJ:2,KeyK:3}; // 물리 키 코드: 한글 IME가 켜져 있어도 인식됨
 const NOTE_FALL_TIME=1600;
-const PERFECT_WIN=55, GREAT_WIN=110, GOOD_WIN=185, BAD_WIN=280;
+const PERFECT_WIN=45, GREAT_WIN=90, GOOD_WIN=135, BAD_WIN=180;
 const LANE_W=W/4, HIT_Y=H-90;
 
 /* ═══════════════════════════════════════
@@ -653,11 +666,19 @@ class Game {
     this.cdMs=2100; this.counting=true; this.shake=0; this.gameOver=false; this.isDaily=false;
     this.lastFrame=0; this.lastCdBeat=-1;
     this.lastTimingMs=null; // for practice mode timing display
+    this.lastHitElapsed=null; // 얼리/레이트 오차바 표시 기준 시각 (500ms 페이드)
+    this.errEarly=0; this.errLate=0; this.errSum=0; // 결과 화면 빠름/늦음 통계
+    this.milestoneFx={n:0,life:0}; // 50콤보 마일스톤 팝업
     this._generate();
   }
 
   _getLane(rawLane){
     return G.mirror?3-rawLane:rawLane;
+  }
+
+  // 스크롤 스피드 개조: 렌더 전용 낙하 시간 (n.time·판정·BPM에는 영향 없음)
+  _fallTime(){
+    return NOTE_FALL_TIME/(G.scroll||1);
   }
 
   _generate(){
@@ -759,6 +780,7 @@ class Game {
     for(let i=0;i<4;i++) this.laneGlow[i]*=.82;
     this.shake*=.78;
     this.comboPulse=Math.max(0,this.comboPulse-.08);
+    if(this.milestoneFx.life>0) this.milestoneFx.life-=dt/1000;
     for(let i=this.rings.length-1;i>=0;i--){ const r=this.rings[i]; r.r+=3.4; r.life-=.07; if(r.life<=0) this.rings.splice(i,1); }
     if(G.motionOn) for(const st of this.stars){ st.y+=st.s*.12; if(st.y>H) st.y=-2; }
     if(this.elapsed>=this.endTime){ this._finish(false); return; }
@@ -804,6 +826,12 @@ class Game {
     this.score+=pts[judge]+cbBonus;
     if(!G.nofail&&!G.practice) this.hp=Math.min(100,this.hp+hpGain[judge]);
     this.combo++; this.maxCombo=Math.max(this.maxCombo,this.combo); this.comboPulse=1;
+    if(this.combo%50===0) this._milestone(this.combo);
+    this.lastHitElapsed=this.elapsed;
+    if(typeof this.lastTimingMs==='number'){
+      if(this.lastTimingMs<0) this.errEarly++; else this.errLate++;
+      this.errSum+=this.lastTimingMs;
+    }
     this.judge[judge]++;
     if(judge==='PERFECT'||judge==='GREAT') this.rings.push({x:lane*LANE_W+LANE_W/2,y:HIT_Y,r:10,life:1,clr:judge==='PERFECT'?'#FFD700':LANE_COLORS[lane]});
     this._spawnParticles(lane,judge==='PERFECT'?18:judge==='GREAT'?12:8,judge);
@@ -819,6 +847,36 @@ class Game {
     this._popup(lane,'MISS','rgba(255,100,100,.9)');
     sfxMiss();
     if(navigator.vibrate) navigator.vibrate([20,25,20]);
+  }
+
+  _milestone(n){
+    this.milestoneFx={n,life:1};
+    this.rings.push({x:W/2,y:65,r:10,life:1,clr:'#FFD23F'});
+    sfxCountdown(0);
+  }
+
+  // 얼리/레이트 오차바: 판정선 아래 중앙, 좌=빠름(−135ms) 우=늦음(+135ms), 500ms 페이드아웃 (전 모드 상시 표시)
+  _drawErrorBar(c){
+    if(this.lastTimingMs===null||this.lastHitElapsed===null) return;
+    const age=this.elapsed-this.lastHitElapsed;
+    if(age<0||age>500) return;
+    const ERR_RANGE=GOOD_WIN; // ±135ms 게이지 끝, |오차| 초과 시 끝에 고정
+    const cx=W/2, cy=HIT_Y+62, gw=160, gh=6;
+    c.save();
+    c.globalAlpha=(1-age/500)*.95;
+    c.fillStyle='rgba(255,255,255,.12)';
+    c.beginPath(); c.roundRect(cx-gw/2,cy-gh/2,gw,gh,3); c.fill();
+    c.fillStyle='rgba(255,255,255,.7)'; c.fillRect(cx-1,cy-gh/2-2,2,gh+4); // 중앙 0 틱
+    c.fillStyle='#38BDF8'; c.fillRect(cx-gw/2,cy-gh/2-2,2,gh+4); // 좌측 끝=빠름
+    c.fillStyle='#FF6B6B'; c.fillRect(cx+gw/2-2,cy-gh/2-2,2,gh+4); // 우측 끝=늦음
+    const err=Math.max(-ERR_RANGE,Math.min(ERR_RANGE,this.lastTimingMs));
+    const a=Math.abs(this.lastTimingMs);
+    const mclr=a<PERFECT_WIN?'#FFD700':a<GREAT_WIN?'#38BDF8':a<GOOD_WIN?'#4ADE80':'#FF6B6B';
+    const mx=cx+err/ERR_RANGE*(gw/2);
+    c.fillStyle=mclr; c.shadowColor=mclr; c.shadowBlur=6;
+    c.beginPath(); c.roundRect(mx-2.5,cy-gh/2-3,5,12,2.5); c.fill(); // 마커: 높이 12px 막대
+    c.shadowBlur=0;
+    c.restore();
   }
 
   _popup(lane,text,color){
@@ -882,8 +940,9 @@ class Game {
       if(!n.isHold||n.missed||!n.hit) continue;
       const endTime=n.time+n.holdDur;
       if(this.elapsed>endTime+200) continue;
-      const progress=1-(n.time-this.elapsed)/NOTE_FALL_TIME, noteY=progress*HIT_Y;
-      const endProg=1-(endTime-this.elapsed)/NOTE_FALL_TIME, endY=Math.min(HIT_Y,endProg*HIT_Y);
+      const ft=this._fallTime();
+      const progress=1-(n.time-this.elapsed)/ft, noteY=progress*HIT_Y;
+      const endProg=1-(endTime-this.elapsed)/ft, endY=Math.min(HIT_Y,endProg*HIT_Y);
       const x=n.lane*LANE_W+LANE_W*.25, nw=LANE_W*.5, clr=LANE_COLORS[n.lane];
       const hg=c.createLinearGradient(0,endY,0,noteY); hg.addColorStop(0,clr+'33'); hg.addColorStop(1,clr+'CC');
       c.fillStyle=hg; c.beginPath(); c.roundRect(x,endY,nw,noteY-endY,8); c.fill();
@@ -895,11 +954,12 @@ class Game {
     // hold bodies (대기 중)
     for(const n of this.notes){
       if(!n.isHold||n.hit||n.missed) continue;
+      const ft=this._fallTime();
       const dt=n.time-this.elapsed;
-      if(dt>NOTE_FALL_TIME||dt<-BAD_WIN-100) continue;
-      const progress=1-(dt/NOTE_FALL_TIME), noteY=progress*HIT_Y;
+      if(dt>ft||dt<-BAD_WIN-100) continue;
+      const progress=1-(dt/ft), noteY=progress*HIT_Y;
       const endTime=n.time+n.holdDur, endDt=endTime-this.elapsed;
-      const endProgress=1-(endDt/NOTE_FALL_TIME), endY=endProgress*HIT_Y;
+      const endProgress=1-(endDt/ft), endY=endProgress*HIT_Y;
       if(noteY<-80&&endY<-80) continue;
       const x=n.lane*LANE_W+LANE_W*.25, nw=LANE_W*.5, clr=LANE_COLORS[n.lane];
       c.fillStyle=clr+'44'; c.beginPath(); c.roundRect(x,Math.max(-20,endY),nw,noteY-Math.max(-20,endY),8); c.fill();
@@ -916,13 +976,15 @@ class Game {
       c.globalAlpha=1;
       this._drawArrow(i,x+LANE_W/2,HIT_Y,pressed?1:.4+glow*.6,pressed?1.12:1);
     }
+    this._drawErrorBar(c);
     // tap notes
     for(const n of this.notes){
       if(n.hit) continue;
+      const ft=this._fallTime();
       const dt=n.time-this.elapsed;
-      if(dt>NOTE_FALL_TIME) continue;
+      if(dt>ft) continue;
       if(n.missed&&dt<-BAD_WIN-150) continue;
-      const progress=1-(dt/NOTE_FALL_TIME), noteY=progress*HIT_Y;
+      const progress=1-(dt/ft), noteY=progress*HIT_Y;
       if(noteY<-50) continue;
       this._drawNote(n.lane,n.lane*LANE_W+LANE_W/2,noteY,n.missed?.3:1,n.missed?.92:1);
     }
@@ -969,6 +1031,18 @@ class Game {
       c.lineWidth=6; c.strokeStyle='rgba(0,0,0,.75)'; c.strokeText(this.combo+' COMBO',0,0);
       c.shadowColor='rgba(255,210,63,.6)'; c.shadowBlur=10+this.comboPulse*18;
       c.fillStyle=cg; c.fillText(this.combo+' COMBO',0,0); c.restore();
+    }
+    // combo milestone (50의 배수 달성 팝업 — 스케일인+페이드, 1초)
+    if(this.milestoneFx&&this.milestoneFx.life>0){
+      const fx=this.milestoneFx, t=1-fx.life;
+      c.save(); c.translate(W/2,110);
+      const sc=t<.18?.5+2.8*t:1;
+      c.scale(sc,sc); c.globalAlpha=fx.life<.35?fx.life/.35:1;
+      c.font='800 26px Fredoka,sans-serif'; c.textAlign='center';
+      c.lineWidth=5; c.strokeStyle='rgba(0,0,0,.8)'; c.strokeText(fx.n+' COMBO!',0,0);
+      c.shadowColor='rgba(255,210,63,.7)'; c.shadowBlur=12;
+      c.fillStyle='#FFD23F'; c.fillText(fx.n+' COMBO!',0,0);
+      c.restore(); c.globalAlpha=1;
     }
     // HP bar
     const hpW=W-32;
@@ -1034,10 +1108,11 @@ class Game {
       // 떨어지는 비트 라인
       const bpm=this._isInfinite?this.currentBpm:this.lvl.bpm*(G.practice?0.5:G.speed);
       const beatMs=60000/bpm;
+      const ft=this._fallTime();
       const firstK=Math.max(0,Math.ceil(this.elapsed/beatMs));
       c.strokeStyle='rgba(255,255,255,.07)'; c.lineWidth=1;
-      for(let k=firstK;k*beatMs-this.elapsed<NOTE_FALL_TIME;k++){
-        const y=(1-(k*beatMs-this.elapsed)/NOTE_FALL_TIME)*HIT_Y;
+      for(let k=firstK;k*beatMs-this.elapsed<ft;k++){
+        const y=(1-(k*beatMs-this.elapsed)/ft)*HIT_Y;
         c.beginPath(); c.moveTo(0,y); c.lineTo(W,y); c.stroke();
       }
     }
@@ -1128,8 +1203,8 @@ class InfiniteGame extends Game {
   }
 
   _tick(dt){
-    // 노트가 떨어지기 전에 미리 다음 청크를 보충 (워터마크로 청크 겹침 방지)
-    if(this._genUpTo<this.elapsed+NOTE_FALL_TIME+1500) this._regenerateChunk();
+    // 노트가 떨어지기 전에 미리 다음 청크를 보충 (워터마크로 청크 겹침 방지 — 스크롤 스피드 반영)
+    if(this._genUpTo<this.elapsed+this._fallTime()+1500) this._regenerateChunk();
     // BPM escalation: +2 every 15 seconds
     const step=Math.floor(this.elapsed/15000);
     if(step>this.lastBpmStep){
@@ -1172,6 +1247,7 @@ class InfiniteGame extends Game {
     this.popups=this.popups.filter(p=>p.life>0);
     for(let i=0;i<4;i++) this.laneGlow[i]=Math.max(0,this.laneGlow[i]-.05*(dt/16));
     this.comboPulse=Math.max(0,this.comboPulse-.08);
+    if(this.milestoneFx.life>0) this.milestoneFx.life-=dt/1000;
     for(let i=this.rings.length-1;i>=0;i--){ const r=this.rings[i]; r.r+=3.4*(dt/16); r.life-=.07*(dt/16); if(r.life<=0) this.rings.splice(i,1); }
     if(G.motionOn) for(const st of this.stars){ st.y+=st.s*.12*(dt/16); if(st.y>H) st.y=-2; }
     // Miss detection
@@ -1270,6 +1346,8 @@ function _renderLevels(){
     const hs=G.highScores[lvl.id]||0;
     const grade=G.grades[lvl.id]||null;
     const gradeHtml=grade?`<div class="card-grade" style="color:${GRADE_COLORS[grade[0]]||'#fff'};border-color:${GRADE_COLORS[grade[0]]||'#fff'}66">${grade}</div>`:'';
+    const fcMark=(G.fcs&&G.fcs[lvl.id])||null;
+    const fcHtml=fcMark?`<div style="position:absolute;top:${grade?'38px':'10px'};right:10px;font-family:'Fredoka',sans-serif;font-weight:700;font-size:10px;line-height:1;padding:3px 6px;border-radius:7px;background:rgba(5,8,22,.55);border:1.5px solid ${fcMark==='PFC'?'#FFD700':'#C0C0C0'};color:${fcMark==='PFC'?'#FFD700':'#C0C0C0'}">${fcMark}</div>`:'';
     const action=locked?"toast('이전 레벨을 클리어하면 잠금 해제됩니다!')":`startLevel(${lvl.id})`;
     const diffDots={'EASY':1,'NORMAL':2,'HARD':4,'EXPERT':5}[lvl.diff]||3;
     const dots=Array.from({length:5},(_,i)=>`<span class="${i<diffDots?'on':''}"></span>`).join('');
@@ -1278,6 +1356,7 @@ function _renderLevels(){
          onclick="${action}">
       <div class="card-pattern" style="color:${clr}"></div>
       ${gradeHtml}
+      ${fcHtml}
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
         <div style="font-size:10px;font-weight:800;letter-spacing:.08em;color:${dc};text-transform:uppercase">${lvl.diff}</div>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="${clr}" opacity=".95"><path d="M12 3l7 9h-4v9h-6v-9H5z"/></svg>
@@ -1524,6 +1603,9 @@ function showResults(g){
   // Stars (1-3)
   const stars=acc>=95?3:acc>=80?2:acc>=60?1:0;
 
+  // FC/PFC (클리어 시에만 표시·저장 — PFC=전 노트 PERFECT, FC=MISS 0)
+  const fcLabel=!g.gameOver&&total>0?(j.PERFECT===total?'PFC':(j.MISS===0?'FC':null)):null;
+
   // Save high score
   if(g.lvl&&!g._isInfinite){
     const lid=g.lvl.id;
@@ -1537,6 +1619,11 @@ function showResults(g){
     if(!prevGrade||gradeOrder.indexOf(grade)<gradeOrder.indexOf(prevGrade)){
       G.grades[lid]=grade;
       try{ localStorage.setItem('bc_grades',JSON.stringify(G.grades)); }catch(e){}
+    }
+    // Save FC/PFC (상위 라벨만 유지: PFC > FC)
+    if(fcLabel&&G.fcs[lid]!=='PFC'&&(fcLabel==='PFC'||!G.fcs[lid])){
+      G.fcs[lid]=fcLabel;
+      try{ localStorage.setItem('bc_fcs',JSON.stringify(G.fcs)); }catch(e){}
     }
     // Unlock next level if cleared
     if(!g.gameOver){
@@ -1580,6 +1667,27 @@ function showResults(g){
   document.getElementById('res-miss').textContent=j.MISS;
   document.getElementById('res-combo').textContent=g.maxCombo;
   document.getElementById('res-acc').textContent=acc+'%';
+
+  // FC/PFC badge (Max Combo 칸 우상단 — 게임오버 시 미표시)
+  const fcEl=document.getElementById('res-fc');
+  if(fcEl){
+    if(fcLabel){
+      fcEl.textContent=fcLabel;
+      const fcClr=fcLabel==='PFC'?'#FFD700':'#C0C0C0';
+      fcEl.style.color=fcClr; fcEl.style.borderColor=fcClr;
+      fcEl.style.display='block';
+    } else fcEl.style.display='none';
+  }
+  // 빠름/늦음 통계 (오프셋 수동 보정 근거)
+  const timingEl=document.getElementById('res-timing');
+  if(timingEl){
+    const hits=(g.errEarly||0)+(g.errLate||0);
+    if(hits>0){
+      const avg=g.errSum/hits;
+      timingEl.textContent=`빠름 ${g.errEarly} · 늦음 ${g.errLate} (평균 ${avg>0?'+':''}${Math.round(avg)}ms)`;
+      timingEl.style.display='block';
+    } else timingEl.style.display='none';
+  }
 
   // Stars
   const starsEl=document.getElementById('res-stars');
@@ -1636,6 +1744,14 @@ function setSpeed(s){
   saveSettings();
 }
 
+function setScroll(v){
+  G.scroll=v;
+  document.querySelectorAll('.mod-chip[data-scroll]').forEach(c=>{
+    c.classList.toggle('sel',parseFloat(c.dataset.scroll)===v);
+  });
+  saveSettings();
+}
+
 function toggleMirror(){
   G.mirror=!G.mirror;
   const tog=document.getElementById('tog-mirror');
@@ -1688,12 +1804,13 @@ function toggleMotion(){
 
 function saveSettings(){
   try{
-    localStorage.setItem('bc_settings',JSON.stringify({audioOn:G.audioOn,motionOn:G.motionOn,speed:G.speed,mirror:G.mirror,nofail:G.nofail,practice:G.practice,offset:G.offset}));
+    localStorage.setItem('bc_settings',JSON.stringify({audioOn:G.audioOn,motionOn:G.motionOn,speed:G.speed,scroll:G.scroll,mirror:G.mirror,nofail:G.nofail,practice:G.practice,offset:G.offset}));
   }catch(e){}
 }
 
 function _syncSettingsUI(){
   document.querySelectorAll('.mod-chip[data-speed]').forEach(c=>c.classList.toggle('sel',parseFloat(c.dataset.speed)===G.speed));
+  document.querySelectorAll('.mod-chip[data-scroll]').forEach(c=>c.classList.toggle('sel',parseFloat(c.dataset.scroll)===G.scroll));
   const tm=document.getElementById('tog-mirror'); if(tm) tm.classList.toggle('on',G.mirror);
   const tn=document.getElementById('tog-nofail'); if(tn) tn.classList.toggle('on',G.nofail);
   const tp=document.getElementById('tog-practice'); if(tp) tp.classList.toggle('on',G.practice);
@@ -1793,6 +1910,7 @@ document.addEventListener('visibilitychange',()=>{
     const sc=localStorage.getItem('bc_scores'); if(sc) G.highScores=JSON.parse(sc);
     const ul=localStorage.getItem('bc_unlocked'); if(ul) G.unlocked=JSON.parse(ul);
     const gr=localStorage.getItem('bc_grades'); if(gr) G.grades=JSON.parse(gr);
+    const fc=localStorage.getItem('bc_fcs'); if(fc) G.fcs=JSON.parse(fc);
     const ac=localStorage.getItem('bc_ach'); if(ac) G.achievements=JSON.parse(ac);
     const inf=localStorage.getItem('bc_inf'); if(inf) G.infScores=JSON.parse(inf);
     const st=localStorage.getItem('bc_settings'); if(st){
@@ -1800,6 +1918,7 @@ document.addEventListener('visibilitychange',()=>{
       if(typeof s.audioOn==='boolean') G.audioOn=s.audioOn;
       if(typeof s.motionOn==='boolean') G.motionOn=s.motionOn;
       if(typeof s.speed==='number') G.speed=s.speed;
+      if(typeof s.scroll==='number') G.scroll=s.scroll;
       if(typeof s.mirror==='boolean') G.mirror=s.mirror;
       if(typeof s.nofail==='boolean') G.nofail=s.nofail;
       if(typeof s.practice==='boolean') G.practice=s.practice;

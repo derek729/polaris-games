@@ -76,6 +76,7 @@
   .lucard .cn{font-weight:900;margin:4px 0 2px;font-size:16px;}
   .lucard .cd{font-size:13px;color:var(--dim);min-height:38px;line-height:1.5;}
   .lucard .key{position:absolute;top:6px;left:9px;font-size:11px;color:var(--dim);font-weight:800;}
+  .lucard .cv{font-size:11px;color:var(--gold);font-weight:900;margin-top:4px;}
   .statgrid{display:flex;gap:22px;justify-content:center;margin:16px 0 4px;font-weight:800;flex-wrap:wrap;}
   .statgrid b{display:block;font-size:20px;color:var(--gold);}
   .chesticon{font-size:72px;filter:drop-shadow(0 0 18px rgba(232,182,76,.6));margin:6px 0;}
@@ -122,7 +123,12 @@
   <div id="scr-levelup" class="screen hidden">
     <h2>⬆️ LEVEL UP! <span id="lulv" style="color:var(--gold)"></span></h2>
     <div class="lucards" id="lucards"></div>
-    <p class="hint">클릭 또는 <kbd>1</kbd>~<kbd>3</kbd></p>
+    <div id="luActions">
+      <button class="btn ghost" id="btnReroll">🎲 리롤 (2)</button>
+      <button class="btn ghost" id="btnSkip">⏭️ 스킵 (체력 8% 회복 + 골드 30)</button>
+    </div>
+    <p class="hint">클릭 또는 <kbd>1</kbd>~<kbd>3</kbd> · <kbd>R</kbd> 리롤 · <kbd>X</kbd> 스킵</p>
+    <div id="luEvoStrip" class="hint"></div>
   </div>
 
   <div id="scr-chest" class="screen hidden">
@@ -141,8 +147,10 @@
   <div id="scr-end" class="screen hidden">
     <div id="endIcon" style="font-size:60px"></div>
     <h1 id="endTitle"></h1>
+    <div class="buildlist" id="endBuild"></div>
     <div class="statgrid" id="endStats"></div>
     <div class="hint" id="endSub"></div>
+    <div class="hint" id="endGoal" style="color:var(--gold)"></div>
     <button class="btn" id="btnRetry">다시 도전</button>
     <button class="btn ghost" id="btnHome">타이틀로</button>
   </div>
@@ -414,6 +422,8 @@ window.addEventListener("keydown", e => {
     else if (scene === "pause") setScene("play");
   }
   if (scene === "levelup" && ["Digit1","Digit2","Digit3"].includes(e.code)) chooseCard(+e.code.slice(-1) - 1);
+  if (scene === "levelup" && e.code === "KeyR") doReroll();
+  if (scene === "levelup" && e.code === "KeyX") doSkip();
   if (scene === "chest" && (e.code === "Space" || e.code === "Enter")) chestAdvance();
   if (scene === "title" && (e.code === "Enter" || e.code === "Space")) setScene("char");
 });
@@ -456,6 +466,7 @@ function newGame(charId){
   const c = CHARS[charId];
   G = {
     charId, t:0, kills:0, gold:0, level:1, xp:0, xpNext:xpNeed(1), luQueue:0,
+    hitstop:0, rerollLeft:2, dmgDealt:0,
     p:{ x:0, y:0, hp:c.hp, baseHp:c.hp, maxHp:c.hp, baseSpd:c.spd, spd:c.spd, baseRegen:c.regen,
         regen:c.regen, cdm:1, baseArea:c.area || 1, area:c.area || 1, pickR:50, face:1, moving:false, anim:0, hurtT:0, iv:0 },
     passives:{}, weapons:[{ id:c.weapon, lv:1, t:0.4, evolved:false, books:null, bT:0, bA:0 }],
@@ -548,9 +559,9 @@ function director(dt){
 }
 
 /* ---------------- 전투 헬퍼 ---------------- */
-function addText(x, y, txt, col){
+function addText(x, y, txt, col, crit){
   if (G.texts.length > 80) G.texts.shift();
-  G.texts.push({ x, y, txt, col, t:0.8, vy:-42 });
+  G.texts.push({ x, y, txt, col, crit: !!crit, t:0.8, vy:-42 });
 }
 function burst(x, y, col, n, sp){
   n = n || 6; sp = sp || 120;
@@ -565,7 +576,8 @@ function dealDmg(e, dmg, opts){
   let d = dmg, crit = false;
   if (opts.crit && Math.random() < opts.crit){ d *= 2; crit = true; }
   e.hp -= d; e.flash = 0.13;
-  addText(e.x + rand(-9,9), e.y - e.r - 8, Math.round(d), crit ? "#ffd24a" : "#ffffff");
+  G.dmgDealt += d; // 런 종료 요약용 누적 피해량 (무기·오라·웅덩이·폭탄 출처 불문)
+  addText(e.x + rand(-9,9), e.y - e.r - 8, Math.round(d), crit ? "#ffd24a" : "#ffffff", crit);
   if (opts.lifesteal) G.p.hp = Math.min(G.p.maxHp, G.p.hp + opts.lifesteal);
   if (e.hp <= 0) killEnemy(e);
 }
@@ -604,7 +616,13 @@ function killEnemy(e){
   e.dead = true;
   G.kills++;
   const col = (e.elite || e.boss) ? "#ff5b5b" : (ENEMIES[e.type] && ENEMIES[e.type].col) || "#b9a7e0";
-  burst(e.x, e.y, col, e.boss ? 24 : 6);
+  burst(e.x, e.y, col, e.boss ? 30 : e.elite ? 18 : 6);
+  if (e.elite || e.boss){
+    // 엘리트/보스 처치 연출: 링 이펙트(기존 "ring" 타입 재사용) + 히트스톱
+    G.effects.push({ type:"ring", x:e.x, y:e.y, r:e.r*3, t:0.35, max:0.35 });
+    G.hitstop = Math.max(G.hitstop, e.boss ? 0.09 : 0.05);
+  }
+  if (e.elite) G.shake = Math.min(10, G.shake + 5);
   dropGem(e.x, e.y, e.xp);
   if (e.elite) G.pickups.push({ x:e.x, y:e.y, kind:pick(["magnet","chicken","bomb"]), ph:rand(0,TAU) });
   if (e.boss){
@@ -612,7 +630,8 @@ function killEnemy(e){
     G.pickups.push({ x:e.x, y:e.y, kind:"chest", ph:0 });
     banner("🎁 보물 상자!", "상자를 열어 무기를 진화시켜라");
     SFX.bossdie(); G.shake = 12;
-  } else SFX.pop();
+  } else if (e.elite) playSfx("explosion", { volume: 0.35 });
+  else SFX.pop();
 }
 function dropGem(x, y, v){
   if (G.gems.length >= 220){
@@ -626,6 +645,7 @@ function damagePlayer(d){
   const P = G.p;
   if (P.iv > 0 || P.hp <= 0) return;
   P.iv = 0.25; P.hp -= d; P.hurtT = 0.35;
+  G.hitstop = Math.max(G.hitstop, 0.04);
   G.shake = Math.min(10, G.shake + 3);
   addText(P.x, P.y - 26, "-" + d, "#ff6b6b");
   SFX.hurt(); playSfx("hit", { throttle: 200 });
@@ -923,6 +943,10 @@ function updateFx(dt){
 }
 function update(dt){
   if (G.luQueue > 0){ setScene("levelup"); return; }
+  if (G.hitstop > 0){ // 히트스톱: 완전 정지 대신 12% 슬로모션 (타격감 유지, 입력 끊김 방지)
+    G.hitstop -= dt;
+    dt *= 0.12;
+  }
   G.t += dt;
   G.animT += dt;
   if (G.t >= GOAL){ setScene("win"); SFX.win(); return; }
@@ -972,11 +996,14 @@ function rollChoices(){
   return out.slice(0, 3);
 }
 let luChoices = [];
-function buildLevelUp(){
+function buildLevelUp(isReroll){
   luChoices = rollChoices();
   $("lulv").textContent = "LV " + G.level;
   const wrap = $("lucards");
   wrap.innerHTML = "";
+  // 역방향 매핑: 패시브 → 대응 무기 (EVO/PASSIVES 단일 진실원)
+  const evoByPassive = {};
+  for (const k in EVO) evoByPassive[EVO[k].passive] = k;
   luChoices.forEach((c, i) => {
     const el = document.createElement("div");
     let icon, name, tag, desc, cls = "lucard";
@@ -987,12 +1014,54 @@ function buildLevelUp(){
     else if (c.type === "pup"){ const P = PASSIVES[c.id]; icon = P.icon; name = P.name + " Lv." + ((G.passives[c.id] || 0) + 1); tag = "패시브 강화"; desc = P.desc; }
     else if (c.type === "heal"){ icon = "🍗"; name = "치킨"; tag = "회복"; desc = "체력을 30 회복한다"; }
     else { icon = "💰"; name = "골드"; tag = "재화"; desc = "골드 +60"; }
+    // 진화 레시프 배지
+    let badge = "";
+    if ((c.type === "pnew" || c.type === "pup") && evoByPassive[c.id]){
+      const w = owned(evoByPassive[c.id]);
+      if (w && w.lv <= 7) badge = `★ ${WEAPONS[w.id].name} 만렙 시 「${EVO[w.id].name}」 재료`;
+      else if (w) badge = `★ 지금 「${EVO[w.id].name}」으로 진화 가능!`;
+    } else if (c.type === "wup" && owned(c.id).lv + 1 >= 8){
+      const P = PASSIVES[EVO[c.id].passive];
+      badge = (G.passives[EVO[c.id].passive] || 0) > 0
+        ? "★ 진화 준비 완료 — 레벨업/보물상자에서 진화"
+        : `★ 만렙! ${P.icon}${P.name} 갖추면 진화`;
+    }
     el.className = cls;
-    el.innerHTML = `<span class="key">${i + 1}</span><div class="ci">${icon}</div><div class="ct">${tag}</div><div class="cn">${name}</div><div class="cd">${desc}</div>`;
+    el.innerHTML = `<span class="key">${i + 1}</span><div class="ci">${icon}</div><div class="ct">${tag}</div><div class="cn">${name}</div><div class="cd">${desc}</div>` + (badge ? `<div class="cv">${badge}</div>` : "");
     el.addEventListener("click", () => chooseCard(i));
     wrap.appendChild(el);
   });
-  SFX.level(); playSfx("powerup");
+  // 진행 스트립: 이번 런의 진화 목표
+  let strip;
+  if (G.weapons.every(w => w.evolved)) strip = "이번 런 목표 — 전 무기 진화 완료!";
+  else {
+    const segs = G.weapons.map(w => w.evolved
+      ? `${EVO[w.id].icon} 진화 완료`
+      : `${WEAPONS[w.id].icon} ${w.lv}/8 · ${PASSIVES[EVO[w.id].passive].icon} ${G.passives[EVO[w.id].passive] || 0}/5`);
+    strip = "이번 런 목표 — " + segs.join(" · ");
+  }
+  $("luEvoStrip").textContent = strip;
+  // 리롤 버튼 라벨/활성 상태
+  const rb = $("btnReroll");
+  if (G.rerollLeft > 0){ rb.textContent = `🎲 리롤 (${G.rerollLeft})`; rb.style.opacity = ""; rb.style.pointerEvents = ""; }
+  else { rb.textContent = "리롤 소진"; rb.style.opacity = ".45"; rb.style.pointerEvents = "none"; }
+  if (isReroll) SFX.pick(); // 리롤 재호출은 팡파레 생략
+  else { SFX.level(); playSfx("powerup"); }
+}
+function doReroll(){
+  if (scene !== "levelup" || G.rerollLeft <= 0) return;
+  G.rerollLeft--;
+  buildLevelUp(true);
+}
+function doSkip(){
+  if (scene !== "levelup") return;
+  const heal = Math.ceil(G.p.maxHp * 0.08);
+  G.p.hp = Math.min(G.p.maxHp, G.p.hp + heal);
+  G.gold += 30;
+  addText(G.p.x, G.p.y - 30, "+" + heal, "#6bff8f");
+  G.luQueue--;
+  if (G.luQueue > 0) buildLevelUp();
+  else setScene("play");
 }
 function chooseCard(i){
   if (scene !== "levelup" || !luChoices[i]) return;
@@ -1064,8 +1133,8 @@ function setScene(s){
   for (const el of document.querySelectorAll(".screen")) el.classList.add("hidden");
   if (s === "play") { /* 화면 없음 */ }
   else if (s === "char"){ buildChar(); $("scr-char").classList.remove("hidden"); }
-  else if (s === "levelup"){ buildLevelUp(); $("scr-levelup").classList.remove("hidden"); }
-  else if (s === "chest"){ buildChest(); $("scr-chest").classList.remove("hidden"); }
+  else if (s === "levelup"){ G.hitstop = 0; buildLevelUp(); $("scr-levelup").classList.remove("hidden"); }
+  else if (s === "chest"){ G.hitstop = 0; buildChest(); $("scr-chest").classList.remove("hidden"); }
   else if (s === "pause"){ buildPause(); $("scr-pause").classList.remove("hidden"); }
   else if (s === "over" || s === "win"){ stopBgm(); buildEnd(s); $("scr-end").classList.remove("hidden"); }
   else if (s === "title"){ stopBgm(); $("scr-title").classList.remove("hidden"); }
@@ -1111,12 +1180,36 @@ function buildEnd(s){
   $("endIcon").textContent = win ? "🎉" : "💀";
   $("endTitle").textContent = win ? "생존 성공!" : "당신은 어둠에 삼켜졌다";
   $("endTitle").style.color = win ? "var(--gold)" : "#ff8484";
+  // 빌드 리캡 (buildPause와 동일 슬롯 렌더링)
+  let bh = "";
+  for (const w of G.weapons){
+    const ic = w.evolved ? EVO[w.id].icon : WEAPONS[w.id].icon;
+    bh += `<div class="slot${w.evolved ? " evo" : ""}" title="${w.evolved ? EVO[w.id].name : WEAPONS[w.id].name}">${ic}<span class="lv">${w.evolved ? "★" : w.lv}</span></div>`;
+  }
+  for (const id in G.passives) bh += `<div class="slot" title="${PASSIVES[id].name}">${PASSIVES[id].icon}<span class="lv">${G.passives[id]}</span></div>`;
+  $("endBuild").innerHTML = bh;
+  const dps = Math.round(G.dmgDealt / Math.max(1, Math.min(G.t, GOAL))); // 승리 시 분모 600 고정
   $("endStats").innerHTML =
     `<span>생존시간<b>${fmt(Math.min(G.t, GOAL))}</b></span>
      <span>레벨<b>${G.level}</b></span>
      <span>처치<b>${G.kills}</b></span>
-     <span>골드<b>${G.gold}</b></span>`;
+     <span>골드<b>${G.gold}</b></span>
+     <span>총 피해량<b>${Math.round(G.dmgDealt).toLocaleString("en-US")}</b></span>
+     <span>DPS<b>${dps}</b></span>`;
   $("endSub").textContent = win ? "새벽이 밝았다. 뱀파이어의 밤은 끝났다." : "10분을 버티면 승리한다!";
+  // 다음 런 목표 (결정론적 3규칙)
+  const evoCnt = G.weapons.filter(w => w.evolved).length;
+  let goal;
+  if (evoCnt === 0){
+    let best = G.weapons[0];
+    for (const w of G.weapons) if (w.lv > best.lv) best = w; // 동률 시 먼저 획득한 것
+    goal = `🎯 다음 런 목표: ${WEAPONS[best.id].name} 만렙(8) + ${PASSIVES[EVO[best.id].passive].name} 획득 → 「${EVO[best.id].name}」`;
+  } else if (!win){
+    goal = `🎯 다음 런 목표: 진화 무기 ${evoCnt}개 상태로 10분 생존`;
+  } else {
+    goal = "🎉 완벽한 새벽! 다른 캐릭터의 진화 빌드에 도전해 보세요";
+  }
+  $("endGoal").textContent = goal;
 }
 function banner(main, sub, dur){
   const b = $("banner");
@@ -1689,8 +1782,9 @@ function drawParticles(){
   ctx.globalAlpha = 1;
 }
 function drawTexts(){
-  ctx.font = "800 13px sans-serif"; ctx.textAlign = "center";
+  ctx.textAlign = "center";
   for (const t of G.texts){
+    ctx.font = t.crit ? "900 17px sans-serif" : "800 13px sans-serif"; // 크리티컬은 크고 금색
     ctx.globalAlpha = clamp(t.t * 2, 0, 1);
     ctx.fillStyle = "#000"; ctx.fillText(t.txt, t.x + 1, t.y + 1);
     ctx.fillStyle = t.col; ctx.fillText(t.txt, t.x, t.y);
@@ -1753,6 +1847,11 @@ function render(now){
   ctx.restore();
   drawFog(now);
   ctx.drawImage(vignette, 0, 0);
+  // 저체력 비네트: 체력 30% 미만 시 화면 전체 붉은 맥동(약 1.27Hz)
+  if (G.p.hp < G.p.maxHp * 0.3){
+    ctx.fillStyle = `rgba(255,40,40,${0.10 + 0.06 * Math.sin(now * 0.008)})`;
+    ctx.fillRect(0, 0, vw, vh);
+  }
 }
 
 /* ---------------- 메인 루프 ---------------- */
@@ -1772,6 +1871,8 @@ $("btnMute").addEventListener("click", toggleMute);
 $("btnResume").addEventListener("click", () => setScene("play"));
 $("btnQuit").addEventListener("click", () => { G = null; setScene("title"); });
 $("btnChest").addEventListener("click", chestAdvance);
+$("btnReroll").addEventListener("click", doReroll);
+$("btnSkip").addEventListener("click", doSkip);
 $("btnRetry").addEventListener("click", () => { G = null; setScene("char"); });
 $("btnHome").addEventListener("click", () => { G = null; setScene("title"); });
 

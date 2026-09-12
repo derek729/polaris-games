@@ -47,12 +47,14 @@ if (!CanvasRenderingContext2D.prototype.roundRect) {
 const SPRITES = {};
 ["plant-sunflower", "plant-peashooter", "plant-snowpea", "plant-repeater",
  "plant-cherry", "plant-wallnut",
- "zombie-basic", "zombie-cone", "zombie-bucket", "zombie-flag"].forEach(n => {
+ "zombie-basic", "zombie-cone", "zombie-bucket", "zombie-flag",
+ "zombie-thrower", "zombie-runner"].forEach(n => {
   const img = new Image();
   img.src = "game-assets/pvz/" + n + ".png";
   SPRITES[n] = img;
 });
-const ZSPRITE = { normal: "zombie-basic", cone: "zombie-cone", bucket: "zombie-bucket", flag: "zombie-flag" };
+const ZSPRITE = { normal: "zombie-basic", cone: "zombie-cone", bucket: "zombie-bucket", flag: "zombie-flag",
+                  thrower: "zombie-thrower", runner: "zombie-runner" };
 
 /* ---------------- 데이터 정의 ---------------- */
 const PTYPES = ["sunflower", "peashooter", "snowpea", "repeater", "wallnut", "cherry"];
@@ -65,22 +67,24 @@ const PLANTS = {
   cherry:     { name: "체리 폭탄", cost: 150, hp: 9999, cd: 25, desc: "3x3 범위 폭발!" },
 };
 const ZTYPES = {
-  normal: { hp: 190,  spd: 16 },
-  cone:   { hp: 560,  spd: 16 },
-  bucket: { hp: 1250, spd: 15 },
-  flag:   { hp: 200,  spd: 24 },
+  normal:  { hp: 190,  spd: 16 },
+  cone:    { hp: 560,  spd: 16 },
+  bucket:  { hp: 1250, spd: 15 },
+  flag:    { hp: 200,  spd: 24 },
+  thrower: { hp: 340,  spd: 12 },  // 화병 투척형: 사거리 내 정지 후 2.2초마다 투척 (2.2)
+  runner:  { hp: 160,  spd: 46 },  // 질주형: 일반의 약 2.9배 속도 (2.2)
 };
 const WAVES = [
   { t: 20,  z: ["normal"] },
   { t: 50,  z: ["normal", "normal"] },
-  { t: 80,  z: ["normal", "cone"] },
+  { t: 80,  z: ["normal", "runner"] },                                        // 러너 첫 등장 (교육)
   { t: 110, z: ["cone", "normal", "normal"] },
-  { t: 140, z: ["cone", "cone", "normal", "normal"] },
-  { t: 170, z: ["bucket", "normal", "cone", "normal"] },
-  { t: 200, z: ["bucket", "cone", "cone", "normal", "normal"] },
-  { t: 230, z: ["bucket", "bucket", "cone", "normal", "normal"] },
-  { t: 258, z: ["bucket", "cone", "cone", "cone", "normal", "normal", "normal"] },
-  { t: 285, final: true, z: ["flag", "bucket", "bucket", "cone", "cone", "normal", "normal", "normal", "normal", "normal"] },
+  { t: 140, z: ["thrower", "cone", "normal"] },                               // 투척형 첫 등장 (교육)
+  { t: 170, z: ["bucket", "thrower", "cone", "normal"] },
+  { t: 200, z: ["runner", "runner", "bucket", "cone", "normal"] },            // 러너 시험
+  { t: 230, z: ["bucket", "bucket", "thrower", "cone", "normal", "normal"] },
+  { t: 258, z: ["bucket", "thrower", "thrower", "cone", "cone", "runner", "normal"] },  // 복합 시험
+  { t: 285, final: true, z: ["flag", "bucket", "bucket", "thrower", "thrower", "cone", "cone", "runner", "runner", "normal", "normal", "normal"] },
 ];
 const FINAL_T = WAVES[WAVES.length - 1].t;
 
@@ -116,6 +120,9 @@ const SFX = {
   boom:   () => tone(130, 28, 0.5, "sawtooth", 0.4),
   mower:  () => tone(80, 240, 0.55, "sawtooth", 0.25),
   wave:   () => tone(300, 150, 0.3, "triangle", 0.18),
+  warn:   () => tone(700, 180, 0.4, "sawtooth", 0.3),   // 최종 웨이브 사전 경고 (2.1)
+  throw:  () => tone(300, 120, 0.12, "triangle", 0.15), // 화병 투척 (2.2)
+  burst:  () => { tone(600, 120, 0.3, "square", 0.25); tone(900, 1500, 0.2, "sine", 0.2); }, // 태양 광폭 (2.3)
   nope:   () => tone(160, 120, 0.08, "square", 0.1),
   lose:   () => tone(320, 55, 1.2, "sawtooth", 0.3),
   win:    () => { tone(523, 523, 0.12, "triangle", 0.2);
@@ -142,13 +149,14 @@ function playSfx(name, opts) {
 
 /* ---------------- 게임 상태 ---------------- */
 let game = null;
-let shake = 0, lastEatSfx = 0;
+let shake = 0, lastEatSfx = 0, burstFlash = 0;  // burstFlash: 태양 광폭 화면 플래시 잔여시간 (2.3)
 const BTN = {
   start: { x: 390, y: 430, w: 220, h: 54 },
   again: { x: 390, y: 430, w: 220, h: 54 },
   pause: { x: 940, y: 15, w: 46, h: 46 },
   mute:  { x: 940, y: 70, w: 46, h: 46 },
   shovel:{ x: 600, y: 15, w: 70, h: 100 },
+  burst: { x: 690, y: 72, w: 236, h: 44 },  // 태양 광폭 버튼 — 미리보기 행(y 48~66)과 수직 분할 (2.3)
 };
 
 function newGame() {
@@ -159,6 +167,8 @@ function newGame() {
     mowers: [], pending: [],
     cd: {}, selected: null, shovel: false,
     waveIdx: 0, sunTimer: 4, mx: -100, my: -100,
+    finalWarned: false,           // 최종 웨이브 15초 전 경고 1회 플래그 (2.1)
+    burst: 0, burstReady: false,  // 태양 광폭: 태양 수집 카운트(12회 = 1충전) / 완충 여부 (2.3)
   };
 }
 game = newGame();
@@ -258,12 +268,32 @@ class Plant {
   }
 }
 class Pea {
-  constructor(x, y, row, frozen) {
+  constructor(x, y, row, frozen, evil) {
     this.x = x; this.y = y + rand(-2, 2); this.row = row;
-    this.frozen = frozen; this.vel = 330; this.dead = false;
+    this.frozen = frozen; this.evil = !!evil;
+    this.vel = evil ? -240 : 330; this.dead = false;  // evil=화병: 우→좌 240px/s (2.2)
   }
   update(dt) {
     this.x += this.vel * dt;
+    if (this.evil) {
+      // 화병: 같은 행 식물과 충돌 (경로상 첫 식물 = 가장 오른쪽 식물), 명중 시 40 고정 피해
+      for (const pl of game.plants) {
+        if (pl.dead || pl.row !== this.row) continue;
+        if (this.x < pl.cx + 22 && this.x > pl.cx - 18) {
+          pl.hp -= 40; pl.flashT = 0.15;
+          puff(this.x, this.y, 4, ["#b5854b", "#8d5a2b"], 90, 0.3, 300);
+          SFX.splat(); playSfx("hit", { volume: 0.35, throttle: 300 });
+          this.dead = true;
+          if (pl.hp <= 0) {
+            pl.dead = true;
+            puff(pl.cx, pl.cy, 12, ["#7ec850", "#5da23a", "#a4d96a"], 150, 0.6);
+          }
+          break;
+        }
+      }
+      if (this.x < -20) this.dead = true;
+      return;
+    }
     for (const z of game.zombies) {
       if (z.dead || z.delayT > 0 || z.row !== this.row) continue;
       if (this.x > z.x - 18 && this.x < z.x + 22) {
@@ -287,6 +317,7 @@ class Zombie {
     this.y = GRID.y + row * GRID.ch + GRID.ch / 2 + 18;
     this.hp = d.hp; this.maxhp = d.hp; this.spd = d.spd;
     this.delayT = delay; this.slowT = 0; this.flashT = 0;
+    this.thrT = rand(0.8, 1.6);  // 투척형 첫 투척 대기시간 (2.2)
     this.wob = rand(0, 6); this.eating = false; this.chomp = 0;
     this.dead = false; this.deathT = 0.9; this.eatSfxT = rand(0, 0.8);
   }
@@ -298,6 +329,24 @@ class Zombie {
     this.flashT = Math.max(0, this.flashT - dt);
     if (this.slowT > 0) this.slowT -= dt;
     const mul = this.slowT > 0 ? 0.45 : 1;
+    // 투척형: 사거리 260px(2.5칸) 내 가장 가까운(가장 오른쪽) 식물에 정지 후 화병 투척 (2.2)
+    if (this.type === "thrower") {
+      let tp = null;
+      for (const pl of game.plants) {
+        if (pl.dead || pl.row !== this.row || pl.type === "cherry") continue;  // 체리(자폭)는 대상 제외
+        if (pl.cx < this.x && this.x - pl.cx <= 260 && (!tp || pl.cx > tp.cx)) tp = pl;
+      }
+      if (tp) {
+        this.eating = false;
+        this.thrT -= dt * mul;  // 얼림 시 투척 간격도 둔해짐
+        if (this.thrT <= 0) {
+          this.thrT = 2.2;  // 2.2초마다 투척
+          game.peas.push(new Pea(this.x - 20, this.y - 30, this.row, false, true));
+          SFX.throw(); playSfx("throw");
+        }
+        return;  // 이동 정지 — 대상이 죽어 사거리 밖이 되면 다시 보행
+      }
+    }
     let target = null;
     for (const pl of game.plants) {
       if (pl.dead || pl.row !== this.row) continue;
@@ -340,7 +389,15 @@ class Sun {
       const k = clamp(this.ct / 0.45, 0, 1), e = 1 - (1 - k) * (1 - k);
       this.x = this.sx + (46 - this.sx) * e;
       this.y = this.sy + (62 - this.sy) * e;
-      if (k >= 1) { game.sun += 25; this.dead = true; }
+      if (k >= 1) {
+        game.sun += 25;
+        // 태양 광폭 충전: 수집 12회 = 1충전, 최대 1개 저장 (완충 중 수집은 낭비) — 2.3
+        if (!game.burstReady) {
+          game.burst++;
+          if (game.burst >= 12) { game.burst = 0; game.burstReady = true; }
+        }
+        this.dead = true;
+      }
       return;
     }
     if (this.fromSky && this.y < this.targetY) this.y += 42 * dt;
@@ -378,6 +435,32 @@ function startGame() {
   banner("식물을 심으세요! 태양을 클릭해 모으세요 ☀", "#fff59d", 22, 3, 165);
 }
 
+/* ---------------- 클러치 스킬: 태양 광폭 (2.3) ---------------- */
+function fireBurst() {
+  if (game.state !== "playing") return;  // 일시정지/메뉴에서는 발동 불가
+  if (!game.burstReady) { SFX.nope(); toast("아직 충전되지 않았어요!"); return; }
+  game.burstReady = false; game.burst = 0;
+  // 효과 1: 전 슈터 즉시 3연발 (더블 완두는 6발) — 각각 x 오프셋 -18/0/+18
+  for (const p of game.plants) {
+    if (p.type !== "peashooter" && p.type !== "snowpea" && p.type !== "repeater") continue;
+    const frozen = p.type === "snowpea";
+    for (const off of [-18, 0, 18]) {
+      game.peas.push(new Pea(p.cx + 24 + off, p.cy - 12, p.row, frozen));
+      if (p.type === "repeater") game.peas.push(new Pea(p.cx + 6 + off, p.cy - 12, p.row, frozen));
+    }
+  }
+  // 효과 2: 전 좀비 80 고정 피해 + flashT (투척체의 화병은 대상 아님 — 좀비만)
+  for (const z of game.zombies) {
+    if (z.dead) continue;
+    z.hp -= 80; z.flashT = 0.3;
+    if (z.hp <= 0) killZombie(z);
+  }
+  // 효과 3: 연출 — 골드 배너 + 화면 흔들림 + 좌우 플래시
+  banner("⚡ 태양 광폭!", "#ffd23e", 40, 1.6, 290);
+  shake = 8; burstFlash = 0.3;
+  SFX.burst(); playSfx("powerup");
+}
+
 /* ---------------- 업데이트 ---------------- */
 function update(dt) {
   game.time += dt;
@@ -397,6 +480,12 @@ function update(dt) {
     if (w.final) banner("🚩 최종 웨이브! 🚩", "#ff5252", 44, 3, 290);
     else if (game.waveIdx > 1) banner(`웨이브 ${game.waveIdx}`, "#ffffff", 30, 1.6, 270);
     SFX.wave();
+  }
+  // 최종 웨이브 15초 전 사전 경고 (정확히 1회) — 2.1B
+  if (!game.finalWarned && game.time >= FINAL_T - 15) {
+    game.finalWarned = true;
+    banner("🚩 대량 좀비 다가온다! 방어 준비", "#ff5252", 30, 2.5, 290);
+    SFX.warn(); playSfx("warn", { volume: 0.4 });
   }
   for (const p of game.pending) {
     if (game.time >= p.at) { spawnZombie(p.type); p.done = true; }
@@ -433,6 +522,7 @@ function update(dt) {
 }
 function updateFX(dt) {
   shake = Math.max(0, shake - dt * 26);
+  burstFlash = Math.max(0, burstFlash - dt);  // 태양 광폭 플래시 잔여시간 (2.3)
   for (const p of game.particles) {
     p.t += dt;
     if (p.type === "dot") {
@@ -576,6 +666,63 @@ function drawPlant(p, x, y, scale) {
 }
 
 /* ---------------- 그리기: 좀비 ---------------- */
+// 장비 파손 단계 (2.1C): armorRatio = (hp - 190) / (장비 좀비 최대 hp - 190) 기반 3단계
+function armorStage(z) {
+  const base = ZTYPES.normal.hp;
+  const ratio = (z.hp - base) / (ZTYPES[z.type].hp - base);
+  if (ratio > 0.6) return 1;
+  if (ratio >= 0.25) return 2;
+  return 3;
+}
+// 장비 파손 오버레이 (2.1C): 머리 중심 좌표계 — 폴백/PNG 스프라이트 위 공통 스트로크
+function drawArmorDamage(z, stage) {
+  if (z.type === "cone") {
+    ctx.strokeStyle = "rgba(74,42,10,0.9)"; ctx.lineWidth = 1.6;
+    if (stage === 2) {          // 금 1줄
+      ctx.beginPath(); ctx.moveTo(-3, -33); ctx.lineTo(0, -26); ctx.lineTo(-4, -19); ctx.stroke();
+    } else if (stage === 3) {   // 금 2줄
+      ctx.beginPath(); ctx.moveTo(-3, -27); ctx.lineTo(1, -21); ctx.lineTo(-3, -15); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(5, -27); ctx.lineTo(3, -20); ctx.lineTo(6, -14); ctx.stroke();
+    }
+  } else if (z.type === "bucket") {
+    if (stage === 2) {          // 측면 찌그러짐 곡선 1줄
+      ctx.strokeStyle = "rgba(40,48,54,0.9)"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(-15, -35); ctx.quadraticCurveTo(-9, -29, -15, -23); ctx.stroke();
+    } else if (stage === 3) {   // 구멍 1개
+      circle(5, -33, 3, "#33383c", "#5c6b73", 1.5);
+    }
+  }
+}
+// 다음 웨이브 미리보기 아이콘 (2.1A): drawZombie 폴백 머리(피부 원 14px + 장비 형태) 축소 재사용 — PNG 유무와 무관하게 동일 렌더
+function drawZombieHeadIcon(x, y, type, r) {
+  r = r || 7;
+  ctx.save(); ctx.translate(x, y); ctx.scale(r / 7, r / 7);
+  if (type === "flag") {  // 깃대 + 깃발
+    ctx.strokeStyle = "#7a5230"; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(-4, 6); ctx.lineTo(-14, -16); ctx.stroke();
+    ctx.fillStyle = "#d8443c";
+    ctx.beginPath(); ctx.moveTo(-14, -16); ctx.lineTo(-26, -12); ctx.lineTo(-14, -8); ctx.closePath(); ctx.fill();
+  }
+  if (type === "thrower") {  // 목에 붉은 스카프
+    ctx.fillStyle = "#d8443c";
+    ctx.beginPath(); ctx.roundRect(-6, 5, 12, 5, 2); ctx.fill();
+  }
+  circle(0, 0, 7, "#a8c08a", "#7d9668", 1.5);  // 피부 원
+  circle(-2.6, -1.6, 1.1, "#fff"); circle(0.4, -1.9, 1.3, "#fff");
+  circle(-3.1, -1.6, 0.55, "#222"); circle(-0.1, -1.9, 0.6, "#222");
+  if (type === "cone") {  // 콘
+    ctx.fillStyle = "#e8862a"; ctx.strokeStyle = "#b05f14"; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(0, -18); ctx.lineTo(-6, -4); ctx.lineTo(6, -4); ctx.closePath();
+    ctx.fill(); ctx.stroke();
+  } else if (type === "bucket") {  // 버킷
+    ctx.fillStyle = "#90a4ae"; ctx.strokeStyle = "#5c6b73"; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.roundRect(-7, -17, 14, 11, 2); ctx.fill(); ctx.stroke();
+  } else if (type === "runner") {  // 머리 띠 1줄
+    ctx.strokeStyle = "#d8443c"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(-6.5, -3); ctx.lineTo(6.5, -3); ctx.stroke();
+  }
+  ctx.restore();
+}
 function drawZombie(z) {
   ctx.save();
   ctx.translate(z.x, z.y);
@@ -593,14 +740,22 @@ function drawZombie(z) {
   const skin = flash ? "#e2836f" : frozen ? "#9cc7de" : "#a8c08a";
   const shirt = frozen ? "#5f7f9e" : "#66788a";
   const dark = "#3c4653";
-  const legSw = z.dead ? 0 : Math.sin(z.wob * 6) * 0.45;
+  const legSw = z.dead ? 0 : Math.sin(z.wob * 6) * 0.45 * (z.type === "runner" ? 1.6 : 1);  // 러너는 다리 스윙 진폭 ×1.6 (2.2)
   const zspr = SPRITES[ZSPRITE[z.type]];
   if (zspr && zspr.complete && zspr.naturalWidth > 0) {
+    // 3단계 파손 버킷: 스프라이트도 8° 기울여 표현 (오버레이 방식 — 2.1C)
+    if (z.type === "bucket" && z.hp > ZTYPES.normal.hp && armorStage(z) === 3) ctx.rotate(0.14);
     ctx.drawImage(zspr, -42, -42, 84, 84);
+    // 장비 파손 오버레이: 금/구멍을 폴백과 동일 좌표에 스트로크 (PNG 위에도 적용 — 2.1C)
+    if ((z.type === "cone" || z.type === "bucket") && z.hp > ZTYPES.normal.hp) {
+      const stage = armorStage(z);
+      if (stage > 1) { ctx.save(); ctx.translate(0, -30); drawArmorDamage(z, stage); ctx.restore(); }
+    }
     if (frozen) { ctx.font = "12px sans-serif"; ctx.textAlign = "center"; ctx.fillText("❄", 0, -78); }
     ctx.restore();
     return;
   }
+  if (z.type === "runner") ctx.rotate(-0.17);  // 질주형: 앞(왼쪽)으로 10° 기울임 (2.2 폴백)
   // 다리
   ctx.strokeStyle = dark; ctx.lineWidth = 7; ctx.lineCap = "round";
   for (const side of [-1, 1]) {
@@ -619,11 +774,20 @@ function drawZombie(z) {
   } else {
     ctx.beginPath(); ctx.moveTo(-8, 0); ctx.lineTo(-14, 4); ctx.stroke();
   }
+  if (z.type === "thrower") {  // 왼손에 갈색 화병 (원 + 입구 타원) (2.2)
+    circle(-38, -14, 7, "#a06a33", "#6d441c", 2);
+    ctx.fillStyle = "#5d3a18";
+    ctx.beginPath(); ctx.ellipse(-38, -19, 4.5, 2, 0, 0, 7); ctx.fill();
+  }
   // 몸통
   ctx.fillStyle = shirt;
   ctx.beginPath(); ctx.roundRect(-14, -16, 28, 36, 6); ctx.fill();
   ctx.fillStyle = frozen ? "#8fd0e8" : "#d8443c";
   ctx.beginPath(); ctx.moveTo(-3, -14); ctx.lineTo(3, -14); ctx.lineTo(0, -2); ctx.closePath(); ctx.fill();
+  if (z.type === "thrower") {  // 목에 붉은 스카프 (2.2)
+    ctx.fillStyle = "#d8443c";
+    ctx.beginPath(); ctx.roundRect(-9, -21, 18, 6, 3); ctx.fill();
+  }
   // 머리
   const chomp = z.eating ? Math.abs(Math.sin(z.chomp * 14)) : 0;
   ctx.save();
@@ -644,21 +808,49 @@ function drawZombie(z) {
   ctx.beginPath(); ctx.moveTo(-6, -14); ctx.lineTo(-8, -19); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(0, -15); ctx.lineTo(0, -20); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(6, -14); ctx.lineTo(8, -18); ctx.stroke();
-  // 장비
+  if (z.type === "runner") {  // 머리에 띠 1줄 + 머리 옆 땀 방울 2개 (2.2)
+    ctx.strokeStyle = "#d8443c"; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(-14, -5); ctx.lineTo(14, -5); ctx.stroke();
+    circle(16, -12, 2.2, "#9fd6ef");
+    circle(19, -5, 1.7, "#9fd6ef");
+  }
+  // 장비 (2.1C: armorRatio 기반 3단계 파손 — hp 190 이하 소실은 기존 동작 유지)
   if (z.type === "cone" && z.hp > ZTYPES.normal.hp) {
+    const stage = armorStage(z);
     ctx.fillStyle = flash ? "#f4a261" : "#e8862a";
     ctx.strokeStyle = "#b05f14"; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(0, -40); ctx.lineTo(-13, -12); ctx.lineTo(13, -12); ctx.closePath();
+    ctx.beginPath();
+    if (stage === 1) {          // 1단계: 정상 (현행)
+      ctx.moveTo(0, -40);
+    } else if (stage === 2) {   // 2단계: 상단 꺾임
+      ctx.moveTo(2, -40); ctx.lineTo(9, -33);
+    } else {                    // 3단계: 뾰족 절단
+      ctx.moveTo(-6, -30); ctx.lineTo(6, -30);
+    }
+    ctx.lineTo(13, -12); ctx.lineTo(-13, -12); ctx.closePath();
     ctx.fill(); ctx.stroke();
-    ctx.strokeStyle = "#fff"; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(-7, -22); ctx.lineTo(7, -22); ctx.stroke();
+    if (stage === 1) {          // 반사 띠 (파손 단계에서는 소실)
+      ctx.strokeStyle = "#fff"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(-7, -22); ctx.lineTo(7, -22); ctx.stroke();
+    }
+    drawArmorDamage(z, stage);  // 금 오버레이
   }
   if (z.type === "bucket" && z.hp > ZTYPES.normal.hp) {
+    const stage = armorStage(z);
+    ctx.save();
+    ctx.translate(0, -29);              // 버킷 중심 기준
+    if (stage === 3) ctx.rotate(0.14);  // 3단계: 8° 기울임
     ctx.fillStyle = flash ? "#cfd8dc" : "#90a4ae";
     ctx.strokeStyle = "#5c6b73"; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.roundRect(-15, -42, 30, 26, 4); ctx.fill(); ctx.stroke();
-    ctx.strokeStyle = "rgba(255,255,255,0.5)"; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.moveTo(-9, -38); ctx.lineTo(-9, -20); ctx.stroke();
+    ctx.beginPath(); ctx.roundRect(-15, -13, 30, 26, 4); ctx.fill(); ctx.stroke();
+    if (stage === 1) {                  // 광택선 (2단계부터 제거)
+      ctx.strokeStyle = "rgba(255,255,255,0.5)"; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(-9, -9); ctx.lineTo(-9, 9); ctx.stroke();
+    }
+    ctx.save(); ctx.translate(0, 29);   // 오버레이는 머리 기준 좌표 (PNG 경로와 동일 함수)
+    drawArmorDamage(z, stage);
+    ctx.restore();
+    ctx.restore();
   }
   if (z.type === "flag") {
     ctx.strokeStyle = "#7a5230"; ctx.lineWidth = 3.5;
@@ -830,8 +1022,53 @@ function drawHUD() {
   const pg = ctx.createLinearGradient(bx, 0, bx + bw, 0);
   pg.addColorStop(0, "#7ec850"); pg.addColorStop(1, prog > 0.85 ? "#ff5252" : "#4caf3a");
   if (prog > 0.02) rrect(bx + 2, by + 2, (bw - 4) * prog, bh - 4, 6, pg);
+  // 🚩 아이콘 — 최종 웨이브 경고 후 sin 알파 깜빡임 (2.1B)
+  ctx.globalAlpha = game.finalWarned ? 0.45 + 0.55 * (0.5 + 0.5 * Math.sin(game.time * 5)) : 1;
   text("🚩", bx + bw + 12, by + 8, 15, "#fff");
-  text(`웨이브 ${Math.min(game.waveIdx, WAVES.length)} / ${WAVES.length}`, bx + bw / 2, by + 38, 16, "#f0e6c8", true);
+  ctx.globalAlpha = 1;
+
+  // 다음 웨이브 미리보기 행 (진행바 아래 y 48~66, 마지막 웨이브 이후 비표시) — 2.1A
+  const isBig = game.waveIdx < WAVES.length && WAVES[game.waveIdx].z.length >= 6;
+  const counterStr = isBig
+    ? `${Math.min(game.waveIdx, WAVES.length)} / ${WAVES.length}`   // 대량 웨이브: "대규모!" 라벨과 공존 위해 축약
+    : `웨이브 ${Math.min(game.waveIdx, WAVES.length)} / ${WAVES.length}`;
+  ctx.font = font(isBig ? 11 : 12, true);
+  const counterW = ctx.measureText(counterStr).width;
+  if (game.waveIdx < WAVES.length) {
+    const w = WAVES[game.waveIdx];
+    const py = 48, ph = 18;
+    const big = w.z.length >= 6;
+    if (big) rrect(bx, py, bw, ph, 6, "rgba(255,82,82,0.18)");  // 대량 웨이브 붉은 반투명 띠
+    // 타입별 집계 (표시 순서: flag → bucket → thrower → cone → runner → normal)
+    const types = ["flag", "bucket", "thrower", "cone", "runner", "normal"].filter(t => w.z.includes(t));
+    ctx.font = font(11, true);
+    const labelW = big ? ctx.measureText("대규모!").width : 0;
+    // 카운터(+대규모! 라벨) 영역을 피한 남은 폭에 맞춰 아이콘 간격 자동 조절
+    const rightLimit = bx + bw - counterW - 8 - (big ? labelW + 8 : 0);
+    const pitch = types.length ? clamp((rightLimit - bx - 12) / types.length, 18, 40) : 40;
+    const headR = pitch >= 26 ? 7 : 5.5;
+    let ix = bx + 12 + headR;
+    for (const t of types) {
+      const n = w.z.filter(v => v === t).length;
+      drawZombieHeadIcon(ix, py + ph / 2, t, headR);
+      text("×" + n, ix + headR + 2, py + ph / 2 + 1, pitch >= 26 ? 11 : 9, "#f0e6c8", true, "left");
+      ix += pitch;
+    }
+    if (big) text("대규모!", bx + bw - counterW - 8 - labelW / 2, py + ph / 2, 11, "#ff8a80", true);
+  }
+  // "웨이브 N / M" 카운터 — 미리보기 행 우측정렬로 이동 (기존: y=63 중앙) — 2.1A
+  text(counterStr, bx + bw, 57, isBig ? 11 : 12, "#f0e6c8", true, "right");
+
+  // 태양 광폭 버튼 (2.3) — (690, 72, 236×44): 충전 중 게이지 + 태양 아이콘 + n/12, 완충 시 골드 펄스
+  const bb = BTN.burst;
+  const bReady = game.burstReady;
+  const pulse = 0.5 + 0.5 * Math.sin(game.time * 6);
+  rrect(bb.x, bb.y, bb.w, bb.h, 8, "rgba(50,32,12,0.9)", bReady ? "#ffd23e" : "#7a5a2f", bReady ? 3 + pulse * 2 : 2);
+  const gFrac = bReady ? 1 : clamp(game.burst / 12, 0, 1);
+  if (gFrac > 0) rrect(bb.x + 3, bb.y + 3, (bb.w - 6) * gFrac, bb.h - 6, 6, bReady ? "rgba(255,210,62,0.32)" : "rgba(255,210,62,0.2)");
+  drawSunIcon(bb.x + 26, bb.y + bb.h / 2, 13, game.time);
+  if (bReady) text("⚡ 발동!", bb.x + 46 + (bb.w - 50) / 2, bb.y + bb.h / 2, 19, "#ffd23e", true);
+  else text(`${game.burst} / 12`, bb.x + 46 + (bb.w - 50) / 2, bb.y + bb.h / 2 + 1, 17, "#f0e6c8", true);
 }
 
 /* ---------------- 그리기: 오버레이 ---------------- */
@@ -902,6 +1139,12 @@ function draw() {
 
   // 완두콩
   for (const pea of game.peas) {
+    if (pea.evil) {  // 화병: 갈색 렌더 (2.2)
+      circle(pea.x, pea.y, 8, "#a06a33", "#6d441c", 2);
+      ctx.fillStyle = "#5d3a18";
+      ctx.beginPath(); ctx.ellipse(pea.x - 3, pea.y - 6, 4, 2, -0.5, 0, 7); ctx.fill();
+      continue;
+    }
     circle(pea.x - 6, pea.y, 4, pea.frozen ? "rgba(140,215,245,0.35)" : "rgba(120,200,80,0.35)");
     circle(pea.x, pea.y, 7, pea.frozen ? "#6cd0f0" : "#59c93c", pea.frozen ? "#2f8db3" : "#3a8f22", 2);
     circle(pea.x - 2, pea.y - 2.5, 2, "rgba(255,255,255,0.6)");
@@ -952,6 +1195,12 @@ function draw() {
   ctx.restore(); // shake
 
   drawHUD();
+
+  // 태양 광폭 화면 플래시 (알파 0.25, 0.3s) — 2.3
+  if (burstFlash > 0) {
+    ctx.fillStyle = `rgba(255,210,62,${(0.25 * burstFlash / 0.3).toFixed(3)})`;
+    ctx.fillRect(0, 0, W, H);
+  }
 
   // 삽 커서
   if (game.shovel) {
@@ -1022,6 +1271,9 @@ canvas.addEventListener("pointerdown", e => {
   // 삽
   if (inRect(x, y, BTN.shovel)) { game.shovel = !game.shovel; game.selected = null; return; }
 
+  // 태양 광폭 버튼 (패킷 루프 이후 · 격자 체크 이전 — 버튼 영역은 격자와 안 겹침) — 2.3
+  if (inRect(x, y, BTN.burst)) { fireBurst(); return; }
+
   // 격자
   const c = Math.floor((x - GRID.x) / GRID.cw), r = Math.floor((y - GRID.y) / GRID.ch);
   if (c >= 0 && c < GRID.cols && r >= 0 && r < GRID.rows) {
@@ -1064,6 +1316,7 @@ window.addEventListener("keydown", e => {
     const t = PTYPES[n - 1];
     if (game.cd[t] <= 0 && game.sun >= PLANTS[t].cost) { game.selected = t; game.shovel = false; }
   }
+  if (e.code === "KeyQ" && game.state === "playing") fireBurst();  // 태양 광폭 단축키 (2.3)
 });
 
 /* ---------------- 루프 ---------------- */

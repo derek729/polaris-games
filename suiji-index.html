@@ -190,6 +190,55 @@ body { font-family: 'Spline Sans', 'Noto Sans KR', system-ui, sans-serif; }
 .card-alkkagi { --card-accent: #8a6a1e; }
 .card-kifu { --card-accent: #3f7d44; }
 
+/* 업적 스트립 (2-3) — 티어: 1=잉크 · 2=금 · 3=홍 */
+.badges-section {
+  max-width: 1160px;
+  margin: 0 auto 30px;
+}
+.badges-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; }
+.badges-head h2 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 26px;
+  font-weight: 600;
+  margin: 0;
+}
+.badges-count { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--ink-3); }
+.badge-strip {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 4px 2px 10px;
+}
+.badge-chip {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 14px 5px 5px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-2);
+  cursor: default;
+}
+.badge-chip .badge-icon {
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--paper-dark);
+  color: var(--ink-light);
+  font-size: 13px;
+}
+.badge-chip.unlocked .badge-icon { background: var(--ink); color: var(--paper); }
+.badge-chip.tier-1 { border-color: var(--ink-light); }
+.badge-chip.tier-2 { border-color: var(--gold); }
+.badge-chip.tier-3 { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.badge-chip.locked { filter: grayscale(1); opacity: 0.65; }
+.badge-chip.locked:hover { opacity: 0.9; }
+
 .loop-section {
   max-width: 1160px;
   margin: 46px auto 0;
@@ -314,6 +363,15 @@ body { font-family: 'Spline Sans', 'Noto Sans KR', system-ui, sans-serif; }
     </p>
   </section>
 
+  <!-- 업적 스트립 (2-3) — 게임 카드 목록 위 -->
+  <section class="badges-section">
+    <div class="badges-head">
+      <h2>업적</h2>
+      <span class="badges-count" id="badgeCount"></span>
+    </div>
+    <div class="badge-strip" id="badgeStrip"></div>
+  </section>
+
   <div class="game-grid">
 
     <a class="game-card card-go" href="suiji-go.html">
@@ -424,6 +482,10 @@ Suiji.nav('index');
 document.getElementById('recordGo').textContent = '전적 ' + (Suiji.stats.text('go') === '—' ? '—' : Suiji.stats.text('go'));
 document.getElementById('recordOmok').textContent = '전적 ' + (Suiji.stats.text('omok') === '—' ? '—' : Suiji.stats.text('omok'));
 document.getElementById('recordAlkkagi').textContent = '전적 ' + (Suiji.stats.text('alkkagi') === '—' ? '—' : Suiji.stats.text('alkkagi'));
+
+// ---- 업적 스트립 (2-3) — 잠금 해제 판정은 각 게임의 record/save 훅이 자동 처리 ----
+Suiji.badges.render(document.getElementById('badgeStrip'));
+document.getElementById('badgeCount').textContent = `${Suiji.badges.unlockedCount()} / ${Suiji.badges.DEFS.length}`;
 
 // ---- resume chip: an auto-saved Baduk game exists ----
 try {

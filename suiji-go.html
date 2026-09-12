@@ -161,6 +161,35 @@ canvas#heatmap {
   .app { padding: 16px 16px 100px; }
   .brand h1 { font-size: 30px; }
 }
+
+/* ---------- 수 품질 원라인 피드백 (2-1) — 기보 quality-badge 팔레트와 동일 톤 ---------- */
+.grade-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.grade-chip[hidden] { display: none; }
+.grade-chip.best, .move-grade.best { background: rgba(63, 125, 68, 0.14); color: var(--ok); }
+.grade-chip.good, .move-grade.good { background: rgba(63, 125, 68, 0.10); color: var(--ok); }
+.grade-chip.lax, .move-grade.lax { background: rgba(184, 134, 11, 0.14); color: var(--gold); }
+.grade-chip.bad, .move-grade.bad { background: rgba(165, 40, 40, 0.14); color: var(--accent); }
+.move-grade {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 17px;
+  height: 15px;
+  padding: 0 4px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+}
+.move-end { display: inline-flex; align-items: center; justify-content: flex-end; gap: 5px; }
 </style>
 </head>
 <body>
@@ -388,6 +417,7 @@ canvas#heatmap {
         </h3>
         <div class="intent-panel">
           <div class="intent-label">Last Move Interpretation</div>
+          <span id="intentGrade" class="grade-chip" hidden></span>
           <div class="intent-text" id="intentText">Black to play first — the game begins with your move.</div>
           <div class="intent-meta" id="intentMeta">
             <span>Awaiting opening</span>
@@ -590,6 +620,7 @@ let reviewPlayInterval = null;
 let deadMarks = new Set();
 let gameGeneration = 0;
 let gameTimerInterval = null;
+const moveGrades = new Map(); // 2-1 수순(1-based) → grade 세션 캐시 (수 목록 칩 표기용)
 
 // online match state
 let onlineActive = false;
@@ -622,6 +653,7 @@ const els = {
   intentText: document.getElementById('intentText'),
   intentMeta: document.getElementById('intentMeta'),
   intentMove: document.getElementById('intentMove'),
+  intentGrade: document.getElementById('intentGrade'),
   rankSelector: document.getElementById('rankSelector'),
   sizeSelector: document.getElementById('sizeSelector'),
   selBoard: document.getElementById('selBoard'),
@@ -1126,6 +1158,8 @@ function startNewGame(silent = false) {
   syncSizeBadges();
   game = new GoGame(config.size, config.ruleset, komiFor(), config.handicap);
   game.setupHandicap();
+  moveGrades.clear(); // 2-1 — 새 대국: 수 품질 캐시 초기화
+  hideGradeChip();
   mountGame();
   persistState();
   if (!silent) {
@@ -1371,6 +1405,8 @@ function attemptPlace(x, y) {
 
   const intent = describePlayerMove(x, y, result.captured.length);
   setIntent(intent.text, intent.meta, game.history.length);
+  // 2-1 — 오프라인 AI 대국의 유저(흑) 착수만 350ms 뒤 AI 근사 판정 (온라인·AI의 수에는 동작 없음)
+  if (!onlineActive && myStone === 1) scheduleMoveGrade(game.history.length);
 
   if (game.gameOver) {
     setTimeout(() => showGameOver(), 500);
@@ -1570,6 +1606,48 @@ function describePlayerMove(x, y, capturedCount) {
   return { text, meta: `Black ${coordName(x, y)}` };
 }
 
+// ============================================
+// 수 품질 원라인 피드백 (2-1) — 착수 350ms 뒤 AI 근사 판정
+// ============================================
+const GRADE_CHIP = { best: '선수', good: '좋은 수', lax: '아쉬운 수', bad: '실수' };
+const GRADE_CHAR = { best: '선', good: '좋', lax: '아', bad: '실' }; // 수 목록 칩 한 글자 표기
+
+function scheduleMoveGrade(ply) {
+  const gen = gameGeneration;
+  // 브리프의 0.5~1초 내 시각 태그 — 착수 처리 직후 비동기 계산으로 프리즈 회피
+  setTimeout(() => {
+    // 세대 가드 — 무르기/새 대국으로 국면이 바뀌거나 수순이 어긋나면 폐기
+    if (gen !== gameGeneration || !game || game.history.length !== ply) return;
+    const info = Suiji.gradeLastMove(game);
+    if (!info) return; // 판정 실패/보류 — describePlayerMove 문구 유지
+    moveGrades.set(ply, info.grade);
+    applyGrade(info, ply);
+    renderMoveList();
+  }, 350);
+}
+
+function applyGrade(info, ply) {
+  const m = game.history[ply - 1];
+  const text = {
+    best: '선수! 정확한 한 수입니다.',
+    good: '좋은 수 — 흐름이 좋습니다.',
+    lax: `아쉬운 수 — ${info.bestCoord}이 더 좋았습니다.`,
+    bad: `실수! ${info.bestCoord}을 놓쳐 약 ${Math.round(info.delta)}칸 손해입니다.`
+  }[info.grade];
+  // 기존 meta(좌표·사석) 뒤에 근사 표기를 덧붙여 승률로 오인하지 않게 한다
+  let meta = `Black ${coordName(m.x, m.y)}`;
+  if (m.captured && m.captured.length > 0) meta += ` · +${m.captured.length} capture${m.captured.length > 1 ? 's' : ''}`;
+  meta += ` · AI 근사 · #${info.rank}선`;
+  setIntent(text, meta, ply);
+  els.intentGrade.textContent = GRADE_CHIP[info.grade];
+  els.intentGrade.className = `grade-chip ${info.grade}`;
+  els.intentGrade.hidden = false;
+}
+
+function hideGradeChip() {
+  if (els.intentGrade) els.intentGrade.hidden = true;
+}
+
 async function aiTurn() {
   if (onlineActive) return; // online matches are human vs human
   if (!game || game.gameOver || game.scoringMode) return;
@@ -1683,6 +1761,9 @@ function onUndo() {
   game.popMoves(Math.min(n, game.history.length));
   boardRenderer.animatingStones.clear();
   setIntent('Move reverted — take another look at the position.', 'Undo', game.history.length);
+  // 2-1 — pop된 수순 이후의 판정 캐시 삭제 + 칩 정리 (재착수 시 새 판정으로 갱신)
+  for (const k of [...moveGrades.keys()]) if (k > game.history.length) moveGrades.delete(k);
+  hideGradeChip();
   updateUI();
   updateTerritory();
   persistState();
@@ -1965,11 +2046,12 @@ function renderMoveList() {
   const html = game.history.map((m, i) => {
     const cls = i === game.history.length - 1 && !reviewMode ? 'current' : '';
     if (m.type === 'move') {
+      const gr = moveGrades.get(i + 1); // 2-1 수 품질 칩 (세션 캐시)
       return `<div class="move-row ${cls}" data-index="${i}">
         <span class="move-num">${i + 1}</span>
         <span class="move-stone ${m.color === 1 ? 'black' : 'white'}"></span>
         <span class="move-coord">${coordName(m.x, m.y)}</span>
-        ${m.captured.length > 0 ? `<span class="move-cap">×${m.captured.length}</span>` : '<span></span>'}
+        <span class="move-end">${m.captured.length > 0 ? `<span class="move-cap">×${m.captured.length}</span>` : ''}${gr ? `<span class="move-grade ${gr}" title="${GRADE_CHIP[gr]}">${GRADE_CHAR[gr]}</span>` : ''}</span>
       </div>`;
     } else if (m.type === 'setup') {
       return `<div class="move-row ${cls}" data-index="${i}">

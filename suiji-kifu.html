@@ -148,6 +148,27 @@ canvas#winGraph { width: 100%; height: 110px; display: block; background: var(--
   font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700;
 }
 .best-row .pts { margin-left: auto; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-light); }
+
+/* 승부처 자동 마킹 (2-2) */
+.turning-list { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
+.turning-list:empty { display: none; }
+.turning-chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 4px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--gold);
+  background: rgba(184, 134, 11, 0.08);
+  color: var(--ink-2);
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.turning-chip:hover { background: rgba(184, 134, 11, 0.18); }
+.turning-chip .t-diamond { width: 7px; height: 7px; background: var(--gold); transform: rotate(45deg); flex-shrink: 0; }
+.turning-chip .t-grade { color: var(--gold); font-weight: 700; }
+.turning-empty { font-size: 11.5px; color: var(--ink-light); font-style: italic; padding: 2px 0; }
 </style>
 </head>
 <body>
@@ -300,6 +321,7 @@ canvas#winGraph { width: 100%; height: 110px; display: block; background: var(--
           <div class="leg" id="graphInfo">—</div>
           <div class="leg">White rising<span class="swatch w"></span></div>
         </div>
+        <div class="turning-list" id="turningList"></div>
       </div>
 
       <div class="panel">
@@ -369,6 +391,7 @@ const els = {
   toggleBest: document.getElementById('toggleBest'),
   winGraph: document.getElementById('winGraph'),
   graphInfo: document.getElementById('graphInfo'),
+  turningList: document.getElementById('turningList'),
   moveList: document.getElementById('moveList'),
   btnSound: document.getElementById('btnSound'),
   btnView: document.getElementById('btnView'),
@@ -553,6 +576,8 @@ function computeWinRates() {
     winRates[p] = wr;
   }
   drawGraph();
+  renderTurningList();      // 2-2 승부처 칩 — 로드 시 1회 렌더 (스크럽 시 재렌더 금지)
+  startQualityPrecompute(); // 2-2 백그라운드 등급 프리컴퓨트 기동
 }
 
 // Rebuild a playable position at `ply` for the analysis AI
@@ -607,6 +632,105 @@ const QUALITY_LABEL = {
   mistake: ['Mistake', 'fa-solid fa-circle-exclamation'],
   blunder: ['Blunder', 'fa-solid fa-bolt']
 };
+
+// ============================================
+// 승부처 자동 마킹 (2-2) — 승률 급변 최대 3곳
+// ============================================
+const TURNING = { threshold: 8, max: 3, gap: 5 }; // 문턱 8%p · 최대 3곳 · 최소 간격 5플리
+let turningPlies = [];   // 현재 기보의 승부처 ply 목록 (프리컴퓨트 배치에서 참조)
+let precomputeGen = 0;   // 로드 세대 가드 — 새 기보 로드 시 진행 중 배치 루프를 즉시 중단
+
+// 승률 기반 판정 — AI 추가 연산 불필요 (로드 직후 즉시 표시 가능)
+function findTurningPoints() {
+  if (!kifuGame || !winRates) return [];
+  const cands = [];
+  for (let i = 1; i < winRates.length; i++) {
+    const m = kifuGame.history[i - 1];
+    if (!m || m.type !== 'move') continue; // pass/setup/resign 제외
+    const drop = winRates[i] - winRates[i - 1]; // 부호: 흑 기준 (+ = 흑이 그 수에서 이득)
+    if (Math.abs(drop) >= TURNING.threshold) cands.push({ ply: i, drop, side: m.color === 1 ? 'B' : 'W' });
+  }
+  cands.sort((a, b) => Math.abs(b.drop) - Math.abs(a.drop));
+  const picked = [];
+  for (const c of cands) {
+    if (picked.length >= TURNING.max) break;
+    if (picked.some(p => Math.abs(p.ply - c.ply) < TURNING.gap)) continue; // 군집 방지
+    picked.push(c);
+  }
+  return picked; // 8%p 미만 스윙만 있는 판은 [] — 억지로 승부처를 만들지 않는다
+}
+
+// 칩 리스트 — 로드 시 1회 렌더 후 클릭만 바인딩 (매 스크럽 재렌더 금지)
+function renderTurningList() {
+  if (!els.turningList) return;
+  const marks = findTurningPoints();
+  turningPlies = marks.map(t => t.ply);
+  if (!marks.length) {
+    els.turningList.innerHTML = '<div class="turning-empty">이른 승부 없음 — 한 수 차이 없이 흘러간 판</div>';
+    return;
+  }
+  els.turningList.innerHTML = marks.map((t, i) => {
+    const sign = t.drop >= 0 ? '+' : '-';
+    const q = qualityCache.get(t.ply);
+    const grade = q ? ` · <span class="t-grade">${QUALITY_LABEL[q.quality][0]}</span>` : '';
+    return `<button type="button" class="turning-chip" data-ply="${t.ply}">` +
+      `<span class="t-diamond"></span>승부처 ${i + 1} · ${t.ply}수 ${t.side === 'B' ? '흑' : '백'} · ${sign}${Math.abs(t.drop).toFixed(0)}%p${grade}` +
+      `</button>`;
+  }).join('');
+  els.turningList.querySelectorAll('.turning-chip').forEach(chip => {
+    chip.addEventListener('click', () => scrub(parseInt(chip.dataset.ply)));
+  });
+}
+
+// 금색 다이아몬드(4px 사각 45° 회전) + 세로 점선 — drawGraph의 blunder 마커 블록 뒤에서 호출
+function drawTurningPoints(ctx, px, py, H) {
+  const marks = findTurningPoints();
+  if (!marks.length) return;
+  ctx.save();
+  for (const t of marks) {
+    const x = px(t.ply), y = py(winRates[t.ply]);
+    ctx.strokeStyle = 'rgba(184, 134, 11, 0.6)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.moveTo(x, 4);
+    ctx.lineTo(x, H - 5);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(Math.PI / 4);
+    ctx.fillStyle = '#b8860b'; // var(--gold) 캔버스 근사값
+    ctx.fillRect(-2, -2, 4, 4);
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+// 백그라운드 등급 프리컴퓨트 — 8플리씩 120ms 간격 배치로 전수 analysePly 실행.
+// blunder 점 마커와 칩 등급 라벨이 점차 채워진다. 새 기보 로드 시 이전 루프는 즉시 중단.
+function startQualityPrecompute() {
+  if (!kifuGame || !winRates) return;
+  const gen = ++precomputeGen;
+  const total = kifuGame.history.length;
+  let from = 1;
+  (function batch() {
+    if (gen !== precomputeGen) return; // 중단 신호
+    try {
+      const to = Math.min(total, from + 8 - 1);
+      let hit = false;
+      for (; from <= to; from++) {
+        analysePly(from);
+        if (turningPlies.includes(from)) hit = true;
+      }
+      if (hit) renderTurningList(); // 승부처 칩의 등급 라벨 채우기
+      drawGraph();                  // blunder 점 마커 점진 반영
+    } catch (e) {
+      return; // 판정 실패 — 조용히 중단 (기존 표시는 유지)
+    }
+    if (from <= total) setTimeout(batch, 120);
+  })();
+}
 
 function updateAnalysis() {
   if (!kifuGame || !winRates) return;
@@ -733,6 +857,9 @@ function drawGraph() {
       ctx.fill();
     }
   }
+
+  // 2-2 승부처 마커 — 금색 다이아몬드 + 세로 점선 (현재 위치 점보다 아래 레이어)
+  drawTurningPoints(ctx, px, py, H);
 
   // current position
   ctx.beginPath();

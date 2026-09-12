@@ -131,6 +131,13 @@
         [392, 330, 262].forEach((f, i) =>
           setTimeout(() => tone(c, { from: f, dur: 0.4, vol: 0.13, type: 'triangle' }), i * 160));
       });
+    },
+    badge() {
+      // 업적 잠금 해제 전용 2음 상승 jingle (2-3)
+      this._p(c => {
+        tone(c, { from: 880, dur: 0.15, vol: 0.12, type: 'triangle' });
+        setTimeout(() => tone(c, { from: 1320, dur: 0.15, vol: 0.12, type: 'triangle' }), 150);
+      });
     }
   };
   Suiji.sound = sound;
@@ -151,6 +158,7 @@
       if (outcome === 'w') s.w++; else if (outcome === 'l') s.l++; else s.d++;
       all[game] = s;
       localStorage.setItem('suiji.stats.v1', JSON.stringify(all));
+      Suiji.badges.evaluate(); // 2-3 업적 판정 훅 — 3개 게임의 모든 판종료가 이곳을 지난다
     },
     text(game) {
       const s = this.get(game);
@@ -174,11 +182,155 @@
       if (idx >= 0) lib[idx] = entry; else lib.unshift(entry);
       if (lib.length > 40) lib.length = 40; // cap storage
       localStorage.setItem('suiji.kifu.v1', JSON.stringify(lib));
+      Suiji.badges.evaluate(); // 2-3 업적 판정 훅 (기보 수집가)
       return entry.id;
     },
     remove(id) {
       const lib = readLib().filter(g => g.id !== id);
       localStorage.setItem('suiji.kifu.v1', JSON.stringify(lib));
+    }
+  };
+
+  /* ---------------- move grading (2-1 수 품질 판정) ---------------- */
+  // 판정 문턱값 — 기보 화면 analysePly()와 동일 값을 단일 출처로 사용 (Δ 초과분 기준)
+  Suiji.GRADE_THRESHOLDS = { best: 2.5, good: 8, lax: 20 };
+
+  // game.history의 마지막 착수를 AI 근사로 채점한다. 엔진 수정 없이 '착수 이전' 국면을
+  // 기보 gameAt()과 동일 방식으로 재구성한다 (※ koPoint 미복원 — 기보와 같은 알려진 근사).
+  // 판정 대상이 없거나 계산이 실패하면 null — 호출부는 기존 문구를 그대로 유지한다.
+  Suiji.gradeLastMove = function (game) {
+    try {
+      if (!game || typeof window === 'undefined' || !window.SuijiEngine || !window.SuijiEngine.GoAI) return null;
+      const hist = game.history;
+      if (!hist.length || hist[hist.length - 1].type !== 'move') return null;
+      const last = hist[hist.length - 1];
+
+      const g = new window.SuijiEngine.GoGame(game.size, game.ruleset, game.komi, 0);
+      const prev = hist.length >= 2 ? hist[hist.length - 2] : null;
+      g.board = prev && prev.boardSnapshot
+        ? prev.boardSnapshot.map(r => [...r])
+        : Array(game.size).fill(0).map(() => Array(game.size).fill(0));
+      g.captures = prev && prev.captures ? { ...prev.captures } : { 1: 0, 2: 0 };
+      g.history = hist.slice(0, hist.length - 1); // moveCount 정합 — evaluateMove의 국면 판정용
+      g.currentPlayer = last.color;
+
+      const ai = new window.SuijiEngine.GoAI(g, 2);
+      // topMoves는 어차피 전 후보를 레벨2 가중으로 평가·정렬하므로 개수에 따른 비용 차가 없다 —
+      // 둔 수의 정확한 delta/rank를 위해 전체 목록을 받는다 (기보 analysePly와 동일 산정)
+      const cands = ai.topMoves(last.color, game.size * game.size);
+      const best = cands[0];
+      if (!best) return null;
+      const played = cands.find(c => c.x === last.x && c.y === last.y);
+      if (!played) return null; // 재구성 판에서 착수점이 후보가 아님(눈 채우기 등) — 판정 보류
+      const delta = best.score - played.score;
+      const rank = cands.indexOf(played) + 1;
+      const T = Suiji.GRADE_THRESHOLDS;
+      const grade = (rank === 1 || delta <= T.best) ? 'best'
+                  : delta <= T.good ? 'good'
+                  : delta <= T.lax ? 'lax' : 'bad';
+      return {
+        grade, delta, rank,
+        best: { x: best.x, y: best.y },
+        bestCoord: Suiji.coordName(best.x, best.y, game.size)
+      };
+    } catch (e) {
+      return null; // 어떤 실패에도 기존 표시를 깨지 않는다
+    }
+  };
+
+  /* ---------------- badges (2-3 업적) ---------------- */
+  const BADGES_KEY = 'suiji.badges.v1';
+  function readBadges() {
+    try {
+      const b = JSON.parse(localStorage.getItem(BADGES_KEY));
+      if (b && typeof b === 'object' && b.unlocked) return b;
+    } catch (e) { /* 손상된 저장소 — 새로 발급 */ }
+    return { version: 1, unlocked: {} };
+  }
+  function writeBadges(b) {
+    try { localStorage.setItem(BADGES_KEY, JSON.stringify(b)); }
+    catch (e) { /* 스토리지 차단 — 업적만 조용히 비활성 (게임은 무영향) */ }
+  }
+  function badgeTotalW(s) {
+    return ['go', 'omok', 'alkkagi'].reduce((n, g) => n + (s[g] ? s[g].w || 0 : 0), 0);
+  }
+  function badgeTotalGames(s) {
+    return ['go', 'omok', 'alkkagi'].reduce((n, g) => {
+      const t = s[g] || { w: 0, l: 0, d: 0 };
+      return n + (t.w || 0) + (t.l || 0) + (t.d || 0);
+    }, 0);
+  }
+
+  Suiji.badges = {
+    // tier: 1=입문(잉크) · 2=중수(금) · 3=고수(홍) — 전부 기존 stats/kifu 데이터만 사용
+    DEFS: [
+      { id: 'first-win-any', name: '첫 승',         desc: '두마당에서 처음으로 이겼다', icon: 'fa-solid fa-flag-checkered', tier: 1, check: s => badgeTotalW(s) >= 1 },
+      { id: 'first-go',      name: '흑백의 시작',   desc: '바둑 첫 승',                 icon: 'fa-solid fa-yin-yang',       tier: 1, check: s => !!(s.go && s.go.w >= 1) },
+      { id: 'first-omok',    name: '다섯 줄의 승부', desc: '오목 첫 승',                icon: 'fa-solid fa-hashtag',        tier: 1, check: s => !!(s.omok && s.omok.w >= 1) },
+      { id: 'first-alkkagi', name: '톡 쳤더니',     desc: '알까기 첫 승',               icon: 'fa-solid fa-baseball',       tier: 1, check: s => !!(s.alkkagi && s.alkkagi.w >= 1) },
+      { id: 'win10',         name: '유단자',        desc: '누적 10승',                  icon: 'fa-solid fa-medal',          tier: 2, check: s => badgeTotalW(s) >= 10 },
+      { id: 'win30',         name: '두마당 고수',   desc: '누적 30승',                  icon: 'fa-solid fa-trophy',         tier: 3, check: s => badgeTotalW(s) >= 30 },
+      { id: 'games50',       name: '단골손님',      desc: '누적 50판',                  icon: 'fa-solid fa-mug-hot',        tier: 2, check: s => badgeTotalGames(s) >= 50 },
+      { id: 'alkkagi5',      name: '낙법 고수',     desc: '알까기 누적 5승',            icon: 'fa-solid fa-baseball',       tier: 2, check: s => !!(s.alkkagi && s.alkkagi.w >= 5) },
+      { id: 'kifu3',         name: '기보 수집가',   desc: '기보 3판 저장',              icon: 'fa-solid fa-book-open',      tier: 2, check: (s, kifuCount) => kifuCount >= 3 }
+    ],
+    get() {
+      const store = readBadges();
+      return this.DEFS.map(d => ({
+        ...d,
+        unlocked: !!store.unlocked[d.id],
+        at: store.unlocked[d.id] || null
+      }));
+    },
+    unlockedCount() {
+      return this.get().filter(b => b.unlocked).length;
+    },
+    // stats+kifu를 다시 읽어 미잠금 조건 충족분을 unlock한다.
+    // 새 잠금은 900ms 뒤 토스트+전용 효과음 (판종료 win/lose 사운드와 겹치지 않게 — 타이밍 규칙).
+    // 여러 개가 동시 달성되면 이름을 나열해 토스트 1회로 묶는다. opts.silent로 연출 생략.
+    evaluate(opts = {}) {
+      let stats = {}, kifuCount = 0;
+      try { stats = readStats(); } catch (e) { /* 읽기 실패 — 빈 통계 */ }
+      try { kifuCount = Suiji.kifu.list().length; } catch (e) { /* 읽기 실패 */ }
+      const store = readBadges();
+      const fresh = [];
+      for (const d of this.DEFS) {
+        if (store.unlocked[d.id]) continue;
+        let ok = false;
+        try { ok = !!d.check(stats, kifuCount); } catch (e) { ok = false; }
+        if (ok) { store.unlocked[d.id] = Date.now(); fresh.push(d); }
+      }
+      if (fresh.length) {
+        writeBadges(store);
+        if (!opts.silent) {
+          const names = fresh.map(d => d.name).join(', ');
+          setTimeout(() => {
+            Suiji.toast(fresh.length === 1 ? `업적 달성 — ${names}` : `업적 달성 ${fresh.length}개 — ${names}`, 4000);
+            Suiji.sound.badge();
+          }, 900);
+        }
+      }
+      return fresh;
+    },
+    // 도장 페이지용 렌더 헬퍼 — 잠금/해금 칩 가로 스크롤 스트립
+    render(el) {
+      if (!el) return;
+      el.innerHTML = '';
+      this.get().forEach(b => {
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = `badge-chip tier-${b.tier} ${b.unlocked ? 'unlocked' : 'locked'}`;
+        if (b.unlocked) {
+          const d = new Date(b.at);
+          chip.title = `${b.desc} · ${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()}`;
+        } else {
+          chip.title = b.desc;
+        }
+        chip.innerHTML = `<span class="badge-icon"><i class="${b.unlocked ? b.icon : 'fa-solid fa-lock'}"></i></span>` +
+                         `<span class="badge-name">${b.name}</span>`;
+        if (!b.unlocked) chip.addEventListener('click', () => Suiji.toast(b.desc)); // 잠금 힌트
+        el.appendChild(chip);
+      });
     }
   };
 
