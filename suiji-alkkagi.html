@@ -1,0 +1,1103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>알까기 • 두마당</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#e8edf3">
+<meta name="description" content="실제 규칙의 바둑, 오목, 알까기, AI 기보 분석까지 — 두마당 보드게임 모음">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="두마당">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/favicon-64.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,500&family=Spline+Sans:wght@300;400;500;600;700&family=Noto+Serif+JP:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="suiji-theme.css?v=15">
+<style>
+.main-grid {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr) 300px;
+  gap: 22px;
+  align-items: start;
+}
+@media (max-width: 1180px) {
+  .main-grid { grid-template-columns: 280px 1fr; }
+  .right-col { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+}
+@media (max-width: 820px) {
+  .main-grid { grid-template-columns: 1fr; }
+  .right-col { grid-column: 1; grid-template-columns: 1fr; }
+  .app { padding: 16px 16px 100px; }
+  .brand h1 { font-size: 30px; }
+}
+.board-section { min-width: 0; }
+.board-wrap {
+  background: linear-gradient(180deg, var(--paper) 0%, var(--paper-2) 100%);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 18px 18px 22px;
+  box-shadow: 0 10px 30px var(--shadow);
+  position: relative;
+}
+.board-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.player-tags { display: flex; gap: 10px; }
+.player-tag {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 14px 7px 8px;
+  background: var(--paper-dark);
+  border-radius: 999px;
+  font-size: 13px;
+  color: var(--ink-2);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid transparent;
+}
+.player-tag.active {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+  box-shadow: 0 4px 14px rgba(31, 20, 16, 0.25);
+  transform: translateY(-1px);
+}
+.player-tag .stone-icon { width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0; }
+.player-tag .stone-icon.black {
+  background: radial-gradient(circle at 30% 25%, #6a6a72 0%, #1a1a1e 50%, #000 100%);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.3), inset -2px -2px 3px rgba(0,0,0,0.5);
+}
+.player-tag .stone-icon.white {
+  background: radial-gradient(circle at 30% 25%, #ffffff 0%, #f5efdc 60%, #c8c0a8 100%);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.2), inset -1px -1px 2px rgba(120,100,70,0.2);
+}
+.player-tag .role { font-weight: 500; }
+.player-tag .captures {
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  background: rgba(31, 20, 16, 0.1);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+.player-tag.active .captures { background: rgba(250, 242, 220, 0.15); color: var(--paper); }
+.board-controls { display: flex; gap: 6px; flex-wrap: wrap; }
+.canvas-wrap { position: relative; display: flex; justify-content: center; border-radius: 8px; overflow: hidden; }
+canvas#board {
+  display: block;
+  width: 100%;
+  max-width: 640px;
+  aspect-ratio: 1;
+  height: auto;
+  touch-action: none;
+}
+canvas#board.aiming { cursor: grabbing; }
+canvas#board.can-shoot { cursor: grab; }
+
+/* power meter */
+.power-wrap { margin-top: 14px; display: none; align-items: center; gap: 10px; }
+.power-wrap.show { display: flex; }
+.power-label { font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-light); font-weight: 600; white-space: nowrap; }
+.power-track { flex: 1; height: 8px; border-radius: 4px; background: var(--paper-dark); border: 1px solid var(--line); overflow: hidden; }
+.power-fill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--gold), var(--accent)); transition: width 0.05s linear; }
+.hint-note { font-size: 13px; color: var(--ink-light); font-style: italic; text-align: center; margin-top: 10px; font-family: 'Cormorant Garamond', serif; }
+.rank-selector { display: flex; gap: 10px; align-items: center; }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <header class="header">
+    <div class="brand">
+      <div class="seal">弹</div>
+      <div>
+        <h1>알까기</h1>
+        <div class="tagline">구슬치기<span class="dot">·</span>물리 대결</div>
+      </div>
+    </div>
+
+    <div class="header-controls">
+      <div class="rank-selector" id="rankSelector">
+        <div class="rank-badge" data-level="1">
+          <div class="medal">初</div>
+          <div class="label"><span class="name">Rookie</span><span class="meta">Wild shots</span></div>
+        </div>
+        <div class="rank-badge active" data-level="2">
+          <div class="medal">中</div>
+          <div class="label"><span class="name">Sharp</span><span class="meta">Tests angles</span></div>
+        </div>
+        <div class="rank-badge" data-level="3">
+          <div class="medal">高</div>
+          <div class="label"><span class="name">Sniper</span><span class="meta">Simulates physics</span></div>
+        </div>
+      </div>
+      <button class="btn icon-only" id="btnSound" title="Toggle sound"><i class="fa-solid fa-volume-high"></i></button>
+    </div>
+  </header>
+
+  <div class="main-grid">
+
+    <aside class="left-col">
+      <div class="panel" id="onlinePanel" hidden>
+        <h3 class="panel-title">Online Match <span class="panel-sub">친구와</span></h3>
+        <div id="netMount"></div>
+      </div>
+
+      <div class="panel">
+        <h3 class="panel-title">Match</h3>
+        <div class="info-row">
+          <span class="label">Board</span>
+          <span class="value">19 × 19</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Stones each</span>
+          <span class="value mono">5</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Your record</span>
+          <span class="value mono" id="recordInfo">—</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Shots</span>
+          <span class="value mono" id="shotCounter">0</span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3 class="panel-title">How to play</h3>
+        <div style="font-size:12.5px; color:var(--ink-2); line-height:1.75;">
+          <p style="margin:0 0 8px;"><b>Drag &amp; release</b> one of your stones like a slingshot — pull back, aim, let go.</p>
+          <p style="margin:0 0 8px;">Knock opponent stones <b>off the board</b>. Falling off eliminates a stone.</p>
+          <p style="margin:0 0 8px;">Land a hit and you <b>shoot again</b>. Lose all your stones and it's over.</p>
+        </div>
+      </div>
+    </aside>
+
+    <section class="board-section">
+      <div class="board-wrap">
+        <div class="board-status">
+          <div class="player-tags">
+            <div class="player-tag active" id="playerBlack">
+              <div class="stone-icon black"></div>
+              <span class="role">You</span>
+              <span class="captures" id="countBlack">5</span>
+              <span class="clock-chip" id="clockBlack" hidden>--:--</span>
+            </div>
+            <div class="player-tag" id="playerWhite">
+              <div class="stone-icon white"></div>
+              <span class="role">AI</span>
+              <span class="captures" id="countWhite">5</span>
+              <span class="clock-chip" id="clockWhite" hidden>--:--</span>
+            </div>
+          </div>
+          <div class="board-controls">
+            <button class="btn" id="btnPassTurn" title="Skip your turn"><i class="fa-solid fa-forward"></i> Pass</button>
+            <button class="btn primary" id="btnNew" title="Restart"><i class="fa-solid fa-rotate"></i> Restart</button>
+          </div>
+        </div>
+
+        <div class="canvas-wrap">
+          <canvas id="board"></canvas>
+          <div class="thinking-overlay" id="thinkingOverlay">
+            <div class="thinking-content">
+              <div class="thinking-spinner">
+                <div class="orbit-stone black" style="animation-delay: 0s"></div>
+                <div class="orbit-stone white" style="animation-delay: -0.4s"></div>
+              </div>
+              <div class="thinking-text">Aiming…</div>
+              <div class="thinking-sub" id="thinkingSub">Testing angles</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="power-wrap" id="powerWrap">
+          <span class="power-label">Power</span>
+          <div class="power-track"><div class="power-fill" id="powerFill"></div></div>
+        </div>
+        <div class="hint-note" id="hintNote">Your shot — drag a black stone and release.</div>
+      </div>
+    </section>
+
+    <aside class="right-col">
+      <div class="panel">
+        <h3 class="panel-title">Shot Log <span class="panel-sub" id="logSub">Live</span></h3>
+        <div class="move-list" id="shotLog">
+          <div class="move-empty">The first flick is yours.</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3 class="panel-title">Commentary</h3>
+        <div class="intent-panel">
+          <div class="intent-label">Latest Call</div>
+          <div class="intent-text" id="intentText">Black to break — line up your angle.</div>
+          <div class="intent-meta" id="intentMeta"><span>Shot 0</span></div>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<div class="game-over-card" id="gameOverCard">
+  <div class="game-over-inner">
+    <div class="game-over-sub" id="goSub">Game Complete</div>
+    <h2 class="game-over-title" id="goTitle">You Win</h2>
+    <div class="game-over-score" id="goScore">
+      <span id="goDetail">5 shots</span>
+    </div>
+    <div class="game-over-actions">
+      <button class="btn primary" id="goNew"><i class="fa-solid fa-rotate"></i> Rematch</button>
+    </div>
+  </div>
+</div>
+
+<script src="suiji-engine.js?v=15"></script>
+<script src="suiji-common.js?v=15"></script>
+<script src="suiji-net.js?v=15"></script>
+<script>
+const { BoardRenderer, makeWoodTexture } = SuijiEngine;
+
+// ============================================
+// CONSTANTS
+// ============================================
+const N = 19;                 // board lines (0..18)
+const R = 0.42;               // stone radius in cell units
+const MAX_DRAG = 3.2;         // drag length (cells) for full power
+const MAX_SPEED = 24;         // cells per second at full power
+const FRICTION = 1.9;         // exponential damping per second
+const RESTITUTION = 0.92;
+const STOP_SPEED = 0.06;
+const EDGE = 0.35;            // center beyond edge ± this → falls off
+
+const START_BLACK = [[4, 3], [4, 6], [4, 9], [4, 12], [4, 15]];
+const START_WHITE = [[14, 3], [14, 6], [14, 9], [14, 12], [14, 15]];
+
+// ============================================
+// STATE
+// ============================================
+let stones = [];
+let turn = 1;                 // 1 = player (black), 2 = AI (white)
+let phase = 'ready';          // ready | running | ai | over
+let shotNo = 0;
+let aim = null;               // {stone, cx, cy}
+let level = 2;
+let generation = 0;
+let lastOutsThisShot = [];
+let lastOutIds = [];          // stone ids knocked out during the current shot
+let lastShotBy = 0;           // colour of the current shot's shooter
+let pendingResult = null;     // authoritative result from the shooter (online)
+
+// online match state
+let onlineActive = false;
+let myColor = 1;
+let wantRematch = false, peerWantsRematch = false;
+
+const els = {
+  board: document.getElementById('board'),
+  thinkingOverlay: document.getElementById('thinkingOverlay'),
+  thinkingSub: document.getElementById('thinkingSub'),
+  playerBlack: document.getElementById('playerBlack'),
+  playerWhite: document.getElementById('playerWhite'),
+  countBlack: document.getElementById('countBlack'),
+  countWhite: document.getElementById('countWhite'),
+  powerWrap: document.getElementById('powerWrap'),
+  powerFill: document.getElementById('powerFill'),
+  hintNote: document.getElementById('hintNote'),
+  shotCounter: document.getElementById('shotCounter'),
+  recordInfo: document.getElementById('recordInfo'),
+  shotLog: document.getElementById('shotLog'),
+  logSub: document.getElementById('logSub'),
+  intentText: document.getElementById('intentText'),
+  intentMeta: document.getElementById('intentMeta'),
+  rankSelector: document.getElementById('rankSelector'),
+  clockBlack: document.getElementById('clockBlack'),
+  clockWhite: document.getElementById('clockWhite'),
+  onlinePanel: document.getElementById('onlinePanel'),
+  btnPassTurn: document.getElementById('btnPassTurn'),
+  btnNew: document.getElementById('btnNew'),
+  btnSound: document.getElementById('btnSound'),
+  gameOverCard: document.getElementById('gameOverCard'),
+  goTitle: document.getElementById('goTitle'),
+  goSub: document.getElementById('goSub'),
+  goDetail: document.getElementById('goDetail'),
+  goNew: document.getElementById('goNew'),
+};
+
+// ============================================
+// RENDERER
+// ============================================
+class AlkkagiRenderer extends BoardRenderer {
+  constructor(canvas) {
+    super(canvas, { size: N, board: [], lastMove: null, gameOver: false, scoringMode: false, canPlace: () => false, currentPlayer: 0 });
+  }
+  render() {
+    const ctx = this.ctx;
+    ctx.clearRect(0, 0, this.displayWidth, this.displayHeight);
+    this.drawWoodBackground();
+    this.drawGrid();
+    this.drawEdgeShade();
+    this.drawStones();
+    this.drawAim();
+  }
+  drawEdgeShade() {
+    const ctx = this.ctx;
+    const g = ctx.createLinearGradient(0, 0, 0, this.displayHeight);
+    g.addColorStop(0, 'rgba(50,28,10,0.12)');
+    g.addColorStop(0.06, 'rgba(50,28,10,0)');
+    g.addColorStop(0.94, 'rgba(50,28,10,0)');
+    g.addColorStop(1, 'rgba(50,28,10,0.16)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, this.displayWidth, this.displayHeight);
+  }
+  toPx(x, y) {
+    return [this.padding + x * this.cellSize, this.padding + y * this.cellSize];
+  }
+  drawStones() {
+    const ctx = this.ctx;
+    const now = performance.now();
+    for (const s of stones) {
+      if (s.out && s.fadeAt === undefined) continue;
+      if (s.fadeAt !== undefined) {
+        const t = (now - s.fadeAt) / 450;
+        if (t >= 1) { s.fadeDone = true; continue; }
+        const [px, py] = this.toPx(s.x, s.y);
+        this.stoneAt(ctx, px, py, s.color, (1 - t) * 0.9, this.stoneRadius * (1 - t * 0.5));
+      } else {
+        const [px, py] = this.toPx(s.x, s.y);
+        // highlight shootable stones of the current player
+        const mine = s.color === turn && phase === 'ready' && turn === 1;
+        if (mine) {
+          ctx.save();
+          ctx.strokeStyle = 'rgba(255, 240, 200, 0.5)';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.arc(px, py, this.stoneRadius + 3, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+        }
+        this.stoneAt(ctx, px, py, s.color, 1, this.stoneRadius);
+      }
+    }
+    // purge finished fades — but keep stones recoverable during online play
+    if (!onlineActive) stones = stones.filter(s => !s.fadeDone);
+  }
+  drawAim() {
+    if (!aim) return;
+    const ctx = this.ctx;
+    const s = aim.stone;
+    const [sx, sy] = this.toPx(s.x, s.y);
+    const [cx, cy] = this.toPx(aim.cx, aim.cy);
+    let dx = s.x - aim.cx, dy = s.y - aim.cy;             // shot direction (slingshot)
+    const drag = Math.hypot(aim.cx - s.x, aim.cy - s.y);
+    const power = Math.min(1, drag / MAX_DRAG);
+    if (drag > 0.15) {
+      const len = Math.hypot(dx, dy);
+      dx /= len; dy /= len;
+      const dist = (0.8 + power * 3.4) * this.cellSize;
+      const ex = sx + dx * dist, ey = sy + dy * dist;
+      // projected line
+      ctx.save();
+      ctx.strokeStyle = 'rgba(31, 20, 16, 0.55)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 5]);
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(ex, ey);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      // arrow head
+      const ang = Math.atan2(dy, dx);
+      ctx.fillStyle = 'rgba(31, 20, 16, 0.7)';
+      ctx.beginPath();
+      ctx.moveTo(ex + Math.cos(ang) * 10, ey + Math.sin(ang) * 10);
+      ctx.lineTo(ex + Math.cos(ang + 2.6) * 9, ey + Math.sin(ang + 2.6) * 9);
+      ctx.lineTo(ex + Math.cos(ang - 2.6) * 9, ey + Math.sin(ang - 2.6) * 9);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+    // rubber band to the drag point
+    ctx.save();
+    ctx.strokeStyle = `rgba(165, 40, 40, ${0.4 + power * 0.4})`;
+    ctx.lineWidth = 2 + power * 2;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(cx, cy);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+let renderer = null;
+
+// ============================================
+// PHYSICS
+// ============================================
+function alive(list) { return list.filter(s => !s.out); }
+
+function stepPhysics(list, dt, events) {
+  // integrate
+  for (const s of list) {
+    if (s.out) continue;
+    if (s.vx || s.vy) {
+      s.x += s.vx * dt;
+      s.y += s.vy * dt;
+      const damp = Math.exp(-FRICTION * dt);
+      s.vx *= damp; s.vy *= damp;
+      if (Math.hypot(s.vx, s.vy) < STOP_SPEED) { s.vx = 0; s.vy = 0; }
+    }
+  }
+  // collisions (equal mass, elastic-ish)
+  const act = alive(list);
+  for (let i = 0; i < act.length; i++) {
+    for (let j = i + 1; j < act.length; j++) {
+      const a = act[i], b = act[j];
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const d = Math.hypot(dx, dy);
+      if (d >= 2 * R || d === 0) continue;
+      const nx = dx / d, ny = dy / d;
+      const rel = (a.vx - b.vx) * nx + (a.vy - b.vy) * ny;
+      if (rel > 0) {
+        const jimp = (1 + RESTITUTION) * rel / 2;
+        a.vx -= jimp * nx; a.vy -= jimp * ny;
+        b.vx += jimp * nx; b.vy += jimp * ny;
+        if (events && rel > 0.8) events.collisions.push(Math.min(1, rel / 14));
+      }
+      const overlap = 2 * R - d;
+      a.x -= nx * overlap / 2; a.y -= ny * overlap / 2;
+      b.x += nx * overlap / 2; b.y += ny * overlap / 2;
+    }
+  }
+  // edges — falling off eliminates the stone
+  for (const s of list) {
+    if (s.out) continue;
+    if (s.x < -EDGE || s.x > (N - 1) + EDGE || s.y < -EDGE || s.y > (N - 1) + EDGE) {
+      s.out = true;
+      s.fadeAt = performance.now();
+      if (events) {
+        events.outs.push(s.color);
+        events.fellOff = true;
+      }
+    }
+  }
+}
+
+function allStopped(list) {
+  return alive(list).every(s => s.vx === 0 && s.vy === 0);
+}
+
+// ============================================
+// GAME FLOW
+// ============================================
+function setupStones() {
+  stones = [];
+  let id = 0;
+  for (const [x, y] of START_BLACK) stones.push({ id: id++, color: 1, x, y, vx: 0, vy: 0, out: false });
+  for (const [x, y] of START_WHITE) stones.push({ id: id++, color: 2, x, y, vx: 0, vy: 0, out: false });
+}
+
+function countStones(color) { return alive(stones).filter(s => s.color === color).length; }
+
+function init() {
+  Suiji.nav('alkkagi');
+  renderer = new AlkkagiRenderer(els.board);
+
+  els.board.addEventListener('mousedown', onPointerDown);
+  els.board.addEventListener('mousemove', onPointerMove);
+  window.addEventListener('mouseup', onPointerUp);
+  els.board.addEventListener('touchstart', onPointerDown, { passive: false });
+  els.board.addEventListener('touchmove', onPointerMove, { passive: false });
+  els.board.addEventListener('touchend', onPointerUp);
+
+  els.btnNew.addEventListener('click', onNewButtonAlk);
+  els.goNew.addEventListener('click', () => {
+    els.gameOverCard.classList.remove('show');
+    setTimeout(onNewButtonAlk, 300);
+  });
+  els.btnPassTurn.addEventListener('click', passTurn);
+  els.btnSound.addEventListener('click', () => {
+    const on = Suiji.sound.toggle();
+    els.btnSound.querySelector('i').className = on ? 'fa-solid fa-volume-high' : 'fa-solid fa-volume-xmark';
+  });
+  els.btnSound.querySelector('i').className = Suiji.sound.enabled ? 'fa-solid fa-volume-high' : 'fa-solid fa-volume-xmark';
+
+  els.rankSelector.querySelectorAll('.rank-badge').forEach(b => {
+    b.addEventListener('click', () => {
+      els.rankSelector.querySelectorAll('.rank-badge').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      level = parseInt(b.dataset.level);
+      Suiji.toast(`AI level set to ${b.querySelector('.name').textContent}`);
+    });
+  });
+
+  // ---- online multiplayer panel ----
+  Suiji.net.createPanel(document.getElementById('netMount'), {
+    game: 'alkkagi',
+    timeControls: [
+      [null, '시간 제한 없음'],
+      [{ main: 60, byo: 10 }, '1분 + 10초 초읽기'],
+      [{ main: 180, byo: 20 }, '3분 + 20초 초읽기']
+    ],
+    onStart: onNetStartAlk,
+    onRemote: onNetRemoteAlk,
+    onRematch: onNetRematchAlk,
+    onPeerLeft: onNetPeerLeftAlk,
+    onClock: onNetClock,
+    onTimeout: onNetTimeoutAlk,
+    onLeave: () => {
+      onlineActive = false;
+      wantRematch = peerWantsRematch = false;
+      pendingResult = null;
+      if (phase === 'waiting-result') phase = 'ready';
+      setRolesAlk();
+      els.onlinePanel.hidden = true;
+      newGame();
+    }
+  });
+
+  window.addEventListener('resize', () => {
+    clearTimeout(init._rt);
+    init._rt = setTimeout(() => {
+      renderer.setupCanvas();
+      renderer.woodTexture = makeWoodTexture(renderer.displayWidth, renderer.displayHeight);
+    }, 200);
+  });
+
+  refreshRecord();
+  newGame();
+
+  // main loop
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.033, (now - last) / 1000);
+    last = now;
+    if (phase === 'running') {
+      const events = { collisions: [], outs: [], outStones: [] };
+      // sub-step for stability
+      const steps = 3;
+      for (let i = 0; i < steps; i++) stepPhysics(stones, dt / steps, events);
+      for (const v of events.collisions) Suiji.sound.clack(0.3 + v);
+      for (const c of events.outs) {
+        Suiji.sound.fall();
+        lastOutsThisShot.push(c);
+        setIntent(c === 2 ? 'White stone off the board!' : 'Oh no — a black stone fell!', 'Shot ' + shotNo, shotNo);
+      }
+      for (const st of events.outStones) lastOutIds.push(st.id);
+      if (allStopped(stones)) setTimeout(onSettled, 250);
+    }
+    // animate fade marks
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+}
+
+function newGame() {
+  generation++;
+  phase = 'ready';
+  turn = 1;
+  shotNo = 0;
+  aim = null;
+  setupStones();
+  els.gameOverCard.classList.remove('show');
+  els.thinkingOverlay.classList.remove('show');
+  els.shotLog.innerHTML = '<div class="move-empty">The first flick is yours.</div>';
+  setIntent('Black to break — line up your angle.', 'Shot 0', 0);
+  updateUI();
+}
+
+function eventToCell(e) {
+  const rect = els.board.getBoundingClientRect();
+  const pt = e.touches ? e.touches[0] : e;
+  const px = pt.clientX - rect.left;
+  const py = pt.clientY - rect.top;
+  return { x: (px - renderer.padding) / renderer.cellSize, y: (py - renderer.padding) / renderer.cellSize };
+}
+
+function onPointerDown(e) {
+  if (phase !== 'ready') return;
+  if (onlineActive && Suiji.net.reconnecting) { Suiji.toast('재접속 시도 중입니다…'); return; }
+  const myTurn = onlineActive ? turn === myColor : turn === 1;
+  if (!myTurn) return;
+  const cell = eventToCell(e);
+  const myStones = onlineActive ? myColor : 1;
+  const mine = alive(stones).filter(s => s.color === myStones);
+  let best = null, bestD = 1e9;
+  for (const s of mine) {
+    const d = Math.hypot(s.x - cell.x, s.y - cell.y);
+    if (d < bestD) { bestD = d; best = s; }
+  }
+  if (!best || bestD > R * 1.6) return;
+  e.preventDefault();
+  aim = { stone: best, cx: cell.x, cy: cell.y };
+  els.board.classList.add('aiming');
+  els.powerWrap.classList.add('show');
+}
+
+function onPointerMove(e) {
+  if (!aim) return;
+  e.preventDefault();
+  const cell = eventToCell(e);
+  aim.cx = cell.x; aim.cy = cell.y;
+  const drag = Math.min(MAX_DRAG, Math.hypot(aim.cx - aim.stone.x, aim.cy - aim.stone.y));
+  els.powerFill.style.width = `${(drag / MAX_DRAG) * 100}%`;
+}
+
+function onPointerUp(e) {
+  if (!aim) return;
+  e.preventDefault();
+  const s = aim.stone;
+  let dx = s.x - aim.cx, dy = s.y - aim.cy;
+  const drag = Math.hypot(dx, dy);
+  els.board.classList.remove('aiming');
+  els.powerWrap.classList.remove('show');
+  els.powerFill.style.width = '0%';
+  const aimCopy = aim;
+  aim = null;
+  if (drag < 0.25) { updateUI(); return; } // too small — cancel
+  const power = Math.min(1, drag / MAX_DRAG);
+  dx /= drag; dy /= drag;
+  launch(s, dx * MAX_SPEED * power, dy * MAX_SPEED * power);
+}
+
+function launch(s, vx, vy, fromRemote = false) {
+  s.vx = vx; s.vy = vy;
+  shotNo++;
+  lastOutsThisShot = [];
+  lastOutIds = [];
+  lastShotBy = s.color;
+  pendingResult = null;
+  phase = 'running';
+  Suiji.sound.whoosh(Math.min(1, Math.hypot(vx, vy) / MAX_SPEED));
+  setIntent(shotNo % 2 ? 'The stone is away — watch it roll.' : 'A fresh flick across the board.', 'Shot ' + shotNo, shotNo);
+  addLog(s.color, s, Math.hypot(vx, vy) / MAX_SPEED);
+  if (onlineActive && !fromRemote && s.color === myColor) {
+    Suiji.net.move({
+      k: 'shot', id: s.id, vx, vy,
+      snap: alive(stones).map(o => [o.id, o.x, o.y])
+    });
+  }
+  updateUI();
+}
+
+function passTurn() {
+  const myTurn = onlineActive ? myColor : 1;
+  if (phase !== 'ready' || turn !== myTurn) return;
+  if (onlineActive) {
+    Suiji.net.move({ k: 'result', opp: 0, own: 0, pass: true, next: turn === 1 ? 2 : 1, board: aliveBoardSnap(), outIds: [] });
+    Suiji.toast('차례를 넘겼습니다');
+    endTurn(0, 0);
+    return;
+  }
+  Suiji.toast('You passed — AI to shoot');
+  endTurn(0, 0);
+}
+
+function aliveBoardSnap() {
+  return alive(stones).map(o => [o.id, o.x, o.y]);
+}
+
+function onSettled() {
+  if (phase !== 'running') return;
+  // online: the non-shooter waits for the shooter's authoritative result
+  if (onlineActive && lastShotBy !== myColor && !pendingResult) {
+    phase = 'waiting-result';
+    return;
+  }
+  proceedSettle();
+}
+
+function proceedSettle() {
+  if (phase !== 'running' && phase !== 'waiting-result') return;
+  phase = 'ready';
+  let oppOut, ownOut;
+  if (onlineActive && lastShotBy !== myColor && pendingResult) {
+    oppOut = pendingResult.opp; ownOut = pendingResult.own;
+  } else {
+    oppOut = lastOutsThisShot.filter(c => c !== turn).length;
+    ownOut = lastOutsThisShot.filter(c => c === turn).length;
+    if (onlineActive) {
+      const next = (oppOut > 0) ? turn : (turn === 1 ? 2 : 1);
+      Suiji.net.move({
+        k: 'result', opp: oppOut, own: ownOut, next,
+        board: aliveBoardSnap(), outIds: [...lastOutIds]
+      });
+    }
+  }
+  pendingResult = null;
+
+  // win / lose checks
+  if (countStones(2) === 0) { finish(1); return; }
+  if (countStones(1) === 0) { finish(2); return; }
+
+  if (oppOut > 0) {
+    Suiji.toast(`Knocked ${oppOut} out — shoot again!`);
+    setIntent(oppOut > 1 ? `A double knock! ${oppOut} white stones gone.` : 'A clean hit — extra turn earned.', 'Shot ' + shotNo, shotNo);
+    updateUI();
+    if (turn === 2 && !onlineActive) setTimeout(aiShoot, 700);
+    return;
+  }
+
+  if (ownOut > 0) setIntent(ownOut > 1 ? `${ownOut} of your own stones fell — costly.` : 'Your stone slipped off — careful.', 'Shot ' + shotNo, shotNo);
+  endTurn(oppOut, ownOut);
+}
+
+function endTurn(oppOut, ownOut) {
+  turn = turn === 1 ? 2 : 1;
+  if (turn === 2 && !onlineActive) setTimeout(aiShoot, 650);
+  else els.hintNote.textContent = onlineActive
+    ? (turn === myColor ? '당신의 차례입니다 — 검은돌/흰돌을 당겨 쏘세요.' : '상대의 차례입니다…')
+    : 'Your shot — drag a black stone and release.';
+  updateUI();
+}
+
+function finish(winner) {
+  phase = 'over';
+  const won = winner === myColor;
+  els.goTitle.textContent = onlineActive
+    ? (won ? '당신 승리!' : '상대 승리')
+    : (won ? 'You Win' : 'AI Wins');
+  els.goSub.textContent = onlineActive
+    ? (winner === 1 ? '흑이 승부를 끝냈습니다' : '백이 승부를 끝냈습니다')
+    : (won ? 'Every white stone is gone' : 'Your stones ran out');
+  els.goDetail.textContent = `Decided after ${shotNo} shots`;
+  els.gameOverCard.classList.add('show');
+  Suiji.stats.record('alkkagi', won ? 'w' : 'l');
+  refreshRecord();
+  if (won) Suiji.sound.win(); else Suiji.sound.lose();
+  setIntent(won ? 'A flawless victory — the board is cleared.' : 'The opponent cleared your stones. Rematch?', 'Final', shotNo);
+  updateUI();
+}
+
+// ============ ONLINE MULTIPLAYER ============
+function setRolesAlk() {
+  const blackRole = els.playerBlack.querySelector('.role');
+  const whiteRole = els.playerWhite.querySelector('.role');
+  if (onlineActive) {
+    blackRole.textContent = myColor === 1 ? 'You' : '친구';
+    whiteRole.textContent = myColor === 2 ? 'You' : '친구';
+  } else {
+    blackRole.textContent = 'You';
+    whiteRole.textContent = 'AI';
+  }
+}
+
+function onNetStartAlk(color, isHost, hasSnapshot) {
+  onlineActive = true;
+  myColor = color;
+  wantRematch = peerWantsRematch = false;
+  if (!(isHost && hasSnapshot)) newGame();
+  setRolesAlk();
+  els.hintNote.textContent = color === 1
+    ? '당신이 흑입니다 — 먼저 쏘세요!'
+    : '당신은 백입니다 — 상대의 선공을 기다리세요…';
+  setIntent(color === 1 ? '온라인 대결 시작 — 흑으로 먼저 쏩니다.' : '온라인 대결 시작 — 백입니다.', 'Online', 0);
+  Suiji.toast(color === 1 ? '상대 입장! 흑으로 시작합니다' : '상대 입장! 당신은 백입니다');
+  if (isHost) {
+    Suiji.net.init({ tc: Suiji.net.getTc() });
+    if (hasSnapshot) {
+      const snap = buildNetSnapshotAlk();
+      Suiji.net.sendSync(snap);
+      Suiji.net.send({ k: 'sync', data: snap });
+      Suiji.toast('재접속 — 대결이 이어집니다');
+    }
+  }
+  updateUI();
+}
+
+function buildNetSnapshotAlk() {
+  return {
+    kind: 'alkkagi',
+    stones: stones.map(o => ({ id: o.id, color: o.color, x: +o.x.toFixed(3), y: +o.y.toFixed(3), out: !!o.out })),
+    turn, shotNo
+  };
+}
+
+function applyNetSnapshotAlk(s) {
+  if (!s || !Array.isArray(s.stones)) return;
+  stones = s.stones.map(o => ({ id: o.id, color: o.color, x: o.x, y: o.y, vx: 0, vy: 0, out: !!o.out, fadeAt: undefined }));
+  turn = s.turn || 1;
+  shotNo = s.shotNo || 0;
+  phase = 'ready';
+  els.gameOverCard.classList.remove('show');
+  updateUI();
+  showToast('대결이 복원되었습니다');
+}
+
+function onNetRemoteAlk(data) {
+  if (!data) return;
+  if (data.k === 'shot') applyRemoteShot(data);
+  else if (data.k === 'result') applyRemoteResult(data);
+  else if (data.k === 'sync') applyNetSnapshotAlk(data);
+  else if (data.k === 'rm') onNetRematchAlk();
+}
+
+function applyRemoteShot(data) {
+  // jump to the shooter's exact pre-shot layout, then replay the shot locally
+  const aliveIds = new Set((data.snap || []).map(row => row[0]));
+  for (const [id, x, y] of (data.snap || [])) {
+    const st = stones.find(o => o.id === id);
+    if (!st) continue;
+    st.out = false; st.fadeAt = undefined; st.fadeDone = false;
+    st.x = x; st.y = y; st.vx = 0; st.vy = 0;
+  }
+  for (const st of stones) {
+    if (!st.out && !aliveIds.has(st.id)) {
+      st.out = true; st.fadeAt = performance.now();
+    }
+  }
+  const s = stones.find(o => o.id === data.id);
+  if (!s) { phase = 'ready'; return; }
+  launch(s, data.vx, data.vy, true);
+  els.hintNote.textContent = '상대가 쏘는 중…';
+}
+
+function applyRemoteResult(data) {
+  if (data.pass) {
+    Suiji.toast('상대가 차례를 넘겼습니다');
+    endTurn(0, 0);
+    return;
+  }
+  // force the board to the shooter's settled state
+  const aliveIds = new Set((data.board || []).map(row => row[0]));
+  const outIds = new Set(data.outIds || []);
+  for (const st of stones) {
+    if (outIds.has(st.id)) { st.out = true; st.fadeAt = undefined; }
+  }
+  for (const [id, x, y] of (data.board || [])) {
+    const st = stones.find(o => o.id === id);
+    if (!st) continue;
+    st.out = false; st.fadeAt = undefined; st.fadeDone = false;
+    st.x = x; st.y = y; st.vx = 0; st.vy = 0;
+  }
+  pendingResult = { opp: data.opp, own: data.own };
+  if (phase === 'waiting-result') {
+    phase = 'running';
+    onSettled();
+  }
+}
+
+function onNetRematchAlk() {
+  if (wantRematch) doOnlineRematchAlk();
+  else {
+    peerWantsRematch = true;
+    Suiji.toast('상대가 재대결을 요청했습니다 — Restart로 수락');
+  }
+}
+
+function doOnlineRematchAlk() {
+  myColor = 3 - myColor;
+  wantRematch = peerWantsRematch = false;
+  newGame();
+  setRolesAlk();
+  if (myColor === 1) { Suiji.net.resetServer(); Suiji.net.init({ tc: Suiji.net.getTc() }); }
+  els.hintNote.textContent = `재대결 — ${myColor === 1 ? '당신(흑)이' : '상대(백이)'} 먼저 쏩니다.`;
+  Suiji.toast('재대결 시작! 색이 교체되었습니다');
+  updateUI();
+}
+
+function onNetPeerLeftAlk(disconnected, rejoinable) {
+  pendingResult = null;
+  if (phase === 'waiting-result') phase = 'ready';
+  if (rejoinable) {
+    els.hintNote.textContent = '상대 재접속 대기 중 (5분)…';
+    setIntent('상대의 연결이 끊겼습니다. 5분 내 재접속하면 대결이 이어집니다.', 'Waiting', shotNo);
+    showToast('상대 재접속 대기 중 (5분)');
+    updateUI();
+    return;
+  }
+  onlineActive = false;
+  wantRematch = peerWantsRematch = false;
+  setRolesAlk();
+  updateUI();
+  Suiji.toast(disconnected ? '서버와의 연결이 끊겼습니다' : '상대가 방을 나갔습니다');
+}
+
+function onNewButtonAlk() {
+  if (onlineActive) {
+    if (wantRematch) { Suiji.toast('이미 재대결을 요청했습니다 — 상대의 수락 대기 중'); return; }
+    if (peerWantsRematch) {
+      doOnlineRematchAlk();
+      Suiji.net.send({ k: 'rm' });
+      return;
+    }
+    wantRematch = true;
+    Suiji.net.send({ k: 'rm' });
+    Suiji.toast('재대결을 요청했습니다');
+    return;
+  }
+  newGame();
+}
+
+// ============================================
+// AI
+// ============================================
+function aiShoot() {
+  if (onlineActive) return; // online: the remote human shoots instead
+  if (phase !== 'ready' || turn !== 2) return;
+  phase = 'ai';
+  els.thinkingOverlay.classList.add('show');
+  els.thinkingSub.textContent = level === 1 ? 'Winging it' : level === 2 ? 'Testing angles' : 'Simulating physics';
+
+  const gen = generation;
+  const mine = alive(stones).filter(s => s.color === 2);
+  const theirs = alive(stones).filter(s => s.color === 1);
+
+  // Build candidate shots
+  const cands = [];
+  for (const s of mine) {
+    for (const t of theirs) {
+      const base = Math.atan2(t.y - s.y, t.x - s.x);
+      const spreads = level === 1 ? [0] : level === 2 ? [-0.18, 0, 0.18] : [-0.32, -0.16, 0, 0.16, 0.32];
+      const powers = level === 1 ? [0.85] : level === 2 ? [0.6, 0.9] : [0.5, 0.75, 1.0];
+      for (const sp of spreads) {
+        for (const p of powers) {
+          cands.push({ s, vx: Math.cos(base + sp) * MAX_SPEED * p, vy: Math.sin(base + sp) * MAX_SPEED * p });
+        }
+      }
+    }
+    // a couple of central safety shots
+    const cAng = Math.atan2(9 - s.y, 9 - s.x);
+    cands.push({ s, vx: Math.cos(cAng) * MAX_SPEED * 0.6, vy: Math.sin(cAng) * MAX_SPEED * 0.6 });
+  }
+  // shuffle so ties vary
+  for (let i = cands.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [cands[i], cands[j]] = [cands[j], cands[i]];
+  }
+
+  let idx = 0;
+  let best = null, bestScore = -1e9;
+  const BATCH = 24;
+
+  function chunk() {
+    if (gen !== generation) return;
+    const t0 = performance.now();
+    while (idx < cands.length && performance.now() - t0 < 24) {
+      const c = cands[idx++];
+      const score = simulateShot(c.s, c.vx, c.vy);
+      if (score > bestScore) { bestScore = score; best = c; }
+    }
+    if (idx < cands.length) {
+      setTimeout(chunk, 0);
+    } else {
+      els.thinkingOverlay.classList.remove('show');
+      if (!best) { phase = 'ready'; endTurn(0, 0); return; }
+      launchAI(best);
+    }
+  }
+  setTimeout(chunk, 120);
+}
+
+function simulateShot(s, vx, vy) {
+  const list = alive(stones).map(o => ({ color: o.color, x: o.x, y: o.y, vx: o.vx, vy: o.vy, out: false }));
+  const shooter = list.find(o => o.x === s.x && o.y === s.y && o.color === s.color);
+  shooter.vx = vx; shooter.vy = vy;
+  const dt = 1 / 60;
+  let steps = 0;
+  while (!allStopped(list) && steps < 420) {
+    stepPhysics(list, dt, null);
+    steps++;
+  }
+  let oppOut = 0, ownOut = 0;
+  for (const o of list) {
+    if (!o.out) continue;
+    if (o.color === 2) ownOut++; else oppOut++;
+  }
+  let score = oppOut * 100 - ownOut * 135;
+  // position the survivors favourably: opponent stones near the edge are future targets
+  for (const o of list) {
+    if (o.out) continue;
+    const de = Math.min(o.x, (N - 1) - o.x, o.y, (N - 1) - o.y);
+    if (o.color === 1) score += Math.max(0, 4.5 - de) * 1.2;      // white likes black stones near edges
+    else if (de < 1.2) score -= (1.2 - de) * 8;                    // white dislikes being near the edge itself
+  }
+  score += Math.random() * 0.5; // tiny jitter to vary play
+  return score;
+}
+
+function launchAI(cand) {
+  const s = stones.find(o => o.id === cand.s.id || (o.x === cand.s.x && o.y === cand.s.y && o.color === 2 && !o.out));
+  if (!s) { phase = 'ready'; endTurn(0, 0); return; }
+  launch(s, cand.vx, cand.vy);
+  els.hintNote.textContent = 'The AI is shooting…';
+  updateUI();
+}
+
+// ============================================
+// UI
+// ============================================
+function addLog(color, stone, power) {
+  const empty = els.shotLog.querySelector('.move-empty');
+  if (empty) empty.remove();
+  const row = document.createElement('div');
+  row.className = 'move-row';
+  row.innerHTML = `
+    <span class="move-num">${shotNo}</span>
+    <span class="move-stone ${color === 1 ? 'black' : 'white'}"></span>
+    <span class="move-coord">(${stone.x.toFixed(1)}, ${stone.y.toFixed(1)})</span>
+    <span class="move-cap">${'▮'.repeat(Math.max(1, Math.round(power * 4)))}</span>`;
+  els.shotLog.prepend(row);
+}
+
+function setIntent(text, meta, shotNum) {
+  els.intentText.textContent = text;
+  els.intentMeta.innerHTML = `<span>${meta}</span>`;
+  els.logSub.textContent = `Shot ${shotNum}`;
+}
+
+function onNetClock(d) {
+  if (!onlineActive) return;
+  renderClock(els.clockBlack, d[1], d.turn === 1);
+  renderClock(els.clockWhite, d[2], d.turn === 2);
+}
+function renderClock(el, side, active) {
+  if (!el) return;
+  el.hidden = false;
+  el.classList.toggle('byo', !!side.byo);
+  el.textContent = side.byo ? `+${side.period}초` : fmtClock(side.main);
+  el.style.opacity = active ? '1' : '0.55';
+}
+function fmtClock(sec) {
+  const m = Math.floor(sec / 60), s = Math.floor(sec % 60);
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+function onNetTimeoutAlk(loserColor) {
+  if (phase === 'over') return;
+  finish(loserColor === 1 ? 2 : 1);
+  Suiji.toast('시간 초과!');
+}
+
+function refreshRecord() {
+  els.recordInfo.textContent = Suiji.stats.text('alkkagi');
+}
+
+function updateUI() {
+  setRolesAlk();
+  const myTurnNo = onlineActive ? myColor : 1;
+  els.playerBlack.classList.toggle('active', turn === 1 && phase !== 'over');
+  els.playerWhite.classList.toggle('active', (turn === 2 || phase === 'ai') && phase !== 'over');
+  els.countBlack.textContent = countStones(1);
+  els.countWhite.textContent = countStones(2);
+  els.shotCounter.textContent = shotNo;
+  els.btnPassTurn.disabled = phase !== 'ready' || turn !== myTurnNo;
+  els.board.classList.toggle('can-shoot', phase === 'ready' && turn === myTurnNo);
+  if (phase === 'ready' && turn === myTurnNo && !onlineActive && !els.hintNote.textContent.includes('Your shot')) {
+    els.hintNote.textContent = 'Your shot — drag a black stone and release.';
+  }
+}
+
+init();
+</script>
+</body>
+</html>

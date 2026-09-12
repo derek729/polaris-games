@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🌻 식물 vs 좀비 🧟</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌻</text></svg>">
+<style>
+  html,body{margin:0;padding:0;background:#16240f;height:100%;}
+  body{display:flex;align-items:center;justify-content:center;min-height:100vh;
+       font-family:"Noto Sans KR","Malgun Gothic","Apple SD Gothic Neo",sans-serif;}
+  canvas{display:block;max-width:100vw;height:auto;border-radius:10px;
+         box-shadow:0 12px 40px rgba(0,0,0,.6);cursor:pointer;}
+</style>
+</head>
+<body>
+<canvas id="game" width="1000" height="650"></canvas>
+<script>
+"use strict";
+/* ============================================================
+   🌻 식물 vs 좀비 (Plants vs. Zombies 스타일 웹 클론)
+   - 단일 HTML 파일, 외부 에셋 없음 (전부 캔버스 드로잉)
+   ============================================================ */
+window.__errors = [];
+window.addEventListener("error", e => __errors.push(e.message));
+
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+const W = 1000, H = 650;
+const GRID = { x: 60, y: 130, cols: 9, rows: 5, cw: 100, ch: 100 };
+const MOWER_X = 44, HOUSE_X = 10;
+
+if (!CanvasRenderingContext2D.prototype.roundRect) {
+  CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
+    r = Math.min(r, w / 2, h / 2);
+    this.moveTo(x + r, y);
+    this.arcTo(x + w, y, x + w, y + h, r);
+    this.arcTo(x + w, y + h, x, y + h, r);
+    this.arcTo(x, y + h, x, y, r);
+    this.arcTo(x, y, x + w, y, r);
+    this.closePath();
+    return this;
+  };
+}
+
+/* ---------------- 스프라이트 (선택 PNG 에셋, 로드 실패 시 기존 드로잉 사용) ---------------- */
+const SPRITES = {};
+["plant-sunflower", "plant-peashooter", "plant-snowpea", "plant-repeater",
+ "plant-cherry", "plant-wallnut",
+ "zombie-basic", "zombie-cone", "zombie-bucket", "zombie-flag"].forEach(n => {
+  const img = new Image();
+  img.src = "game-assets/pvz/" + n + ".png";
+  SPRITES[n] = img;
+});
+const ZSPRITE = { normal: "zombie-basic", cone: "zombie-cone", bucket: "zombie-bucket", flag: "zombie-flag" };
+
+/* ---------------- 데이터 정의 ---------------- */
+const PTYPES = ["sunflower", "peashooter", "snowpea", "repeater", "wallnut", "cherry"];
+const PLANTS = {
+  sunflower:  { name: "해바라기",   cost: 50,  hp: 300,  cd: 5,  desc: "태양을 생성한다" },
+  peashooter: { name: "완두 슈터", cost: 100, hp: 300,  cd: 5,  desc: "완두콩을 발사한다" },
+  snowpea:    { name: "얼음 완두", cost: 175, hp: 300,  cd: 8,  desc: "적을 얼려 둔하게 한다" },
+  repeater:   { name: "더블 완두", cost: 200, hp: 300,  cd: 8,  desc: "완두콩 2발 발사" },
+  wallnut:    { name: "호두 방벽", cost: 50,  hp: 2400, cd: 20, desc: "튼튼한 방어벽" },
+  cherry:     { name: "체리 폭탄", cost: 150, hp: 9999, cd: 25, desc: "3x3 범위 폭발!" },
+};
+const ZTYPES = {
+  normal: { hp: 190,  spd: 16 },
+  cone:   { hp: 560,  spd: 16 },
+  bucket: { hp: 1250, spd: 15 },
+  flag:   { hp: 200,  spd: 24 },
+};
+const WAVES = [
+  { t: 20,  z: ["normal"] },
+  { t: 50,  z: ["normal", "normal"] },
+  { t: 80,  z: ["normal", "cone"] },
+  { t: 110, z: ["cone", "normal", "normal"] },
+  { t: 140, z: ["cone", "cone", "normal", "normal"] },
+  { t: 170, z: ["bucket", "normal", "cone", "normal"] },
+  { t: 200, z: ["bucket", "cone", "cone", "normal", "normal"] },
+  { t: 230, z: ["bucket", "bucket", "cone", "normal", "normal"] },
+  { t: 258, z: ["bucket", "cone", "cone", "cone", "normal", "normal", "normal"] },
+  { t: 285, final: true, z: ["flag", "bucket", "bucket", "cone", "cone", "normal", "normal", "normal", "normal", "normal"] },
+];
+const FINAL_T = WAVES[WAVES.length - 1].t;
+
+/* ---------------- 사운드 (WebAudio) ---------------- */
+let AC = null, muted = false;
+function ac() {
+  try {
+    if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)();
+    if (AC.state === "suspended") AC.resume();
+  } catch (e) { /* 사운드 미지원 환경 */ }
+  return AC;
+}
+function tone(f1, f2, dur, type, vol) {
+  if (muted) return;
+  try {
+    const a = ac(); if (!a) return;
+    const o = a.createOscillator(), g = a.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(f1, a.currentTime);
+    o.frequency.exponentialRampToValueAtTime(Math.max(1, f2), a.currentTime + dur);
+    g.gain.setValueAtTime(vol, a.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, a.currentTime + dur);
+    o.connect(g).connect(a.destination);
+    o.start(); o.stop(a.currentTime + dur);
+  } catch (e) { /* 무시 */ }
+}
+const SFX = {
+  plant:  () => tone(180, 80, 0.14, "triangle", 0.25),
+  shoot:  () => tone(520, 300, 0.06, "square", 0.07),
+  splat:  () => tone(240, 110, 0.05, "square", 0.1),
+  sun:    () => tone(880, 1500, 0.16, "sine", 0.14),
+  eat:    () => tone(130, 70, 0.09, "sawtooth", 0.1),
+  boom:   () => tone(130, 28, 0.5, "sawtooth", 0.4),
+  mower:  () => tone(80, 240, 0.55, "sawtooth", 0.25),
+  wave:   () => tone(300, 150, 0.3, "triangle", 0.18),
+  nope:   () => tone(160, 120, 0.08, "square", 0.1),
+  lose:   () => tone(320, 55, 1.2, "sawtooth", 0.3),
+  win:    () => { tone(523, 523, 0.12, "triangle", 0.2);
+                  setTimeout(() => tone(659, 659, 0.12, "triangle", 0.2), 130);
+                  setTimeout(() => tone(784, 1046, 0.35, "triangle", 0.22), 260); },
+};
+
+/* ---------------- WAV 효과음 (sfx 파일 재생, 파일 없으면 무시) ---------------- */
+const sfxWavLast = {};
+function playSfx(name, opts) {
+  opts = opts || {};
+  try {
+    if (muted) return;  // 기존 🔇 토글 존중
+    const now = performance.now();
+    if (opts.throttle && now - (sfxWavLast[name] || 0) < opts.throttle) return;
+    sfxWavLast[name] = now;
+    const a = new Audio("game-assets/sfx/" + name + ".wav");
+    a.volume = opts.volume != null ? opts.volume : 0.4;
+    if (opts.rate) a.playbackRate = opts.rate;
+    const p = a.play();
+    if (p && p.catch) p.catch(() => {});
+  } catch (e) { /* 파일 없음/미지원 환경 무시 */ }
+}
+
+/* ---------------- 게임 상태 ---------------- */
+let game = null;
+let shake = 0, lastEatSfx = 0;
+const BTN = {
+  start: { x: 390, y: 430, w: 220, h: 54 },
+  again: { x: 390, y: 430, w: 220, h: 54 },
+  pause: { x: 940, y: 15, w: 46, h: 46 },
+  mute:  { x: 940, y: 70, w: 46, h: 46 },
+  shovel:{ x: 600, y: 15, w: 70, h: 100 },
+};
+
+function newGame() {
+  return {
+    state: "menu",           // menu | playing | paused | won | lost
+    sun: 150, time: 0,
+    plants: [], zombies: [], peas: [], suns: [], particles: [], scorches: [],
+    mowers: [], pending: [],
+    cd: {}, selected: null, shovel: false,
+    waveIdx: 0, sunTimer: 4, mx: -100, my: -100,
+  };
+}
+game = newGame();
+for (const t of PTYPES) game.cd[t] = 0;
+for (let r = 0; r < GRID.rows; r++) game.mowers.push({ row: r, x: 42, active: false, used: false, wheel: 0 });
+
+/* ---------------- 유틸 ---------------- */
+const rand = (a, b) => a + Math.random() * (b - a);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const dist = (x1, y1, x2, y2) => Math.hypot(x1 - x2, y1 - y2);
+const inRect = (x, y, r) => x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h;
+const cellCX = c => GRID.x + c * GRID.cw + GRID.cw / 2;
+const cellCY = r => GRID.y + r * GRID.ch + GRID.ch / 2;
+function plantAt(c, r) { return game.plants.find(p => p.col === c && p.row === r && !p.dead) || null; }
+function font(size, bold) { return (bold ? "bold " : "") + size + 'px "Noto Sans KR","Malgun Gothic","Apple SD Gothic Neo",sans-serif'; }
+function circle(x, y, r, fill, stroke, lw) {
+  ctx.beginPath(); ctx.arc(x, y, r, 0, 7);
+  if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+  if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw || 2; ctx.stroke(); }
+}
+function rrect(x, y, w, h, r, fill, stroke, lw) {
+  ctx.beginPath(); ctx.roundRect(x, y, w, h, r);
+  if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+  if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw || 2; ctx.stroke(); }
+}
+function text(str, x, y, size, color, bold, align) {
+  ctx.font = font(size, bold !== false);
+  ctx.fillStyle = color; ctx.textAlign = align || "center"; ctx.textBaseline = "middle";
+  ctx.fillText(str, x, y);
+}
+function banner(text_, color, size, dur, y) {
+  game.particles.push({ type: "banner", text: text_, color, size: size || 30, t: 0, dur: dur || 2, y: y == null ? 300 : y });
+}
+function toast(msg) { banner(msg, "#ffe08a", 20, 1.3, 158); }
+function puff(x, y, n, colors, spd, life, g) {
+  for (let i = 0; i < n; i++) {
+    const a = rand(0, Math.PI * 2), s = rand(spd * 0.3, spd);
+    game.particles.push({
+      type: "dot", x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - spd * 0.3,
+      r: rand(2, 6), color: colors[(Math.random() * colors.length) | 0],
+      t: 0, dur: rand(life * 0.6, life), g: g == null ? 260 : g,
+    });
+  }
+}
+
+/* ---------------- 엔티티 ---------------- */
+class Plant {
+  constructor(type, col, row) {
+    const d = PLANTS[type];
+    this.type = type; this.col = col; this.row = row;
+    this.cx = cellCX(col); this.cy = cellCY(row);
+    this.hp = d.hp; this.maxhp = d.hp;
+    this.t = rand(0, 6); this.anim = rand(0, 6);
+    this.shootT = rand(0.3, 1.2); this.sunT = rand(4, 7);
+    this.recoil = 0; this.flashT = 0; this.dead = false;
+  }
+  update(dt) {
+    this.anim += dt; this.t += dt;
+    this.recoil = Math.max(0, this.recoil - dt * 5);
+    this.flashT = Math.max(0, this.flashT - dt);
+    if (this.type === "sunflower") {
+      this.sunT -= dt;
+      if (this.sunT <= 0) {
+        this.sunT = rand(8.5, 11);
+        spawnSun(this.cx + rand(-18, 18), this.cy - 20, false, this.cy + rand(6, 20));
+        puff(this.cx, this.cy - 14, 6, ["#ffe66b", "#fff3ae"], 70, 0.5, 60);
+      }
+    } else if (this.type === "peashooter" || this.type === "snowpea" || this.type === "repeater") {
+      const target = game.zombies.some(z => !z.dead && z.delayT <= 0 && z.row === this.row && z.x > this.cx - 20 && z.x < W + 10);
+      if (target) {
+        this.shootT -= dt;
+        if (this.shootT <= 0) {
+          this.shootT = 1.4; this.recoil = 1;
+          if (this.type === "repeater") {
+            game.peas.push(new Pea(this.cx + 24, this.cy - 12, this.row, this.type === "snowpea"));
+            game.peas.push(new Pea(this.cx + 6, this.cy - 12, this.row, this.type === "snowpea"));
+          } else {
+            game.peas.push(new Pea(this.cx + 24, this.cy - 12, this.row, this.type === "snowpea"));
+          }
+          SFX.shoot();
+        }
+      } else this.shootT = Math.min(this.shootT, 0.4);
+    } else if (this.type === "cherry") {
+      if (this.t >= 1.1) {
+        this.dead = true; this.exploded = true;
+        for (const z of game.zombies) {
+          if (!z.dead && Math.abs(z.x - this.cx) < 145 && Math.abs(z.y - this.cy) < 135) {
+            z.hp -= 1800; z.flashT = 0.3;
+            if (z.hp <= 0) killZombie(z);
+          }
+        }
+        game.scorches.push({ x: this.cx, y: this.cy, t: 0, dur: 5 });
+        puff(this.cx, this.cy, 36, ["#ff9d2e", "#ffd23e", "#ff5722", "#fff1c4"], 320, 0.9, 200);
+        shake = 12; SFX.boom(); playSfx("explosion", { volume: 0.5 });
+      }
+    }
+  }
+}
+class Pea {
+  constructor(x, y, row, frozen) {
+    this.x = x; this.y = y + rand(-2, 2); this.row = row;
+    this.frozen = frozen; this.vel = 330; this.dead = false;
+  }
+  update(dt) {
+    this.x += this.vel * dt;
+    for (const z of game.zombies) {
+      if (z.dead || z.delayT > 0 || z.row !== this.row) continue;
+      if (this.x > z.x - 18 && this.x < z.x + 22) {
+        z.hp -= 20; z.flashT = 0.12;
+        if (this.frozen) z.slowT = 4;
+        puff(this.x, this.y, 4, this.frozen ? ["#bde9ff", "#7fd0f2"] : ["#8ade5e", "#5cb832"], 90, 0.3, 300);
+        SFX.splat();
+        this.dead = true;
+        if (z.hp <= 0) killZombie(z);
+        break;
+      }
+    }
+    if (this.x > W + 20) this.dead = true;
+  }
+}
+class Zombie {
+  constructor(type, row, delay) {
+    const d = ZTYPES[type];
+    this.type = type; this.row = row;
+    this.x = W + 20 + rand(0, 30);
+    this.y = GRID.y + row * GRID.ch + GRID.ch / 2 + 18;
+    this.hp = d.hp; this.maxhp = d.hp; this.spd = d.spd;
+    this.delayT = delay; this.slowT = 0; this.flashT = 0;
+    this.wob = rand(0, 6); this.eating = false; this.chomp = 0;
+    this.dead = false; this.deathT = 0.9; this.eatSfxT = rand(0, 0.8);
+  }
+  update(dt) {
+    if (this.dead) { this.deathT -= dt; return; }
+    if (this.hp <= 0) { killZombie(this); return; }
+    if (this.delayT > 0) { this.delayT -= dt; return; }
+    this.wob += dt;
+    this.flashT = Math.max(0, this.flashT - dt);
+    if (this.slowT > 0) this.slowT -= dt;
+    const mul = this.slowT > 0 ? 0.45 : 1;
+    let target = null;
+    for (const pl of game.plants) {
+      if (pl.dead || pl.row !== this.row) continue;
+      if (pl.type === "cherry") continue;
+      if (this.x >= pl.cx - 42 && this.x <= pl.cx + 48) { target = pl; break; }
+    }
+    if (target) {
+      this.eating = true; this.chomp += dt;
+      target.hp -= 62 * mul * dt; target.flashT = 0.15;
+      this.eatSfxT -= dt;
+      if (this.eatSfxT <= 0) { this.eatSfxT = 0.8; SFX.eat(); playSfx("hit", { volume: 0.35, throttle: 300 }); }
+      if (target.hp <= 0) {
+        target.dead = true;
+        puff(target.cx, target.cy, 12, ["#7ec850", "#5da23a", "#a4d96a"], 150, 0.6);
+      }
+    } else {
+      this.eating = false;
+      this.x -= this.spd * mul * dt;
+    }
+    if (this.x < MOWER_X + 8) {
+      const m = game.mowers[this.row];
+      if (m && !m.used) { m.used = true; m.active = true; shake = Math.max(shake, 5); SFX.mower(); }
+      else if (this.x < HOUSE_X) { loseGame(); }
+    }
+  }
+}
+class Sun {
+  constructor(x, y, fromSky, targetY) {
+    this.x = x; this.y = fromSky ? -30 : y;
+    this.targetY = targetY == null ? y : targetY;
+    this.fromSky = fromSky; this.t = rand(0, 6);
+    this.life = fromSky ? 14 : 10;
+    this.collected = false; this.dead = false;
+    this.sx = 0; this.sy = 0; this.ct = 0;
+  }
+  update(dt) {
+    this.t += dt;
+    if (this.collected) {
+      this.ct += dt;
+      const k = clamp(this.ct / 0.45, 0, 1), e = 1 - (1 - k) * (1 - k);
+      this.x = this.sx + (46 - this.sx) * e;
+      this.y = this.sy + (62 - this.sy) * e;
+      if (k >= 1) { game.sun += 25; this.dead = true; }
+      return;
+    }
+    if (this.fromSky && this.y < this.targetY) this.y += 42 * dt;
+    this.life -= dt;
+    if (this.life <= 0) this.dead = true;
+  }
+}
+
+/* ---------------- 스폰 / 진행 ---------------- */
+function spawnZombie(type) {
+  const row = (Math.random() * GRID.rows) | 0;
+  game.zombies.push(new Zombie(type, row, 0));
+}
+function spawnSun(x, y, fromSky, targetY) {
+  game.suns.push(new Sun(x, y, fromSky, targetY));
+}
+function killZombie(z) {
+  if (z.dead) return;
+  z.dead = true; z.eating = false;
+  puff(z.x, z.y - 30, 10, ["#a8c08a", "#66788a", "#dcedc8"], 130, 0.7);
+}
+function loseGame() {
+  if (game.state !== "playing") return;
+  game.state = "lost"; SFX.lose();
+}
+function winGame() {
+  if (game.state !== "playing") return;
+  game.state = "won"; SFX.win();
+}
+function startGame() {
+  game = newGame();
+  for (const t of PTYPES) game.cd[t] = 0;
+  for (let r = 0; r < GRID.rows; r++) game.mowers.push({ row: r, x: 42, active: false, used: false, wheel: 0 });
+  game.state = "playing";
+  banner("식물을 심으세요! 태양을 클릭해 모으세요 ☀", "#fff59d", 22, 3, 165);
+}
+
+/* ---------------- 업데이트 ---------------- */
+function update(dt) {
+  game.time += dt;
+  for (const t of PTYPES) if (game.cd[t] > 0) game.cd[t] = Math.max(0, game.cd[t] - dt);
+
+  // 자연 태양
+  game.sunTimer -= dt;
+  if (game.sunTimer <= 0) {
+    game.sunTimer = rand(7, 10);
+    spawnSun(rand(GRID.x + 40, GRID.x + GRID.cols * GRID.cw - 40), 0, true, rand(GRID.y + 60, GRID.y + GRID.rows * GRID.ch - 40));
+  }
+
+  // 웨이브 진행
+  while (game.waveIdx < WAVES.length && game.time >= WAVES[game.waveIdx].t) {
+    const w = WAVES[game.waveIdx]; game.waveIdx++;
+    w.z.forEach((type, i) => game.pending.push({ at: game.time + i * 0.9 + rand(0, 1.3), type }));
+    if (w.final) banner("🚩 최종 웨이브! 🚩", "#ff5252", 44, 3, 290);
+    else if (game.waveIdx > 1) banner(`웨이브 ${game.waveIdx}`, "#ffffff", 30, 1.6, 270);
+    SFX.wave();
+  }
+  for (const p of game.pending) {
+    if (game.time >= p.at) { spawnZombie(p.type); p.done = true; }
+  }
+  game.pending = game.pending.filter(p => !p.done);
+
+  for (const p of game.plants) p.update(dt);
+  for (const z of game.zombies) z.update(dt);
+  for (const pea of game.peas) pea.update(dt);
+  for (const s of game.suns) s.update(dt);
+
+  // 잔디깎이
+  for (const m of game.mowers) {
+    if (!m.active) continue;
+    m.x += 285 * dt; m.wheel += dt * 22;
+    if (Math.random() < 0.5) puff(m.x - 10, GRID.y + m.row * GRID.ch + GRID.ch - 12, 1, ["#9ccc65", "#c0ca33"], 90, 0.4);
+    for (const z of game.zombies) {
+      if (!z.dead && z.row === m.row && z.delayT <= 0 && Math.abs(z.x - m.x) < 36) {
+        z.hp = 0; killZombie(z);
+      }
+    }
+    if (m.x > W + 60) m.active = false;
+  }
+
+  game.plants = game.plants.filter(p => !p.dead);
+  game.zombies = game.zombies.filter(z => !z.dead || z.deathT > 0);
+  game.peas = game.peas.filter(p => !p.dead);
+  game.suns = game.suns.filter(s => !s.dead);
+
+  // 승리 체크
+  if (game.waveIdx >= WAVES.length && game.pending.length === 0 && game.zombies.every(z => z.dead)) {
+    if (game.zombies.length === 0) winGame();
+  }
+}
+function updateFX(dt) {
+  shake = Math.max(0, shake - dt * 26);
+  for (const p of game.particles) {
+    p.t += dt;
+    if (p.type === "dot") {
+      p.x += p.vx * dt; p.y += p.vy * dt; p.vy += (p.g || 0) * dt;
+    }
+  }
+  game.particles = game.particles.filter(p => p.t < p.dur);
+  for (const s of game.scorches) s.t += dt;
+  game.scorches = game.scorches.filter(s => s.t < s.dur);
+}
+
+/* ---------------- 그리기: 식물 ---------------- */
+function drawLeaf(x, y, rot) {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(rot);
+  ctx.fillStyle = "#3e8e2f";
+  ctx.beginPath(); ctx.ellipse(7, 0, 9, 4, 0, 0, 7); ctx.fill();
+  ctx.restore();
+}
+function drawStem() {
+  ctx.strokeStyle = "#3e8e2f"; ctx.lineWidth = 5; ctx.lineCap = "round";
+  ctx.beginPath(); ctx.moveTo(0, 30); ctx.quadraticCurveTo(2, 16, 0, 2); ctx.stroke();
+  drawLeaf(-6, 20, -0.5); drawLeaf(6, 24, Math.PI + 0.5);
+}
+function drawShooterHead(colHead, colDark, colMouth, recoil, repeater, icy, anim) {
+  ctx.save();
+  ctx.translate(-recoil * 5, 0);
+  if (repeater) {
+    ctx.fillStyle = colDark;
+    ctx.beginPath(); ctx.roundRect(-24, -14, 16, 11, 5); ctx.fill();
+    circle(-26, -8.5, 4.5, colMouth);
+  }
+  circle(0, -8, 15, colHead, colDark, 2.5);
+  ctx.fillStyle = colDark;
+  ctx.beginPath(); ctx.roundRect(6, -15, 22, 13, 6); ctx.fill();
+  circle(28, -8.5, 5.5, colMouth);
+  circle(-3, -14, 4, "#ffffff");
+  circle(-4.5, -14, 2, "#222");
+  if (repeater) { drawLeaf(-4, -24, -1.8); }
+  if (icy) { ctx.font = "11px sans-serif"; ctx.textAlign = "center"; ctx.fillText("❄", 12, -22); }
+  ctx.restore();
+}
+function drawPlant(p, x, y, scale) {
+  ctx.save();
+  ctx.translate(x, y + 12);
+  if (scale) ctx.scale(scale, scale);
+  const bob = Math.sin(p.anim * 2.5) * 2;
+  const hurt = p.flashT > 0 ? Math.sin(p.flashT * 40) * 2 : 0;
+  ctx.translate(hurt, 0);
+  const spr = SPRITES["plant-" + p.type];
+  if (spr && spr.complete && spr.naturalWidth > 0) {
+    const s = p.type === "cherry" ? 1 + clamp(p.t / 1.1, 0, 1) * 0.45 : 1;
+    ctx.drawImage(spr, -32 * s, -32 * s + bob * 0.6, 64 * s, 64 * s);
+    ctx.restore();
+    return;
+  }
+  switch (p.type) {
+    case "sunflower": {
+      drawStem();
+      ctx.save(); ctx.translate(0, -8 + bob * 0.6);
+      ctx.fillStyle = "#ffd23e";
+      for (let i = 0; i < 12; i++) {
+        ctx.save(); ctx.rotate(i * Math.PI / 6 + Math.sin(p.anim) * 0.06);
+        ctx.beginPath(); ctx.ellipse(0, -16, 6, 11, 0, 0, 7); ctx.fill();
+        ctx.restore();
+      }
+      circle(0, 0, 11.5, "#8a5a2b", "#6d441c", 2);
+      circle(0, 0, 8, "#a06a33");
+      circle(-3.5, -2.5, 1.8, "#3a2410"); circle(3.5, -2.5, 1.8, "#3a2410");
+      ctx.strokeStyle = "#3a2410"; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(0, 2, 4, 0.2, Math.PI - 0.2); ctx.stroke();
+      ctx.restore();
+      break;
+    }
+    case "peashooter": case "snowpea": case "repeater": {
+      drawStem();
+      const snow = p.type === "snowpea";
+      const head = snow ? "#63c6e8" : "#4faf3a";
+      const dark = snow ? "#3da3c8" : "#37902a";
+      const mouth = snow ? "#155a70" : "#1c4a12";
+      ctx.save(); ctx.translate(0, bob * 0.6);
+      drawShooterHead(head, dark, mouth, p.recoil || 0, p.type === "repeater", snow, p.anim);
+      ctx.restore();
+      break;
+    }
+    case "wallnut": {
+      const ratio = p.hp / p.maxhp;
+      ctx.save(); ctx.translate(0, bob * 0.3);
+      ctx.beginPath(); ctx.ellipse(0, -2, 24, 30, 0, 0, 7);
+      ctx.fillStyle = "#c98f3f"; ctx.fill();
+      ctx.strokeStyle = "#8a5f24"; ctx.lineWidth = 3; ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(-7, 6, 10, 16, 0.3, 0, 7);
+      ctx.fillStyle = "rgba(255,235,180,0.25)"; ctx.fill();
+      // 얼굴
+      const squint = ratio < 0.33;
+      circle(-8, -10, 5, "#fff"); circle(8, -10, 5, "#fff");
+      circle(-8, -10, squint ? 1.2 : 2.4, "#3a2a10"); circle(8, -10, squint ? 1.2 : 2.4, "#3a2a10");
+      ctx.strokeStyle = "#5d4022"; ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      if (ratio < 0.66) { ctx.arc(0, 4, 6, Math.PI + 0.4, -0.4); }  // 걱정하는 입
+      else { ctx.arc(0, 0, 6, 0.3, Math.PI - 0.3); }                 // 평소 미소
+      ctx.stroke();
+      // 금
+      ctx.strokeStyle = "#6d4a1a"; ctx.lineWidth = 2;
+      if (ratio < 0.66) {
+        ctx.beginPath(); ctx.moveTo(12, -26); ctx.lineTo(7, -16); ctx.lineTo(13, -8); ctx.stroke();
+      }
+      if (ratio < 0.33) {
+        ctx.beginPath(); ctx.moveTo(-14, -20); ctx.lineTo(-8, -10); ctx.lineTo(-15, 0); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, 26); ctx.lineTo(4, 16); ctx.stroke();
+      }
+      ctx.restore();
+      break;
+    }
+    case "cherry": {
+      const k = clamp(p.t / 1.1, 0, 1);
+      const s = 1 + k * 0.45 + Math.sin(p.anim * 18) * 0.04 * (0.3 + k);
+      ctx.save(); ctx.scale(s, s);
+      if (k > 0.25) {
+        const g = ctx.createRadialGradient(0, 0, 4, 0, 0, 40);
+        g.addColorStop(0, `rgba(255,120,40,${0.5 * k})`); g.addColorStop(1, "rgba(255,120,40,0)");
+        circle(0, 0, 40, g);
+      }
+      ctx.strokeStyle = "#3e8e2f"; ctx.lineWidth = 3.5; ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(-9, -8); ctx.quadraticCurveTo(-3, -22, 2, -24); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(9, -10); ctx.quadraticCurveTo(6, -22, 2, -24); ctx.stroke();
+      drawLeaf(3, -25, -0.9);
+      circle(-10, 4, 13, "#e53935", "#a02724", 2.5);
+      circle(10, 6, 13, "#c62828", "#8e1f1c", 2.5);
+      circle(-14, 0, 2.2, "#fff"); circle(-6, -1, 2.2, "#fff");
+      circle(6, 2, 2.2, "#fff"); circle(14, 1, 2.2, "#fff");
+      circle(-14, 0, 1.1, "#222"); circle(-6, -1, 1.1, "#222");
+      circle(6, 2, 1.1, "#222"); circle(14, 1, 1.1, "#222");
+      ctx.strokeStyle = "#7f1d1b"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(-15, -6); ctx.lineTo(-10, -4.5); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(5, -4); ctx.lineTo(10, -2.5); ctx.stroke();
+      ctx.restore();
+      break;
+    }
+  }
+  ctx.restore();
+}
+
+/* ---------------- 그리기: 좀비 ---------------- */
+function drawZombie(z) {
+  ctx.save();
+  ctx.translate(z.x, z.y);
+  if (z.dead) {
+    const k = 1 - clamp(z.deathT / 0.9, 0, 1);
+    ctx.globalAlpha = 1 - k;
+    ctx.rotate(k * 1.5);
+    ctx.translate(k * 8, 0);
+  } else {
+    ctx.rotate(Math.sin(z.wob * 4) * 0.05);
+    ctx.translate(0, -Math.abs(Math.sin(z.wob * 4)) * 2.5);
+  }
+  const frozen = z.slowT > 0 && !z.dead;
+  const flash = z.flashT > 0;
+  const skin = flash ? "#e2836f" : frozen ? "#9cc7de" : "#a8c08a";
+  const shirt = frozen ? "#5f7f9e" : "#66788a";
+  const dark = "#3c4653";
+  const legSw = z.dead ? 0 : Math.sin(z.wob * 6) * 0.45;
+  const zspr = SPRITES[ZSPRITE[z.type]];
+  if (zspr && zspr.complete && zspr.naturalWidth > 0) {
+    ctx.drawImage(zspr, -42, -42, 84, 84);
+    if (frozen) { ctx.font = "12px sans-serif"; ctx.textAlign = "center"; ctx.fillText("❄", 0, -78); }
+    ctx.restore();
+    return;
+  }
+  // 다리
+  ctx.strokeStyle = dark; ctx.lineWidth = 7; ctx.lineCap = "round";
+  for (const side of [-1, 1]) {
+    ctx.save(); ctx.translate(side * 5, 18); ctx.rotate(legSw * side);
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, 20); ctx.stroke();
+    ctx.fillStyle = "#2b2b2b"; ctx.beginPath(); ctx.ellipse(-3, 22, 6, 3.5, 0, 0, 7); ctx.fill();
+    ctx.restore();
+  }
+  // 팔 (앞으로 뻗음, 체력 낮으면 한 팔 탈락)
+  ctx.strokeStyle = skin; ctx.lineWidth = 7;
+  ctx.beginPath(); ctx.moveTo(-8, -6); ctx.lineTo(-32, -9); ctx.stroke();
+  circle(-35, -9, 5, skin);
+  if (z.hp > z.maxhp * 0.5) {
+    ctx.beginPath(); ctx.moveTo(-6, 2); ctx.lineTo(-26, 6); ctx.stroke();
+    circle(-29, 6, 5, skin);
+  } else {
+    ctx.beginPath(); ctx.moveTo(-8, 0); ctx.lineTo(-14, 4); ctx.stroke();
+  }
+  // 몸통
+  ctx.fillStyle = shirt;
+  ctx.beginPath(); ctx.roundRect(-14, -16, 28, 36, 6); ctx.fill();
+  ctx.fillStyle = frozen ? "#8fd0e8" : "#d8443c";
+  ctx.beginPath(); ctx.moveTo(-3, -14); ctx.lineTo(3, -14); ctx.lineTo(0, -2); ctx.closePath(); ctx.fill();
+  // 머리
+  const chomp = z.eating ? Math.abs(Math.sin(z.chomp * 14)) : 0;
+  ctx.save();
+  ctx.translate(0, -30 - chomp * 2);
+  if (z.eating) ctx.rotate(Math.sin(z.chomp * 14) * 0.08);
+  circle(0, 0, 15, skin, frozen ? "#5f8ba8" : "#7d9668", 2);
+  // 눈
+  circle(-10, -4, 4.2, "#fff"); circle(1, -5, 5, "#fff");
+  circle(-12, -4, 1.8, "#222"); circle(-1, -5, 2, "#222");
+  ctx.strokeStyle = "#4c5b3e"; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(-14, -9); ctx.lineTo(-7, -7); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(5, -10); ctx.lineTo(-2, -8.5); ctx.stroke();
+  // 입
+  ctx.fillStyle = "#3a2a28";
+  ctx.beginPath(); ctx.ellipse(-9, 6, 5, 2.5 + chomp * 3, 0, 0, 7); ctx.fill();
+  // 머리카락
+  ctx.strokeStyle = "#4c5b3e"; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(-6, -14); ctx.lineTo(-8, -19); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0, -15); ctx.lineTo(0, -20); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(6, -14); ctx.lineTo(8, -18); ctx.stroke();
+  // 장비
+  if (z.type === "cone" && z.hp > ZTYPES.normal.hp) {
+    ctx.fillStyle = flash ? "#f4a261" : "#e8862a";
+    ctx.strokeStyle = "#b05f14"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(0, -40); ctx.lineTo(-13, -12); ctx.lineTo(13, -12); ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = "#fff"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(-7, -22); ctx.lineTo(7, -22); ctx.stroke();
+  }
+  if (z.type === "bucket" && z.hp > ZTYPES.normal.hp) {
+    ctx.fillStyle = flash ? "#cfd8dc" : "#90a4ae";
+    ctx.strokeStyle = "#5c6b73"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.roundRect(-15, -42, 30, 26, 4); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,0.5)"; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(-9, -38); ctx.lineTo(-9, -20); ctx.stroke();
+  }
+  if (z.type === "flag") {
+    ctx.strokeStyle = "#7a5230"; ctx.lineWidth = 3.5;
+    ctx.beginPath(); ctx.moveTo(-30, -6); ctx.lineTo(-34, -62); ctx.stroke();
+    const waveF = Math.sin(z.wob * 7) * 3;
+    ctx.fillStyle = "#d8443c";
+    ctx.beginPath();
+    ctx.moveTo(-34, -62); ctx.lineTo(-62 + waveF, -54); ctx.lineTo(-34, -46);
+    ctx.closePath(); ctx.fill();
+  }
+  ctx.restore(); // 머리
+  // 얼림 표시
+  if (frozen) { ctx.font = "12px sans-serif"; ctx.textAlign = "center"; ctx.fillText("❄", 0, -78); }
+  ctx.restore();
+}
+
+/* ---------------- 그리기: 기타 ---------------- */
+function drawSunIcon(x, y, r, t) {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(t * 0.7);
+  const pulse = 1 + Math.sin(t * 3) * 0.06;
+  ctx.scale(pulse, pulse);
+  const g = ctx.createRadialGradient(0, 0, 2, 0, 0, r);
+  g.addColorStop(0, "#fff7c0"); g.addColorStop(0.55, "#ffd94d"); g.addColorStop(1, "rgba(255,200,40,0)");
+  circle(0, 0, r, g);
+  ctx.fillStyle = "#ffce33";
+  for (let i = 0; i < 8; i++) {
+    ctx.save(); ctx.rotate(i * Math.PI / 4);
+    ctx.beginPath(); ctx.moveTo(r * 0.55, -3.5); ctx.lineTo(r * 0.95, 0); ctx.lineTo(r * 0.55, 3.5);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+  circle(0, 0, r * 0.52, "#fff2a8");
+  ctx.restore();
+}
+function drawMower(m) {
+  if (m.used && !m.active) return;
+  const y = GRID.y + m.row * GRID.ch + GRID.ch - 14;
+  ctx.save(); ctx.translate(m.x, y);
+  if (m.active) ctx.translate(rand(-1, 1), rand(-1, 1));
+  ctx.strokeStyle = "#455a64"; ctx.lineWidth = 4; ctx.lineCap = "round";
+  ctx.beginPath(); ctx.moveTo(-12, -12); ctx.lineTo(-26, -30); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-26, -30); ctx.lineTo(-20, -33); ctx.stroke();
+  rrect(-17, -17, 34, 15, 4, m.active ? "#e53935" : "#c62828", "#8e1f1c", 2);
+  rrect(-6, -23, 14, 8, 2, "#b0bec5", "#78909c", 1.5);
+  for (const wx of [-9, 9]) {
+    circle(wx, 1, 5.5, "#37474f", "#263238", 1.5);
+    ctx.strokeStyle = "#90a4ae"; ctx.lineWidth = 1.5;
+    ctx.save(); ctx.translate(wx, 1); ctx.rotate(m.wheel);
+    ctx.beginPath(); ctx.moveTo(-4, 0); ctx.lineTo(4, 0); ctx.stroke();
+    ctx.restore();
+  }
+  ctx.restore();
+}
+function drawLawn() {
+  // 하늘/배경
+  ctx.fillStyle = "#24401c"; ctx.fillRect(0, 0, W, H);
+  // 잔디
+  for (let r = 0; r < GRID.rows; r++) {
+    for (let c = 0; c < GRID.cols; c++) {
+      ctx.fillStyle = (r + c) % 2 === 0 ? "#7ec850" : "#6db544";
+      ctx.fillRect(GRID.x + c * GRID.cw, GRID.y + r * GRID.ch, GRID.cw, GRID.ch);
+    }
+  }
+  // 마을(왼쪽)
+  ctx.fillStyle = "#8a5a2b"; ctx.fillRect(0, GRID.y, GRID.x, GRID.rows * GRID.ch);
+  ctx.strokeStyle = "rgba(0,0,0,0.15)"; ctx.lineWidth = 2;
+  for (let y = GRID.y; y <= GRID.y + GRID.rows * GRID.ch; y += 40) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(GRID.x, y); ctx.stroke();
+  }
+  ctx.fillStyle = "#5d3a18"; ctx.fillRect(GRID.x - 6, GRID.y, 6, GRID.rows * GRID.ch);
+  // 길(오른쪽)
+  ctx.fillStyle = "#3b3b2a"; ctx.fillRect(GRID.x + GRID.cols * GRID.cw, GRID.y, W, GRID.rows * GRID.ch);
+  ctx.fillStyle = "#2e2e20";
+  for (let y = GRID.y + 10; y < GRID.y + GRID.rows * GRID.ch; y += 60) {
+    ctx.fillRect(GRID.x + GRID.cols * GRID.cw + 12, y, 16, 30);
+  }
+  // 흙길(위/아래)
+  ctx.fillStyle = "#5d4022";
+  ctx.fillRect(GRID.x, GRID.y - 26, GRID.cols * GRID.cw, 26);
+  ctx.fillRect(GRID.x, GRID.y + GRID.rows * GRID.ch, GRID.cols * GRID.cw, H - (GRID.y + GRID.rows * GRID.ch));
+  // 그리드 선
+  ctx.strokeStyle = "rgba(0,0,0,0.06)"; ctx.lineWidth = 1;
+  for (let c = 0; c <= GRID.cols; c++) {
+    ctx.beginPath(); ctx.moveTo(GRID.x + c * GRID.cw, GRID.y); ctx.lineTo(GRID.x + c * GRID.cw, GRID.y + GRID.rows * GRID.ch); ctx.stroke();
+  }
+  for (let r = 0; r <= GRID.rows; r++) {
+    ctx.beginPath(); ctx.moveTo(GRID.x, GRID.y + r * GRID.ch); ctx.lineTo(GRID.x + GRID.cols * GRID.cw, GRID.y + r * GRID.ch); ctx.stroke();
+  }
+  // 그을음
+  for (const s of game.scorches) {
+    const a = clamp(1 - s.t / s.dur, 0, 1) * 0.55;
+    const g = ctx.createRadialGradient(s.x, s.y, 5, s.x, s.y, 90);
+    g.addColorStop(0, `rgba(30,20,10,${a})`); g.addColorStop(1, "rgba(30,20,10,0)");
+    circle(s.x, s.y, 90, g);
+  }
+}
+
+/* ---------------- 그리기: HUD ---------------- */
+function drawHUD() {
+  // 목재 바
+  const g = ctx.createLinearGradient(0, 0, 0, 130);
+  g.addColorStop(0, "#6b4423"); g.addColorStop(1, "#4a2d12");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, 130);
+  ctx.fillStyle = "rgba(0,0,0,0.25)"; ctx.fillRect(0, 126, W, 4);
+  ctx.strokeStyle = "rgba(255,220,150,0.25)"; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(0, 127.5); ctx.lineTo(W, 127.5); ctx.stroke();
+
+  // 태양 카운터
+  rrect(12, 15, 84, 100, 10, "#f7ecc5", "#8a5a2b", 3);
+  drawSunIcon(54, 50, 21, game.time);
+  text(String(game.sun), 54, 94, 24, "#5b3a1e", true);
+
+  // 씨앗 패킷
+  for (let i = 0; i < PTYPES.length; i++) {
+    const t = PTYPES[i], px = 108 + i * 80, d = PLANTS[t];
+    const ready = game.cd[t] <= 0, afford = game.sun >= d.cost;
+    const sel = game.selected === t;
+    rrect(px, 15, 74, 100, 8, ready && afford ? "#e8d9a8" : "#b3a586",
+      sel ? "#ffd23e" : "#7a5a2f", sel ? 4 : 2);
+    const fake = { type: t, anim: game.time, hp: 1, maxhp: 1, flashT: 0, recoil: 0, t: 0 };
+    drawPlant(fake, px + 37, 46, 0.62);
+    text(String(d.cost), px + 37, 106, 15, afford ? "#3a2a10" : "#c62828", true);
+    if (!ready) {
+      const frac = clamp(game.cd[t] / d.cd, 0, 1);
+      ctx.fillStyle = "rgba(20,20,20,0.55)";
+      ctx.beginPath(); ctx.roundRect(px + 2, 15 + 100 - 98 * frac, 70, 98 * frac, 6); ctx.fill();
+      text(Math.ceil(game.cd[t]) + "s", px + 37, 66, 18, "#fff", true);
+    }
+    // 호버 툴팁
+    if (game.mx >= px && game.mx <= px + 74 && game.my >= 15 && game.my <= 115 && game.state === "playing") {
+      const tipW = 168, tipX = clamp(px + 37 - tipW / 2, 4, W - tipW - 4);
+      rrect(tipX, 136, tipW, 46, 8, "rgba(30,22,10,0.92)", "#c9a86a", 2);
+      text(d.name, tipX + tipW / 2, 152, 16, "#ffd23e", true);
+      text(d.desc + " · 태양 " + d.cost, tipX + tipW / 2, 170, 12, "#e8dfc8", false);
+    }
+  }
+
+  // 삽
+  const sh = BTN.shovel;
+  rrect(sh.x, sh.y, sh.w, sh.h, 8, "#c9b487", game.shovel ? "#ffd23e" : "#7a5a2f", game.shovel ? 4 : 2);
+  ctx.save(); ctx.translate(sh.x + 35, sh.y + 40); ctx.rotate(0.7);
+  ctx.strokeStyle = "#8a5a2b"; ctx.lineWidth = 6; ctx.lineCap = "round";
+  ctx.beginPath(); ctx.moveTo(0, -22); ctx.lineTo(0, 6); ctx.stroke();
+  ctx.strokeStyle = "#6d441c"; ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.arc(0, -24, 6, Math.PI, Math.PI * 2); ctx.stroke();
+  ctx.fillStyle = "#aeb8bd"; ctx.strokeStyle = "#78868c"; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(-9, 6); ctx.lineTo(9, 6); ctx.lineTo(6, 24); ctx.quadraticCurveTo(0, 30, -6, 24); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  ctx.restore();
+  text("삽", sh.x + 35, sh.y + 86, 14, "#5b3a1e", true);
+
+  // 일시정지 / 소리
+  rrect(BTN.pause.x, BTN.pause.y, BTN.pause.w, BTN.pause.h, 8, "#8a5a2b", "#5b3a1e", 2);
+  if (game.state === "paused") {
+    ctx.fillStyle = "#f7ecc5";
+    ctx.beginPath(); ctx.moveTo(BTN.pause.x + 16, BTN.pause.y + 12); ctx.lineTo(BTN.pause.x + 34, BTN.pause.y + 23); ctx.lineTo(BTN.pause.x + 16, BTN.pause.y + 34); ctx.closePath(); ctx.fill();
+  } else {
+    ctx.fillStyle = "#f7ecc5";
+    ctx.fillRect(BTN.pause.x + 14, BTN.pause.y + 12, 6, 22);
+    ctx.fillRect(BTN.pause.x + 26, BTN.pause.y + 12, 6, 22);
+  }
+  rrect(BTN.mute.x, BTN.mute.y, BTN.mute.w, BTN.mute.h, 8, "#8a5a2b", "#5b3a1e", 2);
+  text(muted ? "🔇" : "🔊", BTN.mute.x + 23, BTN.mute.y + 24, 20, "#fff");
+
+  // 웨이브 진행 바
+  const prog = clamp(game.time / FINAL_T, 0, 1);
+  const bx = 690, by = 25, bw = 236, bh = 16;
+  rrect(bx, by, bw, bh, 8, "rgba(0,0,0,0.45)", "#c9a86a", 2);
+  const pg = ctx.createLinearGradient(bx, 0, bx + bw, 0);
+  pg.addColorStop(0, "#7ec850"); pg.addColorStop(1, prog > 0.85 ? "#ff5252" : "#4caf3a");
+  if (prog > 0.02) rrect(bx + 2, by + 2, (bw - 4) * prog, bh - 4, 6, pg);
+  text("🚩", bx + bw + 12, by + 8, 15, "#fff");
+  text(`웨이브 ${Math.min(game.waveIdx, WAVES.length)} / ${WAVES.length}`, bx + bw / 2, by + 38, 16, "#f0e6c8", true);
+}
+
+/* ---------------- 그리기: 오버레이 ---------------- */
+const MENU_DECO = [];
+for (let i = 0; i < 14; i++) {
+  MENU_DECO.push({ e: ["🌻", "🧟", "🌰", "☀️", "🌷", "🧠"][i % 6], x: rand(30, 970), y: rand(30, 620), s: rand(24, 46), ph: rand(0, 6), sp: rand(0.5, 1.2) });
+}
+function drawButton(r, label, color) {
+  rrect(r.x, r.y, r.w, r.h, 12, color, "rgba(0,0,0,0.4)", 3);
+  text(label, r.x + r.w / 2, r.y + r.h / 2 + 1, 22, "#ffffff", true);
+}
+function drawMenu() {
+  ctx.fillStyle = "#1c3315"; ctx.fillRect(0, 0, W, H);
+  const t = performance.now() / 1000;
+  ctx.globalAlpha = 0.5;
+  for (const d of MENU_DECO) {
+    ctx.font = d.s + "px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(d.e, d.x, d.y + Math.sin(t * d.sp + d.ph) * 10);
+  }
+  ctx.globalAlpha = 1;
+  rrect(190, 110, 620, 410, 22, "rgba(10,20,8,0.82)", "#c9a86a", 3);
+  text("🌻 식물 vs 좀비 🧟", 500, 175, 46, "#ffd23e", true);
+  text("웹 캔버스로 만든 PvZ 스타일 타워 디펜스", 500, 216, 17, "#cfe8b0", false);
+  const lines = [
+    "☀️  하늘에서 떨어지는 태양과 해바라기를 클릭해 태양을 모으세요",
+    "🌱  위의 씨앗 패킷을 클릭 → 잔디 밭을 클릭해 식물을 심으세요",
+    "🧟  10개의 좀비 웨이브를 모두 막아내면 승리!",
+    "🥄  삽: 식물 제거 · 우클릭/Esc: 선택 취소 · Space: 일시정지",
+    "🚜  잔디깎이는 각 줄의 마지막 방어선입니다 (한 번만 작동!)",
+  ];
+  lines.forEach((l, i) => text(l, 500, 262 + i * 30, 16, "#f0ead8", false));
+  drawButton(BTN.start, "▶  게임 시작", "#4caf3a");
+}
+function drawEndOverlay(won) {
+  ctx.fillStyle = "rgba(0,0,0,0.62)"; ctx.fillRect(0, 0, W, H);
+  rrect(230, 170, 540, 280, 20, "rgba(20,26,16,0.95)", won ? "#ffd23e" : "#b3402e", 4);
+  if (won) {
+    text("🏆 승리!", 500, 235, 46, "#ffd23e", true);
+    text("당신의 정원을 지켜냈습니다!", 500, 290, 20, "#c8e6a0", false);
+    text(`생존 시간 ${Math.floor(game.time)}초 · 남은 태양 ${game.sun}`, 500, 325, 16, "#e8dfc8", false);
+    drawButton(BTN.again, "🔄  다시 하기", "#4caf3a");
+  } else {
+    text("🧟 좀비가 당신의 뇌를", 500, 225, 34, "#ff6b5e", true);
+    text("먹어치웠습니다...", 500, 270, 34, "#ff6b5e", true);
+    text(`버틴 시간 ${Math.floor(game.time)}초 · 웨이브 ${Math.max(1, game.waveIdx)}/${WAVES.length}`, 500, 320, 16, "#e8dfc8", false);
+    drawButton(BTN.again, "🔄  다시 도전", "#c62828");
+  }
+}
+
+/* ---------------- 전체 그리기 ---------------- */
+function draw() {
+  if (game.state === "menu") { drawMenu(); return; }
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = "#24401c"; ctx.fillRect(0, 0, W, H);
+  ctx.save();
+  if (shake > 0) ctx.translate(rand(-shake, shake) * 0.6, rand(-shake, shake) * 0.6);
+
+  drawLawn();
+  for (const m of game.mowers) drawMower(m);
+
+  // 식물 (행 순)
+  const plants = [...game.plants].sort((a, b) => a.row - b.row || a.col - b.col);
+  for (const p of plants) drawPlant(p, p.cx, p.cy);
+
+  // 좀비 (행 순, 같은 행은 x 순)
+  const zombies = [...game.zombies].sort((a, b) => a.row - b.row || a.x - b.x);
+  for (const z of zombies) drawZombie(z);
+
+  // 완두콩
+  for (const pea of game.peas) {
+    circle(pea.x - 6, pea.y, 4, pea.frozen ? "rgba(140,215,245,0.35)" : "rgba(120,200,80,0.35)");
+    circle(pea.x, pea.y, 7, pea.frozen ? "#6cd0f0" : "#59c93c", pea.frozen ? "#2f8db3" : "#3a8f22", 2);
+    circle(pea.x - 2, pea.y - 2.5, 2, "rgba(255,255,255,0.6)");
+  }
+
+  // 파티클
+  for (const p of game.particles) {
+    const a = clamp(1 - p.t / p.dur, 0, 1);
+    if (p.type === "dot") {
+      ctx.globalAlpha = a;
+      circle(p.x, p.y, p.r * (0.5 + a * 0.5), p.color);
+      ctx.globalAlpha = 1;
+    } else if (p.type === "banner") {
+      const pop = p.t < 0.18 ? 0.6 + (p.t / 0.18) * 0.4 : 1;
+      ctx.globalAlpha = p.t > p.dur - 0.35 ? clamp((p.dur - p.t) / 0.35, 0, 1) : 1;
+      ctx.save(); ctx.translate(W / 2, p.y); ctx.scale(pop, pop);
+      ctx.font = font(p.size, true); ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.lineWidth = 6; ctx.strokeStyle = "rgba(0,0,0,0.7)"; ctx.strokeText(p.text, 0, 0);
+      ctx.fillStyle = p.color; ctx.fillText(p.text, 0, 0);
+      ctx.restore(); ctx.globalAlpha = 1;
+    }
+  }
+
+  // 태양 (맨 위)
+  for (const s of game.suns) {
+    const blink = !s.collected && s.life < 3 ? (Math.sin(s.life * 12) > 0 ? 1 : 0.35) : 1;
+    ctx.globalAlpha = blink;
+    drawSunIcon(s.x, s.y, s.collected ? 20 * (1 - s.ct * 0.8) : 22, s.t);
+    ctx.globalAlpha = 1;
+  }
+
+  // 배치 미리보기
+  const gc = Math.floor((game.mx - GRID.x) / GRID.cw), gr = Math.floor((game.my - GRID.y) / GRID.ch);
+  if (game.selected && gc >= 0 && gc < GRID.cols && gr >= 0 && gr < GRID.rows) {
+    const occupied = !!plantAt(gc, gr);
+    ctx.globalAlpha = 0.55;
+    if (!occupied) {
+      const fake = { type: game.selected, anim: game.time, hp: 1, maxhp: 1, flashT: 0, recoil: 0, t: 0 };
+      drawPlant(fake, cellCX(gc), cellCY(gr));
+    } else {
+      ctx.strokeStyle = "#ff5252"; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.roundRect(GRID.x + gc * GRID.cw + 6, GRID.y + gr * GRID.ch + 6, GRID.cw - 12, GRID.ch - 12, 10); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(GRID.x + gc * GRID.cw + 20, GRID.y + gr * GRID.ch + 20);
+      ctx.lineTo(GRID.x + (gc + 1) * GRID.cw - 20, GRID.y + (gr + 1) * GRID.ch - 20); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+  ctx.restore(); // shake
+
+  drawHUD();
+
+  // 삽 커서
+  if (game.shovel) {
+    ctx.save(); ctx.translate(game.mx, game.my); ctx.rotate(0.7);
+    ctx.strokeStyle = "#8a5a2b"; ctx.lineWidth = 5; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(0, -18); ctx.lineTo(0, 4); ctx.stroke();
+    ctx.fillStyle = "#aeb8bd";
+    ctx.beginPath(); ctx.moveTo(-8, 4); ctx.lineTo(8, 4); ctx.lineTo(5, 20); ctx.quadraticCurveTo(0, 26, -5, 20); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+
+  // 배너 위 정리 문구는 particles에서 처리됨
+  if (game.state === "paused") {
+    ctx.fillStyle = "rgba(0,0,0,0.55)"; ctx.fillRect(0, 0, W, H);
+    text("⏸ 일시정지", 500, 300, 40, "#ffffff", true);
+    text("Space 또는 ▶ 버튼으로 계속하기", 500, 350, 18, "#e0d8c0", false);
+  }
+  if (game.state === "won" || game.state === "lost") drawEndOverlay(game.state === "won");
+}
+
+/* ---------------- 입력 ---------------- */
+function toXY(e) {
+  const r = canvas.getBoundingClientRect();
+  return { x: (e.clientX - r.left) * W / r.width, y: (e.clientY - r.top) * H / r.height };
+}
+canvas.addEventListener("pointermove", e => {
+  const p = toXY(e); game.mx = p.x; game.my = p.y;
+});
+canvas.addEventListener("pointerdown", e => {
+  ac();
+  const { x, y } = toXY(e);
+  if (game.state === "menu") {
+    if (inRect(x, y, BTN.start)) startGame();
+    return;
+  }
+  if (game.state === "won" || game.state === "lost") {
+    if (inRect(x, y, BTN.again)) startGame();
+    return;
+  }
+  if (inRect(x, y, BTN.pause)) {
+    game.state = game.state === "paused" ? "playing" : "paused";
+    return;
+  }
+  if (inRect(x, y, BTN.mute)) { muted = !muted; return; }
+  if (game.state !== "playing") return;
+
+  // 태양 클릭
+  for (let i = game.suns.length - 1; i >= 0; i--) {
+    const s = game.suns[i];
+    if (!s.collected && dist(x, y, s.x, s.y) < 34) {
+      s.collected = true; s.ct = 0; s.sx = s.x; s.sy = s.y;
+      puff(s.x, s.y, 5, ["#fff3ae", "#ffe66b"], 80, 0.4, 0);
+      SFX.sun();
+      return;
+    }
+  }
+  // 씨앗 패킷
+  for (let i = 0; i < PTYPES.length; i++) {
+    const px = 108 + i * 80, t = PTYPES[i];
+    if (x >= px && x <= px + 74 && y >= 15 && y <= 115) {
+      if (game.selected === t) { game.selected = null; return; }
+      if (game.cd[t] > 0) { toast("아직 준비 중이에요!"); SFX.nope(); return; }
+      if (game.sun < PLANTS[t].cost) { toast("태양이 부족해요!"); SFX.nope(); return; }
+      game.selected = t; game.shovel = false;
+      return;
+    }
+  }
+  // 삽
+  if (inRect(x, y, BTN.shovel)) { game.shovel = !game.shovel; game.selected = null; return; }
+
+  // 격자
+  const c = Math.floor((x - GRID.x) / GRID.cw), r = Math.floor((y - GRID.y) / GRID.ch);
+  if (c >= 0 && c < GRID.cols && r >= 0 && r < GRID.rows) {
+    if (game.shovel) {
+      const p = plantAt(c, r);
+      if (p) {
+        p.dead = true;
+        game.plants = game.plants.filter(pp => !pp.dead);
+        puff(cellCX(c), cellCY(r), 10, ["#8d6e63", "#a1887f", "#6d4c41"], 130, 0.5);
+        SFX.plant(); game.shovel = false;
+      } else toast("여기엔 식물이 없어요");
+      return;
+    }
+    if (game.selected) {
+      if (plantAt(c, r)) { toast("여기엔 이미 식물이 있어요!"); SFX.nope(); return; }
+      const d = PLANTS[game.selected];
+      if (game.sun < d.cost) { toast("태양이 부족해요!"); SFX.nope(); return; }
+      game.sun -= d.cost;
+      game.cd[game.selected] = d.cd;
+      game.plants.push(new Plant(game.selected, c, r));
+      puff(cellCX(c), cellCY(r) + 20, 8, ["#8d6e63", "#5d4022", "#a1887f"], 110, 0.5);
+      SFX.plant(); playSfx("select", { volume: 0.4 });
+      game.selected = null;
+    }
+  }
+});
+canvas.addEventListener("contextmenu", e => {
+  e.preventDefault();
+  game.selected = null; game.shovel = false;
+});
+window.addEventListener("keydown", e => {
+  if (e.code === "Space") {
+    e.preventDefault();
+    if (game.state === "playing") game.state = "paused";
+    else if (game.state === "paused") game.state = "playing";
+  }
+  if (e.key === "Escape") { game.selected = null; game.shovel = false; }
+  const n = parseInt(e.key, 10);
+  if (n >= 1 && n <= 6 && game.state === "playing") {
+    const t = PTYPES[n - 1];
+    if (game.cd[t] <= 0 && game.sun >= PLANTS[t].cost) { game.selected = t; game.shovel = false; }
+  }
+});
+
+/* ---------------- 루프 ---------------- */
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000);
+  last = now;
+  if (game.state === "playing") update(dt);
+  updateFX(dt);
+  draw();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+window.game = game;
+window.__start = startGame;
+// 테스트/디버깅 훅
+window.Plant = Plant; window.Zombie = Zombie; window.Sun = Sun; window.Pea = Pea;
+window.__update = update;
+</script>
+</body>
+</html>

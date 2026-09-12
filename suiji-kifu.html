@@ -1,0 +1,1032 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>기보 • 두마당</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#e8edf3">
+<meta name="description" content="실제 규칙의 바둑, 오목, 알까기, AI 기보 분석까지 — 두마당 보드게임 모음">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="두마당">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/favicon-64.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,500&family=Spline+Sans:wght@300;400;500;600;700&family=Noto+Serif+JP:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="suiji-theme.css?v=15">
+<style>
+.main-grid {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr) 320px;
+  gap: 22px;
+  align-items: start;
+}
+@media (max-width: 1180px) {
+  .main-grid { grid-template-columns: 300px 1fr; }
+  .right-col { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+}
+@media (max-width: 820px) {
+  .main-grid { grid-template-columns: 1fr; }
+  .right-col { grid-column: 1; grid-template-columns: 1fr; }
+  .app { padding: 16px 16px 60px; }
+  .brand h1 { font-size: 30px; }
+}
+
+.board-section { min-width: 0; }
+.board-wrap {
+  background: linear-gradient(180deg, var(--paper) 0%, var(--paper-2) 100%);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 18px 18px 22px;
+  box-shadow: 0 10px 30px var(--shadow);
+  position: relative;
+}
+.board-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.kifu-title { font-family: 'Cormorant Garamond', serif; font-size: 19px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+.kifu-title .meta { font-family: 'Spline Sans', sans-serif; font-size: 10.5px; color: var(--ink-light); letter-spacing: 0.14em; text-transform: uppercase; font-weight: 500; }
+.board-controls { display: flex; gap: 6px; flex-wrap: wrap; }
+.canvas-wrap { position: relative; display: flex; justify-content: center; border-radius: 8px; overflow: hidden; }
+canvas#board {
+  display: block;
+  width: 100%;
+  max-width: 620px;
+  aspect-ratio: 1;
+  height: auto;
+  touch-action: none;
+}
+.replay-inline { margin-top: 16px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.replay-inline .replay-slider-wrap { flex: 1; min-width: 180px; padding-top: 12px; position: relative; }
+
+/* library */
+.lib-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--paper-dark);
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.lib-item:hover { border-color: var(--ink-light); transform: translateX(2px); }
+.lib-item.active { border-color: var(--accent); box-shadow: inset 2px 0 0 var(--accent); }
+.lib-item .lib-main { flex: 1; min-width: 0; }
+.lib-item .lib-name { font-size: 12.5px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lib-item .lib-meta { font-size: 10.5px; color: var(--ink-light); font-family: 'JetBrains Mono', monospace; margin-top: 2px; }
+.lib-item .lib-del {
+  border: none; background: transparent; color: var(--ink-light);
+  cursor: pointer; padding: 4px 6px; border-radius: 4px; font-size: 12px;
+}
+.lib-item .lib-del:hover { color: var(--accent); background: rgba(165, 40, 40, 0.1); }
+.empty-note { text-align: center; padding: 16px 0; color: var(--ink-light); font-size: 12px; font-style: italic; }
+
+textarea.sgf-paste {
+  width: 100%;
+  min-height: 74px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--ink);
+  background: var(--paper-dark);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px;
+  resize: vertical;
+  outline: none;
+}
+textarea.sgf-paste:focus { border-color: var(--accent); }
+.file-label { display: inline-flex; }
+
+.progress-track { height: 8px; border-radius: 4px; background: var(--paper-dark); border: 1px solid var(--line); overflow: hidden; margin-top: 10px; display: none; }
+.progress-track.show { display: block; }
+.progress-fill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--gold), var(--accent)); transition: width 0.15s; }
+
+/* analysis */
+.wr-big { display: flex; align-items: baseline; gap: 10px; margin: 4px 0 8px; }
+.wr-big .num { font-family: 'JetBrains Mono', monospace; font-size: 30px; font-weight: 700; color: var(--ink); }
+.wr-big .who { font-size: 12px; color: var(--ink-2); font-weight: 600; }
+.quality-badge {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  margin-top: 8px;
+}
+.quality-badge.excellent { background: rgba(63, 125, 68, 0.14); color: var(--ok); }
+.quality-badge.good { background: rgba(63, 125, 68, 0.10); color: var(--ok); }
+.quality-badge.inaccuracy { background: rgba(184, 134, 11, 0.14); color: var(--gold); }
+.quality-badge.mistake { background: rgba(200, 90, 20, 0.14); color: #b05a14; }
+.quality-badge.blunder { background: rgba(165, 40, 40, 0.14); color: var(--accent); }
+canvas#winGraph { width: 100%; height: 110px; display: block; background: var(--paper-dark); border: 1px solid var(--line); border-radius: 6px; }
+.graph-wrap { margin-top: 12px; }
+.toggle-row { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; font-size: 12.5px; color: var(--ink-2); }
+.switch { position: relative; width: 38px; height: 20px; flex-shrink: 0; cursor: pointer; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.switch .track { position: absolute; inset: 0; background: var(--paper-dark); border: 1px solid var(--line); border-radius: 999px; transition: 0.25s; }
+.switch .track::before { content: ''; position: absolute; width: 14px; height: 14px; left: 2px; top: 2px; background: var(--ink-light); border-radius: 50%; transition: 0.25s; }
+.switch input:checked + .track { background: var(--accent); border-color: var(--accent); }
+.switch input:checked + .track::before { transform: translateX(18px); background: var(--paper); }
+.best-list { margin-top: 10px; }
+.best-row { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 4px 0; color: var(--ink-2); }
+.best-row .rank-dot {
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--ink); color: var(--paper);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700;
+}
+.best-row .pts { margin-left: auto; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-light); }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <header class="header">
+    <div class="brand">
+      <div class="seal">譜</div>
+      <div>
+        <h1>기보</h1>
+        <div class="tagline">기보 열람<span class="dot">·</span>AI 리뷰</div>
+      </div>
+    </div>
+    <div class="header-controls">
+      <button class="btn icon-only" id="btnSound" title="Toggle sound"><i class="fa-solid fa-volume-high"></i></button>
+    </div>
+  </header>
+
+  <div class="main-grid">
+
+    <!-- LEFT: library & import -->
+    <aside class="left-col">
+      <div class="panel">
+        <h3 class="panel-title">Library <span class="panel-sub" id="libCount">0 games</span></h3>
+        <div id="library">
+          <div class="empty-note">No games saved yet.<br>Play a game of Baduk and press the 💾 save button, or generate a self-play game below.</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3 class="panel-title">Import SGF</h3>
+        <div style="display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap;">
+          <label class="btn file-label"><i class="fa-solid fa-file-import"></i> Open file
+            <input type="file" id="fileInput" accept=".sgf,text/plain" style="display:none;">
+          </label>
+          <button class="btn" id="btnSample"><i class="fa-solid fa-flask"></i> Sample 9×9</button>
+        </div>
+        <textarea class="sgf-paste" id="sgfPaste" placeholder="…or paste SGF text here, e.g. (;GM[1]SZ[19];B[dd];W[pq])"></textarea>
+        <div style="margin-top:10px; display:flex; gap:8px;">
+          <button class="btn primary" id="btnLoadPaste" style="flex:1;"><i class="fa-solid fa-right-to-bracket"></i> Load pasted SGF</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3 class="panel-title">AI Self-Play <span class="panel-sub">Generator</span></h3>
+        <div class="info-row">
+          <span class="label">Board</span>
+          <select class="info-select" id="genSize">
+            <option value="9">9 × 9</option>
+            <option value="13">13 × 13</option>
+            <option value="19" selected>19 × 19</option>
+          </select>
+        </div>
+        <div class="info-row">
+          <span class="label">AI level</span>
+          <select class="info-select" id="genLevel">
+            <option value="1">Beginner · fast</option>
+            <option value="2" selected>Mid Dan</option>
+            <option value="3">High Dan · slow</option>
+          </select>
+        </div>
+        <div class="info-row">
+          <span class="label">Max moves</span>
+          <select class="info-select" id="genMax">
+            <option value="120">120</option>
+            <option value="225" selected>225</option>
+            <option value="320">320</option>
+          </select>
+        </div>
+        <button class="btn primary" id="btnGenerate" style="width:100%; justify-content:center; margin-top:12px;">
+          <i class="fa-solid fa-robot"></i> Generate Game
+        </button>
+        <div class="progress-track" id="genProgress"><div class="progress-fill" id="genFill"></div></div>
+      </div>
+    </aside>
+
+    <!-- CENTER: board -->
+    <section class="board-section">
+      <div class="board-wrap">
+        <div class="board-status">
+          <div class="kifu-title">
+            <span id="kifuName">No game loaded</span>
+            <span class="meta" id="kifuMeta"></span>
+          </div>
+          <div class="board-controls">
+            <button class="btn" id="btnCopySgf" title="Copy SGF"><i class="fa-solid fa-clipboard"></i></button>
+            <button class="btn" id="btnDownloadSgf" title="Download SGF"><i class="fa-solid fa-download"></i></button>
+            <button class="btn" id="btnView" title="2D / 3D 전환"><i class="fa-solid fa-cube"></i> <span id="viewLabel">3D</span></button>
+          </div>
+        </div>
+
+        <div class="canvas-wrap">
+          <canvas id="board"></canvas>
+        </div>
+
+        <div class="replay-inline">
+          <div class="replay-controls">
+            <button class="btn" id="btnFirst" title="Start"><i class="fa-solid fa-backward-fast"></i></button>
+            <button class="btn" id="btnPrev" title="Previous"><i class="fa-solid fa-backward-step"></i></button>
+            <button class="btn primary" id="btnPlay" title="Play"><i class="fa-solid fa-play"></i></button>
+            <button class="btn" id="btnNext" title="Next"><i class="fa-solid fa-forward-step"></i></button>
+            <button class="btn" id="btnLast" title="End"><i class="fa-solid fa-forward-fast"></i></button>
+          </div>
+          <div class="replay-slider-wrap">
+            <input type="range" class="replay-slider" id="replaySlider" min="0" max="0" value="0">
+          </div>
+          <div class="move-info" id="plyInfo">
+            <span class="move-num" id="plyNum">Ply 0</span>
+            <span class="reason" id="plyReason">Load a game to begin</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT: analysis -->
+    <aside class="right-col">
+      <div class="panel">
+        <h3 class="panel-title">AI Analysis <span class="panel-sub live">Estimates</span></h3>
+
+        <div class="score-bar" style="margin-top:4px;">
+          <div class="black-fill" id="wrBarBlack" style="width:50%"></div>
+          <div class="white-fill" id="wrBarWhite" style="width:50%"></div>
+        </div>
+        <div class="wr-big">
+          <span class="num" id="wrNum">—</span>
+          <span class="who" id="wrWho">load a game</span>
+        </div>
+        <div class="score-margin" id="wrNote">Win rate is estimated from territory influence.</div>
+
+        <div id="qualityWrap" style="display:none;">
+          <div class="quality-badge good" id="qualityBadge"><i class="fa-solid fa-check"></i> <span id="qualityText">Good move</span></div>
+          <div class="best-list" id="bestList"></div>
+        </div>
+
+        <div class="toggle-row">
+          <span>Show AI best moves (top 3)</span>
+          <label class="switch">
+            <input type="checkbox" id="toggleBest">
+            <span class="track"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3 class="panel-title">Win-rate Graph</h3>
+        <canvas id="winGraph" width="600" height="220"></canvas>
+        <div class="heatmap-legend" style="margin-top:6px;">
+          <div class="leg"><span class="swatch b"></span>Black rising</div>
+          <div class="leg" id="graphInfo">—</div>
+          <div class="leg">White rising<span class="swatch w"></span></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3 class="panel-title">Move List</h3>
+        <div class="move-list" id="moveList">
+          <div class="move-empty">No game loaded.</div>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script src="suiji-engine.js?v=15"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="suiji-3d.js?v=15"></script>
+<script src="suiji-common.js?v=15"></script>
+<script>
+const { GoGame, GoAI, BoardRenderer, SGF } = SuijiEngine;
+
+// ============================================
+// STATE
+// ============================================
+let kifuGame = null;         // replayed GoGame with full history
+let currentEntry = null;     // library entry currently open
+let cur = 0;                 // current ply (0..history.length)
+let winRates = null;         // array of black win% per ply
+let showBest = false;
+let analysisTimer = null;
+const qualityCache = new Map(); // ply -> {delta, quality, top3}
+const bestCache = new Map();    // ply -> top3 array
+
+const els = {
+  board: document.getElementById('board'),
+  kifuName: document.getElementById('kifuName'),
+  kifuMeta: document.getElementById('kifuMeta'),
+  library: document.getElementById('library'),
+  libCount: document.getElementById('libCount'),
+  fileInput: document.getElementById('fileInput'),
+  sgfPaste: document.getElementById('sgfPaste'),
+  btnLoadPaste: document.getElementById('btnLoadPaste'),
+  btnSample: document.getElementById('btnSample'),
+  genSize: document.getElementById('genSize'),
+  genLevel: document.getElementById('genLevel'),
+  genMax: document.getElementById('genMax'),
+  btnGenerate: document.getElementById('btnGenerate'),
+  genProgress: document.getElementById('genProgress'),
+  genFill: document.getElementById('genFill'),
+  btnCopySgf: document.getElementById('btnCopySgf'),
+  btnDownloadSgf: document.getElementById('btnDownloadSgf'),
+  btnFirst: document.getElementById('btnFirst'),
+  btnPrev: document.getElementById('btnPrev'),
+  btnNext: document.getElementById('btnNext'),
+  btnLast: document.getElementById('btnLast'),
+  btnPlay: document.getElementById('btnPlay'),
+  replaySlider: document.getElementById('replaySlider'),
+  plyNum: document.getElementById('plyNum'),
+  plyReason: document.getElementById('plyReason'),
+  wrBarBlack: document.getElementById('wrBarBlack'),
+  wrBarWhite: document.getElementById('wrBarWhite'),
+  wrNum: document.getElementById('wrNum'),
+  wrWho: document.getElementById('wrWho'),
+  wrNote: document.getElementById('wrNote'),
+  qualityWrap: document.getElementById('qualityWrap'),
+  qualityBadge: document.getElementById('qualityBadge'),
+  qualityText: document.getElementById('qualityText'),
+  bestList: document.getElementById('bestList'),
+  toggleBest: document.getElementById('toggleBest'),
+  winGraph: document.getElementById('winGraph'),
+  graphInfo: document.getElementById('graphInfo'),
+  moveList: document.getElementById('moveList'),
+  btnSound: document.getElementById('btnSound'),
+  btnView: document.getElementById('btnView'),
+  viewLabel: document.getElementById('viewLabel'),
+};
+
+// ============================================
+// RENDERER — with best-move markers
+// ============================================
+class KifuRenderer extends BoardRenderer {
+  render() {
+    super.render();
+    if (showBest && bestCache.has(cur)) {
+      const ctx = this.ctx;
+      const top = bestCache.get(cur);
+      top.forEach((m, i) => {
+        const px = this.padding + m.x * this.cellSize;
+        const py = this.padding + m.y * this.cellSize;
+        if (this.game.board[m.x][m.y] !== 0) return;
+        ctx.save();
+        ctx.fillStyle = i === 0 ? 'rgba(165, 40, 40, 0.92)' : 'rgba(31, 20, 16, 0.72)';
+        ctx.beginPath();
+        ctx.arc(px, py, this.stoneRadius * 0.62, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(250, 242, 220, 0.9)';
+        ctx.lineWidth = 1.6;
+        ctx.stroke();
+        ctx.fillStyle = '#faf2dc';
+        ctx.font = `700 ${Math.max(10, this.cellSize * 0.42)}px "JetBrains Mono"`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(String(i + 1), px, py + 1);
+        ctx.restore();
+      });
+    }
+  }
+}
+
+class KifuBoard3D extends Suiji3D.BoardRenderer3D {
+  drawOverlay3D() {
+    if (!showBest || !bestCache.has(cur)) return;
+    const top = bestCache.get(cur);
+    top.forEach((m, i) => {
+      if (this.game.board[m.x][m.y] !== 0) return;
+      this.overlayGroup.add(this.label3D(m.x, m.y, String(i + 1),
+        '#faf2dc', i === 0 ? '#a52828' : '#2a231c'));
+    });
+  }
+}
+
+let renderer = null;
+let view = null;
+
+function makeView() {
+  // adapter over the replayed game for BoardRenderer
+  view = {
+    get size() { return kifuGame.size; },
+    get board() { return kifuGame.board; },
+    get lastMove() { return kifuGame.lastMove; },
+    gameOver: true,
+    scoringMode: false,
+    currentPlayer: 1,
+    canPlace: () => false
+  };
+}
+
+// ============================================
+// LIBRARY
+// ============================================
+function renderLibrary() {
+  const lib = Suiji.kifu.list();
+  els.libCount.textContent = `${lib.length} game${lib.length === 1 ? '' : 's'}`;
+  if (!lib.length) {
+    els.library.innerHTML = '<div class="empty-note">No games saved yet.<br>Play a game of Baduk and press the 💾 save button, or generate a self-play game below.</div>';
+    return;
+  }
+  els.library.innerHTML = '';
+  for (const g of lib) {
+    const item = document.createElement('div');
+    item.className = 'lib-item' + (currentEntry && currentEntry.id === g.id ? ' active' : '');
+    const date = new Date(g.date);
+    item.innerHTML = `
+      <div class="lib-main">
+        <div class="lib-name">${g.title}</div>
+        <div class="lib-meta">${g.moves} moves · ${g.result || '—'} · ${date.getMonth() + 1}/${date.getDate()}</div>
+      </div>
+      <button class="lib-del" title="Delete"><i class="fa-solid fa-trash-can"></i></button>`;
+    item.addEventListener('click', (e) => {
+      if (e.target.closest('.lib-del')) {
+        Suiji.kifu.remove(g.id);
+        if (currentEntry && currentEntry.id === g.id) { currentEntry = null; }
+        renderLibrary();
+        Suiji.toast('Game removed from library');
+        return;
+      }
+      loadFromEntry(g);
+    });
+    els.library.appendChild(item);
+  }
+}
+
+function loadFromEntry(entry) {
+  currentEntry = entry;
+  loadSGF(entry.sgf, entry.title);
+}
+
+function loadSGF(text, titleOverride) {
+  let parsed;
+  try {
+    parsed = SGF.parse(text);
+  } catch (e) {
+    Suiji.toast('Could not parse this SGF');
+    return;
+  }
+  if (!parsed.moves.length && !parsed.setup.black.length) {
+    Suiji.toast('No moves found in this SGF');
+    return;
+  }
+  kifuGame = SGF.toGame(parsed);
+  qualityCache.clear();
+  bestCache.clear();
+  winRates = null;
+  cur = 0;
+  makeView();
+  if (renderer) renderer.destroy();
+  renderer = makeKifuRenderer();
+
+function makeKifuRenderer() {
+  const want3D = localStorage.getItem('dumadang.view3d') === '1';
+  if (want3D && window.Suiji3D && Suiji3D.available) {
+    try { return new KifuBoard3D(els.board, view); }
+    catch (e) { /* WebGL unavailable → 2D */ }
+  }
+  return new KifuRenderer(els.board, view);
+}
+
+function swapKifuView() {
+  const is3D = window.Suiji3D && renderer instanceof Suiji3D.BoardRenderer3D;
+  localStorage.setItem('dumadang.view3d', (!is3D) ? '1' : '0');
+  renderer.destroy();
+  renderer = makeKifuRenderer();
+  els.viewLabel.textContent = (!is3D) ? '2D' : '3D';
+  Suiji.toast((!is3D) ? '3D 전개 — 드래그로 회전, 휠로 줌' : '2D 전개로 되돌아왔습니다');
+}
+
+  els.kifuName.textContent = titleOverride ||
+    `${parsed.players.b || 'Black'} vs ${parsed.players.w || 'White'}`;
+  els.kifuMeta.textContent = `${parsed.size}×${parsed.size} · komi ${parsed.komi} · ${kifuGame.history.length} plies`;
+  els.replaySlider.max = kifuGame.history.length;
+  els.replaySlider.value = 0;
+  renderMoveList();
+  computeWinRates();
+  scrub(0);
+  renderLibrary();
+  Suiji.sound.stone(0.5);
+}
+
+// ============================================
+// WIN-RATE & ANALYSIS
+// ============================================
+function snapshotAt(ply) {
+  return ply === 0
+    ? (kifuGame.history[0] && kifuGame.history[0].type === 'setup'
+        ? kifuGame.history[0].boardSnapshot.map(r => [...r])
+        : Array(kifuGame.size).fill(0).map(() => Array(kifuGame.size).fill(0)))
+    : kifuGame.history[ply - 1].boardSnapshot;
+}
+
+function computeWinRates() {
+  const total = kifuGame.history.length;
+  winRates = new Array(total + 1);
+  for (let p = 0; p <= total; p++) {
+    const snap = snapshotAt(p);
+    let stones = 0;
+    for (const row of snap) for (const v of row) if (v) stones++;
+    const t = kifuGame.calculateTerritory(snap);
+    const sum = t.blackArea + t.whiteArea;
+    let wr = sum > 0 ? (t.blackArea / sum) * 100 : 50;
+    // empty boards are even; clamp the raw influence ratio to a readable band
+    if (stones === 0) wr = 50;
+    wr = Math.max(4, Math.min(96, wr));
+    winRates[p] = wr;
+  }
+  drawGraph();
+}
+
+// Rebuild a playable position at `ply` for the analysis AI
+function gameAt(ply) {
+  const g = new GoGame(kifuGame.size, kifuGame.ruleset, kifuGame.komi, 0);
+  g.board = snapshotAt(ply).map(r => [...r]);
+  const prev = ply > 0 ? kifuGame.history[ply - 1] : null;
+  g.captures = prev ? { ...prev.captures } : { 1: 0, 2: 0 };
+  g.history = kifuGame.history.slice(0, ply);
+  g.currentPlayer = prev ? (prev.color === 1 ? 2 : 1) : 1;
+  return g;
+}
+
+function analysePly(ply) {
+  if (qualityCache.has(ply)) return qualityCache.get(ply);
+  if (ply === 0 || ply > kifuGame.history.length) return null;
+  const m = kifuGame.history[ply - 1];
+  if (m.type !== 'move') return null;
+
+  const g = gameAt(ply - 1);
+  const color = m.color;
+  const ai = new GoAI(g, 2);
+  const cands = ai.getCandidates();
+  if (!cands.length) return null;
+  const evaluated = cands.map(c => ({ ...c, ...ai.evaluateMove(c, color) }));
+  evaluated.sort((a, b) => b.score - a.score);
+  const best = evaluated[0];
+  const played = evaluated.find(c => c.x === m.x && c.y === m.y);
+  const delta = played ? best.score - played.score : 999;
+  const rank = played ? evaluated.indexOf(played) + 1 : 999;
+
+  let quality;
+  if (rank === 1 || delta <= 2.5) quality = 'excellent';
+  else if (delta <= 8) quality = 'good';
+  else if (delta <= 20) quality = 'inaccuracy';
+  else if (delta <= 45) quality = 'mistake';
+  else quality = 'blunder';
+
+  const info = {
+    delta, quality, rank,
+    top3: evaluated.slice(0, 3).map((c, i) => ({ x: c.x, y: c.y, rank: i + 1, score: c.score }))
+  };
+  qualityCache.set(ply, info);
+  bestCache.set(ply, info.top3);
+  return info;
+}
+
+const QUALITY_LABEL = {
+  excellent: ['Excellent', 'fa-solid fa-star'],
+  good: ['Good move', 'fa-solid fa-check'],
+  inaccuracy: ['Inaccuracy', 'fa-solid fa-triangle-exclamation'],
+  mistake: ['Mistake', 'fa-solid fa-circle-exclamation'],
+  blunder: ['Blunder', 'fa-solid fa-bolt']
+};
+
+function updateAnalysis() {
+  if (!kifuGame || !winRates) return;
+  const wr = winRates[cur];
+  els.wrBarBlack.style.width = `${wr}%`;
+  els.wrBarWhite.style.width = `${100 - wr}%`;
+  els.wrNum.textContent = `${wr.toFixed(0)}%`;
+  els.wrWho.textContent = cur === 0 ? 'opening estimate' :
+    (winRates[cur] >= winRates[cur - 1] ? 'Black drifting up' : 'White gaining ground');
+
+  // ply info
+  if (cur === 0) {
+    els.plyNum.textContent = 'Ply 0';
+    els.plyReason.textContent = 'Start position';
+  } else {
+    const m = kifuGame.history[cur - 1];
+    const who = m.color === 1 ? 'B' : 'W';
+    if (m.type === 'move') {
+      els.plyNum.textContent = `Ply ${cur}`;
+      els.plyReason.textContent = `${who} ${Suiji.coordName(m.x, m.y, kifuGame.size)}`;
+    } else if (m.type === 'pass') {
+      els.plyNum.textContent = `Ply ${cur}`;
+      els.plyReason.textContent = `${who} pass`;
+    } else if (m.type === 'setup') {
+      els.plyNum.textContent = 'Setup';
+      els.plyReason.textContent = 'Handicap stones';
+    } else {
+      els.plyNum.textContent = `Ply ${cur}`;
+      els.plyReason.textContent = 'resignation';
+    }
+  }
+
+  // move quality for the move that led to this position
+  if (cur > 0 && kifuGame.history[cur - 1].type === 'move') {
+    const info = analysePly(cur);
+    if (info) {
+      els.qualityWrap.style.display = 'block';
+      const [label, icon] = QUALITY_LABEL[info.quality];
+      els.qualityBadge.className = `quality-badge ${info.quality}`;
+      els.qualityBadge.innerHTML = `<i class="${icon}"></i> <span>${label}</span>`;
+      const wrDrop = Math.abs(winRates[cur] - winRates[cur - 1]);
+      els.plyReason.textContent += ` · #${info.rank} best (${info.delta.toFixed(1)} pts off)`;
+      els.bestList.innerHTML = info.top3.map((t, i) => `
+        <div class="best-row">
+          <span class="rank-dot" style="${i === 0 ? 'background:var(--accent);' : ''}">${i + 1}</span>
+          ${Suiji.coordName(t.x, t.y, kifuGame.size)}
+          <span class="pts">${t.score.toFixed(1)}</span>
+        </div>`).join('');
+      if (info.quality === 'blunder' || info.quality === 'mistake') {
+        els.wrNote.textContent = `This move swung the estimate by ${wrDrop.toFixed(1)}%.`;
+      } else {
+        els.wrNote.textContent = 'Win rate is estimated from territory influence.';
+      }
+    } else {
+      els.qualityWrap.style.display = 'none';
+    }
+  } else {
+    els.qualityWrap.style.display = 'none';
+    els.wrNote.textContent = 'Win rate is estimated from territory influence.';
+  }
+
+  drawGraph();
+  highlightMoveList();
+}
+
+// ============================================
+// GRAPH
+// ============================================
+function drawGraph() {
+  const canvas = els.winGraph;
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.clientWidth || 560, H = 110;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+
+  // reference lines
+  ctx.strokeStyle = 'rgba(26,39,51,0.15)';
+  ctx.lineWidth = 1;
+  [25, 50, 75].forEach(v => {
+    const y = H - (v / 100) * H;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  });
+
+  if (!winRates || winRates.length < 2) {
+    els.graphInfo.textContent = '—';
+    return;
+  }
+
+  const n = winRates.length;
+  const px = i => (i / (n - 1)) * (W - 8) + 4;
+  const py = v => H - (v / 100) * (H - 10) - 5;
+
+  // area under curve
+  ctx.beginPath();
+  ctx.moveTo(px(0), py(winRates[0]));
+  for (let i = 1; i < n; i++) ctx.lineTo(px(i), py(winRates[i]));
+  ctx.lineTo(px(n - 1), H); ctx.lineTo(px(0), H);
+  ctx.closePath();
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, 'rgba(26, 39, 51, 0.25)');
+  grad.addColorStop(1, 'rgba(26, 39, 51, 0.03)');
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // line
+  ctx.beginPath();
+  ctx.moveTo(px(0), py(winRates[0]));
+  for (let i = 1; i < n; i++) ctx.lineTo(px(i), py(winRates[i]));
+  ctx.strokeStyle = '#1a2733';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // blunder markers
+  for (let i = 1; i < n; i++) {
+    const m = kifuGame.history[i - 1];
+    if (!m || m.type !== 'move') continue;
+    const info = qualityCache.get(i);
+    if (info && (info.quality === 'blunder' || info.quality === 'mistake')) {
+      ctx.beginPath();
+      ctx.arc(px(i), py(winRates[i]), 3.4, 0, Math.PI * 2);
+      ctx.fillStyle = info.quality === 'blunder' ? '#a52828' : '#c85a14';
+      ctx.fill();
+    }
+  }
+
+  // current position
+  ctx.beginPath();
+  ctx.arc(px(cur), py(winRates[cur]), 4.6, 0, Math.PI * 2);
+  ctx.fillStyle = '#a52828';
+  ctx.fill();
+  ctx.strokeStyle = '#faf2dc';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  els.graphInfo.textContent = `ply ${cur} / ${n - 1}`;
+}
+
+// ============================================
+// SCRUB / REPLAY
+// ============================================
+function scrub(ply) {
+  if (!kifuGame) return;
+  cur = Math.max(0, Math.min(kifuGame.history.length, ply));
+  els.replaySlider.value = cur;
+  kifuGame.board = snapshotAt(cur);
+  const prev = cur > 0 ? kifuGame.history[cur - 1] : null;
+  kifuGame.captures = prev ? { ...prev.captures } : { 1: 0, 2: 0 };
+  kifuGame.lastMove = prev && prev.type === 'move' ? { x: prev.x, y: prev.y, color: prev.color } : null;
+  if (prev && prev.type === 'move' && prev.captured && prev.captured.length) {
+    // subtle pop for reviewed move
+    renderer.animateStoneDrop(prev.x, prev.y, prev.color);
+  }
+  updateAnalysis();
+}
+
+function renderMoveList() {
+  if (!kifuGame || !kifuGame.history.length) {
+    els.moveList.innerHTML = '<div class="move-empty">No game loaded.</div>';
+    return;
+  }
+  els.moveList.innerHTML = kifuGame.history.map((m, i) => {
+    const cls = i === cur - 1 ? 'current' : '';
+    if (m.type === 'move') {
+      return `<div class="move-row ${cls}" data-ply="${i + 1}">
+        <span class="move-num">${i + 1}</span>
+        <span class="move-stone ${m.color === 1 ? 'black' : 'white'}"></span>
+        <span class="move-coord">${Suiji.coordName(m.x, m.y, kifuGame.size)}</span>
+        ${m.captured && m.captured.length ? `<span class="move-cap">×${m.captured.length}</span>` : '<span></span>'}
+      </div>`;
+    } else if (m.type === 'setup') {
+      return `<div class="move-row ${cls}" data-ply="${i + 1}">
+        <span class="move-num">0</span>
+        <span class="move-stone black"></span>
+        <span class="move-coord">handicap</span><span></span>
+      </div>`;
+    } else if (m.type === 'pass') {
+      return `<div class="move-row ${cls}" data-ply="${i + 1}">
+        <span class="move-num">${i + 1}</span>
+        <span class="move-stone ${m.color === 1 ? 'black' : 'white'}"></span>
+        <span class="move-coord">pass</span><span></span>
+      </div>`;
+    }
+    return `<div class="move-row ${cls}" data-ply="${i + 1}">
+      <span class="move-num">${i + 1}</span>
+      <span class="move-stone ${m.color === 1 ? 'black' : 'white'}"></span>
+      <span class="move-coord">resign</span><span></span>
+    </div>`;
+  }).join('');
+  els.moveList.querySelectorAll('.move-row').forEach(row => {
+    row.addEventListener('click', () => scrub(parseInt(row.dataset.ply)));
+  });
+}
+
+function highlightMoveList() {
+  els.moveList.querySelectorAll('.move-row').forEach(r => r.classList.remove('review-current'));
+  const row = els.moveList.querySelector(`[data-ply="${cur}"]`);
+  if (row) {
+    row.classList.add('review-current');
+    row.scrollIntoView({ block: 'nearest' });
+  }
+}
+
+let playInterval = null;
+function togglePlay() {
+  if (!kifuGame) return;
+  if (playInterval) {
+    clearInterval(playInterval);
+    playInterval = null;
+    els.btnPlay.innerHTML = '<i class="fa-solid fa-play"></i>';
+  } else {
+    if (cur >= kifuGame.history.length) scrub(0);
+    els.btnPlay.innerHTML = '<i class="fa-solid fa-pause"></i>';
+    playInterval = setInterval(() => {
+      if (cur >= kifuGame.history.length) {
+        clearInterval(playInterval);
+        playInterval = null;
+        els.btnPlay.innerHTML = '<i class="fa-solid fa-play"></i>';
+        return;
+      }
+      scrub(cur + 1);
+      Suiji.sound.stone(0.5);
+    }, 750);
+  }
+}
+
+// ============================================
+// SELF-PLAY GENERATOR
+// ============================================
+async function generateSelfPlay() {
+  if (els.btnGenerate.disabled) return;
+  const size = parseInt(els.genSize.value);
+  const level = parseInt(els.genLevel.value);
+  const maxMoves = parseInt(els.genMax.value);
+
+  els.btnGenerate.disabled = true;
+  els.genProgress.classList.add('show');
+  els.genFill.style.width = '0%';
+
+  const g = new GoGame(size, 'korean', size === 9 ? 5.5 : 6.5, 0);
+  const aiB = new GoAI(g, level);
+  const aiW = new GoAI(g, level);
+  let passRun = 0;
+
+  const done = await new Promise(resolve => {
+    function step() {
+      if (g.scoringMode || g.gameOver || g.history.length >= maxMoves) { resolve(); return; }
+      const ai = g.currentPlayer === 1 ? aiB : aiW;
+      const res = ai.selectMove();
+      if (res.pass) g.pass();
+      else {
+        const r = g.place(res.move.x, res.move.y);
+        if (!r.valid) g.pass();
+      }
+      els.genFill.style.width = `${Math.min(98, (g.history.length / maxMoves) * 100)}%`;
+      setTimeout(step, 0);
+    }
+    step();
+  });
+
+  // estimated result (no dead-stone marking in auto-generated games)
+  const t = g.calculateTerritory();
+  const winner = t.blackArea > t.whiteArea ? 1 : t.whiteArea > t.blackArea ? 2 : 0;
+  const margin = Math.abs(t.blackArea - t.whiteArea);
+  g.gameOver = true;
+  g.winner = winner;
+  g.finalScore = { margin, winner };
+
+  const entry = {
+    title: `Self-play · ${size}×${size} · L${level}`,
+    date: Date.now(),
+    size, komi: g.komi, handicap: 0,
+    moves: g.history.length,
+    result: winner === 1 ? `B+${margin.toFixed(1)} (est)` : winner === 2 ? `W+${margin.toFixed(1)} (est)` : 'Draw (est)',
+    sgf: SGF.build(g, { black: `두마당 L${level}`, white: `두마당 L${level}` })
+  };
+  Suiji.kifu.save(entry);
+  els.genFill.style.width = '100%';
+  setTimeout(() => {
+    els.genProgress.classList.remove('show');
+    els.btnGenerate.disabled = false;
+  }, 600);
+  renderLibrary();
+  loadFromEntry(entry);
+  Suiji.toast(`Generated ${g.history.length}-move game — saved to library`);
+}
+
+// ============================================
+// INIT & EVENTS
+// ============================================
+function init() {
+  Suiji.nav('kifu');
+  view = { size: 19, board: Array(19).fill(0).map(() => Array(19).fill(0)), lastMove: null, gameOver: true, scoringMode: false, currentPlayer: 1, canPlace: () => false };
+  renderer = makeKifuRenderer();
+
+function makeKifuRenderer() {
+  const want3D = localStorage.getItem('dumadang.view3d') === '1';
+  if (want3D && window.Suiji3D && Suiji3D.available) {
+    try { return new KifuBoard3D(els.board, view); }
+    catch (e) { /* WebGL unavailable → 2D */ }
+  }
+  return new KifuRenderer(els.board, view);
+}
+
+function swapKifuView() {
+  const is3D = window.Suiji3D && renderer instanceof Suiji3D.BoardRenderer3D;
+  localStorage.setItem('dumadang.view3d', (!is3D) ? '1' : '0');
+  renderer.destroy();
+  renderer = makeKifuRenderer();
+  els.viewLabel.textContent = (!is3D) ? '2D' : '3D';
+  Suiji.toast((!is3D) ? '3D 전개 — 드래그로 회전, 휠로 줌' : '2D 전개로 되돌아왔습니다');
+}
+
+  els.fileInput.addEventListener('change', () => {
+    const f = els.fileInput.files[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      loadSGF(String(reader.result), f.name.replace(/\.sgf$/i, ''));
+      Suiji.toast(`Loaded ${f.name}`);
+    };
+    reader.readAsText(f);
+    els.fileInput.value = '';
+  });
+
+  els.btnLoadPaste.addEventListener('click', () => {
+    const text = els.sgfPaste.value.trim();
+    if (!text) { Suiji.toast('Paste some SGF text first'); return; }
+    loadSGF(text);
+  });
+
+  els.btnSample.addEventListener('click', () => {
+    // quick synchronous 9×9 self-play as a demo
+    const g = new GoGame(9, 'korean', 5.5, 0);
+    const aiB = new GoAI(g, 2), aiW = new GoAI(g, 2);
+    while (!g.scoringMode && !g.gameOver && g.history.length < 90) {
+      const ai = g.currentPlayer === 1 ? aiB : aiW;
+      const res = ai.selectMove();
+      if (res.pass) g.pass();
+      else { const r = g.place(res.move.x, res.move.y); if (!r.valid) g.pass(); }
+    }
+    const t = g.calculateTerritory();
+    const winner = t.blackArea > t.whiteArea ? 1 : 2;
+    g.gameOver = true; g.winner = winner;
+    g.finalScore = { margin: Math.abs(t.blackArea - t.whiteArea), winner };
+    const entry = {
+      title: `Sample · 9×9 demo`, date: Date.now(), size: 9, komi: 5.5, handicap: 0,
+      moves: g.history.length,
+      result: winner === 1 ? `B+${g.finalScore.margin.toFixed(1)} (est)` : `W+${g.finalScore.margin.toFixed(1)} (est)`,
+      sgf: SGF.build(g, { black: 'Suiji L2', white: 'Suiji L2' })
+    };
+    Suiji.kifu.save(entry);
+    renderLibrary();
+    loadFromEntry(entry);
+    Suiji.toast('Sample game generated and loaded');
+  });
+
+  els.btnGenerate.addEventListener('click', generateSelfPlay);
+
+  els.btnCopySgf.addEventListener('click', () => {
+    if (!currentEntry) { Suiji.toast('Load a game first'); return; }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(currentEntry.sgf)
+        .then(() => Suiji.toast('SGF copied to clipboard'))
+        .catch(() => Suiji.toast('Clipboard unavailable — use download'));
+    } else Suiji.toast('Clipboard unavailable — use download');
+  });
+
+  els.btnDownloadSgf.addEventListener('click', () => {
+    if (!currentEntry) { Suiji.toast('Load a game first'); return; }
+    const blob = new Blob([currentEntry.sgf], { type: 'application/x-go-sgf' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${currentEntry.title.replace(/[^\w-]+/g, '_')}.sgf`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  });
+
+  els.btnFirst.addEventListener('click', () => scrub(0));
+  els.btnPrev.addEventListener('click', () => scrub(cur - 1));
+  els.btnNext.addEventListener('click', () => scrub(cur + 1));
+  els.btnLast.addEventListener('click', () => scrub(kifuGame ? kifuGame.history.length : 0));
+  els.btnPlay.addEventListener('click', togglePlay);
+  els.replaySlider.addEventListener('input', (e) => scrub(parseInt(e.target.value)));
+
+  els.toggleBest.addEventListener('change', () => {
+    showBest = els.toggleBest.checked;
+    if (showBest && kifuGame && cur > 0) analysePly(cur);
+  });
+
+  els.btnView.addEventListener('click', swapKifuView);
+  if (window.Suiji3D && renderer instanceof Suiji3D.BoardRenderer3D) els.viewLabel.textContent = '2D';
+
+  els.btnSound.addEventListener('click', () => {
+    const on = Suiji.sound.toggle();
+    els.btnSound.querySelector('i').className = on ? 'fa-solid fa-volume-high' : 'fa-solid fa-volume-xmark';
+  });
+  els.btnSound.querySelector('i').className = Suiji.sound.enabled ? 'fa-solid fa-volume-high' : 'fa-solid fa-volume-xmark';
+
+  document.addEventListener('keydown', (e) => {
+    if (!kifuGame) return;
+    if (e.key === 'ArrowLeft') { scrub(cur - 1); e.preventDefault(); }
+    if (e.key === 'ArrowRight') { scrub(cur + 1); e.preventDefault(); }
+    if (e.key === ' ') { togglePlay(); e.preventDefault(); }
+  });
+
+  window.addEventListener('resize', () => {
+    clearTimeout(init._rt);
+    init._rt = setTimeout(() => {
+      renderer.setupCanvas();
+      renderer.woodTexture = SuijiEngine.makeWoodTexture(renderer.displayWidth, renderer.displayHeight);
+      drawGraph();
+    }, 200);
+  });
+
+  renderLibrary();
+}
+
+init();
+</script>
+</body>
+</html>

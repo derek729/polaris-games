@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>폴라리스 게임 센터 — POLARIS GAMES</title>
+<meta name="description" content="주식회사 폴라리스 소프트웨어개발팀의 게임 컬렉션 — 뱀파이어 키우기, 식물 vs 좀비, BeatCraft, 두마당 보드게임">
+<meta name="theme-color" content="#0d1021">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/favicon-64.png">
+<style>
+  :root {
+    --bg: #0d1021;
+    --card: #171b31;
+    --card-hover: #1e2440;
+    --line: #2a3154;
+    --text: #e8eaf6;
+    --muted: #9aa3c7;
+    --accent: #7c6cff;
+    --accent2: #4fd1c5;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: radial-gradient(1200px 600px at 70% -10%, #1b2145 0%, var(--bg) 55%);
+    color: var(--text);
+    font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+    min-height: 100vh;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 48px 24px 80px; }
+  header { text-align: center; margin-bottom: 56px; }
+  header .logo {
+    display: inline-flex; align-items: center; gap: 14px; margin-bottom: 18px;
+  }
+  header .logo .star { font-size: 40px; }
+  header h1 {
+    font-size: clamp(30px, 5vw, 46px);
+    letter-spacing: 0.12em;
+    background: linear-gradient(90deg, #9f8cff, #4fd1c5);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  header .tagline { color: var(--muted); margin-top: 10px; font-size: 15px; }
+  header .badge {
+    display: inline-block; margin-top: 16px; padding: 4px 12px; border: 1px solid var(--line);
+    border-radius: 999px; font-size: 12px; color: var(--accent2); letter-spacing: 0.08em;
+  }
+  h2 {
+    font-size: 14px; letter-spacing: 0.2em; color: var(--muted);
+    margin: 44px 0 18px; text-transform: uppercase;
+  }
+  h2::before { content: "★ "; color: var(--accent); }
+  .grid {
+    display: grid; gap: 18px;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  }
+  a.card {
+    display: block; text-decoration: none; color: inherit;
+    background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+    padding: 22px; transition: transform .15s ease, background .15s ease, border-color .15s ease;
+  }
+  a.card:hover { transform: translateY(-4px); background: var(--card-hover); border-color: var(--accent); }
+  .card .thumb {
+    height: 84px; display: flex; align-items: center; gap: 10px; margin-bottom: 16px;
+  }
+  .card .thumb img {
+    height: 64px; width: 64px; object-fit: contain;
+    image-rendering: pixelated;
+    filter: drop-shadow(0 4px 10px rgba(0,0,0,.5));
+  }
+  .card .thumb img.small { height: 44px; width: 44px; }
+  .card h3 { font-size: 19px; margin-bottom: 6px; }
+  .card p { color: var(--muted); font-size: 13.5px; line-height: 1.55; }
+  .card .go { display: inline-block; margin-top: 14px; font-size: 13px; color: var(--accent2); }
+  a.card:hover .go::after { content: " →"; }
+  footer {
+    text-align: center; color: var(--muted); font-size: 12.5px;
+    margin-top: 72px; border-top: 1px solid var(--line); padding-top: 28px; line-height: 1.9;
+  }
+  footer strong { color: var(--text); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo"><span class="star">✦</span></div>
+    <h1>POLARIS GAMES</h1>
+    <p class="tagline">주식회사 폴라리스 소프트웨어개발팀 — AI 생성 아트·사운드가 담긴 게임 컬렉션</p>
+    <span class="badge">v1.0.0</span>
+  </header>
+
+  <h2>아케이드</h2>
+  <div class="grid">
+    <a class="card" href="vampire-survivors.html">
+      <div class="thumb">
+        <img src="game-assets/vampire-survivors/enemy-hunter.png" alt="헌터">
+        <img class="small" src="game-assets/vampire-survivors/enemy-bat.png" alt="박쥐">
+        <img class="small" src="game-assets/vampire-survivors/item-gem.png" alt="젬">
+      </div>
+      <h3>뱀파이어 키우기</h3>
+      <p>뱀서라이크 생존 액션 — 10분만 버텨라. 자동 공격, 레벨업 3택, 무기 진화와 보스전.</p>
+      <span class="go">플레이</span>
+    </a>
+    <a class="card" href="plants-vs-zombies.html">
+      <div class="thumb">
+        <img src="game-assets/pvz/plant-sunflower.png" alt="해바라기">
+        <img class="small" src="game-assets/pvz/plant-peashooter.png" alt="완두콩">
+        <img class="small" src="game-assets/pvz/zombie-basic.png" alt="좀비">
+      </div>
+      <h3>식물 vs 좀비</h3>
+      <p>햇빛을 모아 식물을 심고 10개 웨이브의 좀비를 막아내는 타워 디펜스.</p>
+      <span class="go">플레이</span>
+    </a>
+    <a class="card" href="beatcraft.html">
+      <div class="thumb">
+        <img src="game-assets/beatcraft/note-blue.png" alt="블루 노트">
+        <img src="game-assets/beatcraft/note-pink.png" alt="핑크 노트">
+        <img class="small" src="game-assets/beatcraft/star-perfect.png" alt="퍼펙트 스타">
+      </div>
+      <h3>BeatCraft — DDR 에디션</h3>
+      <p>오락실 리듬 게임. 4레인 화살표와 홀드 노트로 콤보를 쌓고 S랭크를 노려라.</p>
+      <span class="go">플레이</span>
+    </a>
+  </div>
+
+  <h2>보드게임 · 두마당</h2>
+  <div class="grid">
+    <a class="card" href="suiji-go.html">
+      <div class="thumb">
+        <img src="game-assets/suiji/stone-black.png" alt="흑돌">
+        <img src="game-assets/suiji/stone-white.png" alt="백돌">
+      </div>
+      <h3>바둑</h3>
+      <p>실제 규칙의 바둑. AI 단수 선택, 실시간 부동산 추정, AI 해설 기보 분석.</p>
+      <span class="go">플레이</span>
+    </a>
+    <a class="card" href="suiji-omok.html">
+      <div class="thumb">
+        <img src="game-assets/suiji/stone-black.png" alt="흑돌">
+      </div>
+      <h3>오목</h3>
+      <p>먼저 다섯 알을 잇는 게임. AI 대국과 온라인 대결을 지원.</p>
+      <span class="go">플레이</span>
+    </a>
+    <a class="card" href="suiji-alkkagi.html">
+      <div class="thumb">
+        <img class="small" src="game-assets/suiji/stone-white.png" alt="알">
+      </div>
+      <h3>알까기</h3>
+      <p>물리 엔진 기반 알치기 대결. 친구와 온라인으로 즐겨보세요.</p>
+      <span class="go">플레이</span>
+    </a>
+    <a class="card" href="suiji-index.html">
+      <div class="thumb">
+        <img class="small" src="game-assets/suiji/stone-black.png" alt="두마당">
+        <img class="small" src="game-assets/suiji/stone-white.png" alt="두마당">
+      </div>
+      <h3>두마당 전체 보기</h3>
+      <p>바둑·오목·알까기·기보 분석까지 — PWA로 설치해 오프라인에서도 실행 가능.</p>
+      <span class="go">이동</span>
+    </a>
+  </div>
+
+  <footer>
+    <strong>주식회사 폴라리스</strong> · 소프트웨어개발팀 김팀장 라인 — AI 에이전트 조직으로 개발<br>
+    아트: ComfyUI + SDXL · 사운드: 절차적 합성 + MusicGen · 개발·QA: 멀티에이전트 파이프라인
+  </footer>
+</div>
+</body>
+</html>

@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>두마당 • 바둑 · 오목 · 알까기 · 기보</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#e8edf3">
+<meta name="description" content="실제 규칙의 바둑, 오목, 알까기, AI 기보 분석까지 — 두마당 보드게임 모음">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="두마당">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/favicon-64.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,500&family=Spline+Sans:wght@300;400;500;600;700&family=Noto+Serif+JP:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="suiji-theme.css?v=15">
+<style>
+body { font-family: 'Spline Sans', 'Noto Sans KR', system-ui, sans-serif; }
+
+.hero {
+  text-align: center;
+  padding: 54px 20px 44px;
+  position: relative;
+}
+.hero .hero-seal {
+  width: 84px; height: 84px;
+  background: var(--accent);
+  border-radius: 12px;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--paper);
+  font-family: 'Noto Serif JP', serif;
+  font-weight: 900;
+  font-size: 44px;
+  transform: rotate(-3deg);
+  box-shadow: 0 10px 30px rgba(165, 40, 40, 0.35), inset 0 0 0 3px rgba(255,255,255,0.12);
+  position: relative;
+  margin-bottom: 22px;
+}
+.hero .hero-seal::after {
+  content: '';
+  position: absolute;
+  inset: 6px;
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 7px;
+}
+.hero h1 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 58px;
+  font-weight: 600;
+  margin: 0;
+  letter-spacing: 0.01em;
+  line-height: 1;
+}
+.hero .hero-tag {
+  font-size: 12px;
+  color: var(--ink-light);
+  letter-spacing: 0.4em;
+  text-transform: uppercase;
+  font-weight: 500;
+  margin-top: 12px;
+}
+.hero .hero-desc {
+  max-width: 560px;
+  margin: 18px auto 0;
+  font-size: 14.5px;
+  color: var(--ink-2);
+  line-height: 1.75;
+}
+.hero::after {
+  content: '';
+  display: block;
+  width: 120px; height: 2px;
+  margin: 30px auto 0;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+}
+
+.game-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 20px;
+  max-width: 1160px;
+  margin: 0 auto;
+}
+.game-card {
+  background: linear-gradient(180deg, var(--paper) 0%, var(--paper-2) 100%);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 26px 24px 22px;
+  box-shadow: 0 2px 10px rgba(60, 35, 15, 0.05), inset 0 1px 0 rgba(255,255,255,0.4);
+  position: relative;
+  overflow: hidden;
+  transition: all 0.35s cubic-bezier(0.34, 1.3, 0.64, 1);
+  text-decoration: none;
+  display: block;
+  color: var(--ink);
+}
+.game-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 18px 44px rgba(60, 35, 15, 0.16), inset 0 1px 0 rgba(255,255,255,0.4);
+}
+.game-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--card-accent, var(--accent));
+  opacity: 0.9;
+}
+.game-card .card-icon {
+  width: 56px; height: 56px;
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px;
+  color: var(--paper);
+  background: var(--card-accent, var(--accent));
+  box-shadow: 0 6px 16px rgba(31, 20, 16, 0.22);
+  margin-bottom: 16px;
+  transform: rotate(-2deg);
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.game-card:hover .card-icon { transform: rotate(0deg) scale(1.06); }
+.game-card h3 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 26px;
+  font-weight: 600;
+  margin: 0 0 2px;
+}
+.game-card .kr {
+  font-size: 12px;
+  color: var(--ink-light);
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+.game-card p {
+  font-size: 13px;
+  color: var(--ink-2);
+  line-height: 1.7;
+  margin: 12px 0 14px;
+  min-height: 66px;
+}
+.game-card .record {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11.5px;
+  color: var(--ink-3);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 12px;
+  border-top: 1px dashed var(--line);
+}
+.game-card .record .play {
+  font-family: 'Spline Sans', sans-serif;
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--card-accent, var(--accent));
+  display: inline-flex; align-items: center; gap: 6px;
+  transition: gap 0.2s;
+}
+.game-card:hover .record .play { gap: 10px; }
+.resume-chip {
+  position: absolute;
+  top: 14px; right: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  background: var(--ok);
+  color: var(--paper);
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 999px;
+  box-shadow: 0 4px 12px rgba(63, 125, 68, 0.35);
+  animation: chipIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  z-index: 2;
+}
+.resume-chip i { font-size: 9px; }
+@keyframes chipIn {
+  from { opacity: 0; transform: scale(0.7); }
+  to { opacity: 1; transform: scale(1); }
+}
+.card-go { --card-accent: #a52828; }
+.card-omok { --card-accent: #2d5a8a; }
+.card-alkkagi { --card-accent: #8a6a1e; }
+.card-kifu { --card-accent: #3f7d44; }
+
+.loop-section {
+  max-width: 1160px;
+  margin: 46px auto 0;
+  background: linear-gradient(135deg, rgba(165, 40, 40, 0.05) 0%, rgba(184, 134, 11, 0.05) 100%);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 30px 34px;
+}
+.loop-section h2 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 28px;
+  font-weight: 600;
+  margin: 0 0 6px;
+  text-align: center;
+}
+.loop-section .loop-sub {
+  text-align: center;
+  font-size: 13px;
+  color: var(--ink-3);
+  margin-bottom: 26px;
+}
+.loop-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 16px;
+}
+.loop-step {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 18px;
+  text-align: center;
+  position: relative;
+}
+.loop-step .step-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--paper);
+  background: var(--ink);
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  margin-bottom: 10px;
+}
+.loop-step h4 { margin: 0 0 6px; font-size: 14px; font-weight: 600; }
+.loop-step p { margin: 0; font-size: 12px; color: var(--ink-3); line-height: 1.65; }
+.loop-step i { font-size: 18px; color: var(--accent); margin-bottom: 8px; display: inline-block; }
+
+.feature-strip {
+  max-width: 1160px;
+  margin: 22px auto 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 14px;
+}
+.feature {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-size: 12px;
+  color: var(--ink-2);
+  font-weight: 500;
+}
+.feature i { color: var(--gold); font-size: 13px; }
+
+.footer {
+  text-align: center;
+  margin-top: 48px;
+  font-size: 11px;
+  color: var(--ink-light);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+/* install pill */
+.install-pill {
+  position: fixed;
+  bottom: calc(24px + env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 13px 26px;
+  background: var(--ink);
+  color: var(--paper);
+  border: none;
+  border-radius: 999px;
+  font-family: 'Spline Sans', 'Noto Sans KR', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 12px 32px rgba(31, 20, 16, 0.35);
+  z-index: 200;
+  animation: pillIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.install-pill:hover { transform: translateX(-50%) translateY(-3px); box-shadow: 0 16px 40px rgba(31, 20, 16, 0.4); }
+.install-pill i { color: var(--accent-2); }
+@keyframes pillIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(24px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <section class="hero">
+    <div class="hero-seal">두</div>
+    <h1>두마당</h1>
+    <div class="hero-tag">바둑 · 오목 · 알까기 · 기보</div>
+    <p class="hero-desc">
+      밤의 도장에서 벌이는 정통 보드 대결.
+      실제 규칙 그대로 두는 바둑, 두 수를 읽는 오목 AI, 물리 엔진 알까기,
+      그리고 당신의 기보를 복기하는 AI 리뷰까지 — 한 곳에서.
+    </p>
+  </section>
+
+  <div class="game-grid">
+
+    <a class="game-card card-go" href="suiji-go.html">
+      <span class="resume-chip" id="resumeGo" hidden><i class="fa-solid fa-play"></i> 이어두기 · <b>0</b>수</span>
+      <div class="card-icon"><i class="fa-solid fa-yin-yang"></i></div>
+      <div class="kr">REAL BADUK · 실제 규칙</div>
+      <h3>바둑</h3>
+      <p>
+        19·13·9 국판, 한국/중국 규칙, 접수와 공짠까지 실제 대국 그대로.
+        집계 단계에서 죽은 돌을 표시해 실계산하고, AI 힌트와 수순 리뷰도 받아보세요.
+      </p>
+      <div class="record">
+        <span id="recordGo">전적 —</span>
+        <span class="play">대국 시작 <i class="fa-solid fa-arrow-right"></i></span>
+      </div>
+    </a>
+
+    <a class="game-card card-omok" href="suiji-omok.html">
+      <div class="card-icon"><i class="fa-solid fa-hashtag"></i></div>
+      <div class="kr">FIVE IN A ROW · 프리스타일</div>
+      <h3>오목</h3>
+      <p>
+        15×15 오목판 위 승부. 3단계 AI가 패(3·4·열린 다섯)를 읽고 두 수 앞을 계산합니다.
+        친구와의 대결 모드, 위협 형태 실시간 분석 포함.
+      </p>
+      <div class="record">
+        <span id="recordOmok">전적 —</span>
+        <span class="play">대국 시작 <i class="fa-solid fa-arrow-right"></i></span>
+      </div>
+    </a>
+
+    <a class="game-card card-alkkagi" href="suiji-alkkagi.html">
+      <div class="card-icon"><i class="fa-solid fa-baseball"></i></div>
+      <div class="kr">MARBLE FLICK · 물리 대결</div>
+      <h3>알까기</h3>
+      <p>
+        바둑판 위 알까기 대결. 슬링샷처럼 당겨 쏘고, 상대 알을 판 밖으로 떨어뜨리세요.
+        상대를 맞히면 한 번 더 — AI는 발사각을 물리 시뮬레이션으로 검증합니다.
+      </p>
+      <div class="record">
+        <span id="recordAlkkagi">전적 —</span>
+        <span class="play">대결 시작 <i class="fa-solid fa-arrow-right"></i></span>
+      </div>
+    </a>
+
+    <a class="game-card card-kifu" href="suiji-kifu.html">
+      <div class="card-icon"><i class="fa-solid fa-book-open"></i></div>
+      <div class="kr">GAME RECORDS · AI 리뷰</div>
+      <h3>기보</h3>
+      <p>
+        SGF 기보를 불러와 수순별 승률 그래프와 AI 최적수, 실수·블런더 판정을 확인.
+        AI 자가대국을 생성해 기보 라이브러리를 쌓아두면 학습 데이터가 됩니다.
+      </p>
+      <div class="record">
+        <span>분석 룸 열기</span>
+        <span class="play">기보 보기 <i class="fa-solid fa-arrow-right"></i></span>
+      </div>
+    </a>
+  </div>
+
+  <section class="loop-section">
+    <h2>AI 성장 루프</h2>
+    <div class="loop-sub">기보가 쌓일수록 당신의 바둑도, 이 도장의 분석도 깊어집니다</div>
+    <div class="loop-steps">
+      <div class="loop-step">
+        <i class="fa-solid fa-yin-yang"></i><br>
+        <span class="step-num">1</span>
+        <h4>대국</h4>
+        <p>바둑 페이지에서 AI와 실제 규칙으로 대국합니다. 진행 중인 기판은 자동 저장됩니다.</p>
+      </div>
+      <div class="loop-step">
+        <i class="fa-solid fa-floppy-disk"></i><br>
+        <span class="step-num">2</span>
+        <h4>기보 저장</h4>
+        <p>끝난 대국은 💾 버튼으로 SGF 기보로 저장 — 클립보드 복사나 파일 내보내기도 가능합니다.</p>
+      </div>
+      <div class="loop-step">
+        <i class="fa-solid fa-chart-line"></i><br>
+        <span class="step-num">3</span>
+        <h4>AI 리뷰</h4>
+        <p>기보 페이지에서 수순별 승률 변화, AI의 최적수, 실수와 블런더를 한 눈에 점검합니다.</p>
+      </div>
+      <div class="loop-step">
+        <i class="fa-solid fa-robot"></i><br>
+        <span class="step-num">4</span>
+        <h4>자가대국 생성</h4>
+        <p>AI끼리 수천 패를 두워 기보 라이브러리를 채우면, 패턴 데이터로 다음 분석이 정교해집니다.</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="feature-strip">
+    <div class="feature"><i class="fa-solid fa-scale-balanced"></i> 한국식 · 중국식 집계</div>
+    <div class="feature"><i class="fa-solid fa-lightbulb"></i> AI 힌트 &amp; 의도 해설</div>
+    <div class="feature"><i class="fa-solid fa-volume-high"></i> 합석 사운드</div>
+    <div class="feature"><i class="fa-solid fa-clock-rotate-left"></i> 자동 저장 · 이어두기</div>
+    <div class="feature"><i class="fa-solid fa-mobile-screen"></i> 터치 지원</div>
+  </div>
+
+  <div class="footer">수지 도장 · 囲 · 오픈소스 한글 폰트 Pretendard · Gowun Batang</div>
+</div>
+
+<button class="install-pill" id="btnInstall" hidden><i class="fa-solid fa-download"></i><span id="installLabel">앱으로 설치</span></button>
+
+<script src="suiji-common.js?v=15"></script>
+<script>
+Suiji.nav('index');
+document.getElementById('recordGo').textContent = '전적 ' + (Suiji.stats.text('go') === '—' ? '—' : Suiji.stats.text('go'));
+document.getElementById('recordOmok').textContent = '전적 ' + (Suiji.stats.text('omok') === '—' ? '—' : Suiji.stats.text('omok'));
+document.getElementById('recordAlkkagi').textContent = '전적 ' + (Suiji.stats.text('alkkagi') === '—' ? '—' : Suiji.stats.text('alkkagi'));
+
+// ---- resume chip: an auto-saved Baduk game exists ----
+try {
+  const saved = JSON.parse(localStorage.getItem('suiji.go.autosave'));
+  const moveCount = saved && Array.isArray(saved.history)
+    ? saved.history.filter(m => m.t === 'm' || m.t === 'p').length
+    : 0;
+  if (moveCount > 0) {
+    const chip = document.getElementById('resumeGo');
+    chip.querySelector('b').textContent = moveCount;
+    chip.hidden = false;
+  }
+} catch (e) { /* no saved game */ }
+
+// ---- app install pill ----
+const btnInstall = document.getElementById('btnInstall');
+const installLabel = document.getElementById('installLabel');
+
+function refreshInstall() {
+  if (Suiji.isStandalone()) { btnInstall.hidden = true; return; }
+  if (Suiji.canInstall()) {
+    installLabel.textContent = '앱으로 설치';
+    btnInstall.hidden = false;
+  } else if (Suiji.isIOS()) {
+    installLabel.textContent = '홈 화면에 추가하기';
+    btnInstall.hidden = false;
+  } else {
+    btnInstall.hidden = true;
+  }
+}
+
+btnInstall.addEventListener('click', async () => {
+  if (Suiji.canInstall()) {
+    const ok = await Suiji.installApp();
+    if (ok) Suiji.toast('앱이 설치되었습니다 — 홈 화면에서 만나요!');
+    refreshInstall();
+  } else if (Suiji.isIOS()) {
+    Suiji.toast('Safari 하단 공유 버튼(⬆️) → "홈 화면에 추가"를 눌러주세요', 5000);
+  }
+});
+
+window.addEventListener('suiji:installable', refreshInstall);
+window.addEventListener('suiji:installed', () => {
+  Suiji.toast('설치 완료! 이제 홈 화면 아이콘으로 실행하세요');
+  refreshInstall();
+});
+refreshInstall();
+</script>
+</body>
+</html>

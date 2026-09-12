@@ -1,0 +1,1821 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>BeatCraft DDR — 리듬 게임</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --coral:#FF6B6B;--yellow:#FFD23F;--green:#4ADE80;--sky:#38BDF8;
+  --purple:#A78BFA;--navy:#0A0E2A;--navy2:#12193A;--navy3:#1E2A5A;
+  --white:#FFFFFF;--cream:#FFF6E0;--gold:#FFD700;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0}
+html,body{width:100%;height:100%;overflow-x:hidden}
+body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--navy);color:var(--white);min-height:100vh;}
+.font-display{font-family:'Fredoka',sans-serif}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 22px;font-family:'Fredoka',sans-serif;font-weight:600;font-size:16px;border:3px solid #fff;border-radius:14px;box-shadow:5px 5px 0 rgba(255,255,255,.25);cursor:pointer;background:rgba(255,255,255,.1);color:#fff;transition:transform .1s,box-shadow .1s,background .1s;user-select:none;}
+.btn:hover{transform:translate(-2px,-2px);box-shadow:7px 7px 0 rgba(255,255,255,.25);background:rgba(255,255,255,.2)}
+.btn:active{transform:translate(4px,4px);box-shadow:1px 1px 0 rgba(255,255,255,.25)}
+.btn.primary{background:var(--coral);border-color:var(--coral);box-shadow:5px 5px 0 rgba(255,107,107,.4)}
+.btn.primary:hover{box-shadow:7px 7px 0 rgba(255,107,107,.4)}
+.btn.yellow{background:var(--yellow);color:var(--navy);border-color:var(--yellow);box-shadow:5px 5px 0 rgba(255,210,63,.4)}
+.btn.yellow:hover{box-shadow:7px 7px 0 rgba(255,210,63,.4)}
+.btn.green{background:var(--green);color:var(--navy);border-color:var(--green);box-shadow:5px 5px 0 rgba(74,222,128,.4)}
+.btn.green:hover{box-shadow:7px 7px 0 rgba(74,222,128,.4)}
+.btn.sky{background:var(--sky);color:var(--navy);border-color:var(--sky);box-shadow:5px 5px 0 rgba(56,189,248,.4)}
+.btn.sky:hover{box-shadow:7px 7px 0 rgba(56,189,248,.4)}
+.btn.purple{background:var(--purple);color:var(--navy);border-color:var(--purple);box-shadow:5px 5px 0 rgba(167,139,250,.4)}
+.btn.purple:hover{box-shadow:7px 7px 0 rgba(167,139,250,.4)}
+.btn.icon{padding:0;width:46px;height:46px;border-radius:12px}
+.btn:disabled{opacity:.4;cursor:not-allowed;transform:none!important}
+.btn:focus-visible{outline:3px solid var(--yellow);outline-offset:2px}
+
+.screen{display:none;position:absolute;inset:0;flex-direction:column;align-items:center;justify-content:center}
+.screen.active{display:flex;animation:fadeUp .3s ease}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.page{width:100%;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:20px 16px 40px;overflow-y:auto;}
+
+.neon-text{text-shadow:0 0 10px currentColor,0 0 20px currentColor,0 0 40px currentColor;}
+.neon-coral{color:var(--coral);text-shadow:0 0 8px var(--coral),0 0 20px var(--coral)}
+.neon-yellow{color:var(--yellow);text-shadow:0 0 8px var(--yellow),0 0 20px var(--yellow)}
+.neon-green{color:var(--green);text-shadow:0 0 8px var(--green),0 0 20px var(--green)}
+.neon-sky{color:var(--sky);text-shadow:0 0 8px var(--sky),0 0 20px var(--sky)}
+
+/* level grid */
+.level-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:12px;width:100%;max-width:560px;}
+.level-card{border:2px solid;border-radius:18px;padding:13px;cursor:pointer;transition:transform .15s,box-shadow .15s;position:relative;overflow:hidden;background:linear-gradient(160deg,rgba(255,255,255,.08),rgba(255,255,255,.02));text-align:left;}
+.level-card:hover:not(.locked){transform:translate(-2px,-4px);box-shadow:0 12px 28px rgba(0,0,0,.5)}
+.level-card:active:not(.locked){transform:translate(1px,2px)}
+.level-card.locked{opacity:.55;cursor:not-allowed;filter:saturate(.35)}
+.level-card .card-pattern{position:absolute;inset:0;background-image:radial-gradient(circle,currentColor 1.5px,transparent 1.5px);background-size:16px 16px;opacity:.09;pointer-events:none;}
+.card-grade{position:absolute;top:10px;right:10px;font-family:'Fredoka',sans-serif;font-weight:700;font-size:13px;line-height:1;padding:4px 8px;border-radius:9px;border:1.5px solid;background:rgba(5,8,22,.55)}
+.diff-dots{display:flex;gap:4px;margin-top:8px}
+.diff-dots span{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.13)}
+.diff-dots span.on{background:currentColor;box-shadow:0 0 6px currentColor}
+.lock-veil{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(5,8,22,.42)}
+
+/* filter tabs */
+.filter-tabs{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-bottom:12px;width:100%;max-width:560px;}
+.filter-tab{padding:5px 14px;border-radius:20px;border:2px solid;font-family:'Fredoka',sans-serif;font-weight:600;font-size:13px;cursor:pointer;transition:all .15s;background:transparent;}
+.filter-tab.active{color:var(--navy)!important;}
+
+/* filter tabs */
+
+/* grade badge on card */
+.card-grade{position:absolute;top:8px;right:8px;font-family:'Fredoka',sans-serif;font-weight:700;font-size:18px;line-height:1;opacity:.9;}
+
+/* modifier panel */
+.mod-panel{width:100%;max-width:480px;background:rgba(255,255,255,.06);border:2px solid rgba(255,255,255,.12);border-radius:16px;overflow:hidden;margin-bottom:10px;}
+.mod-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;cursor:pointer;user-select:none;}
+.mod-body{padding:12px 14px;display:none;flex-direction:column;gap:10px;}
+.mod-body.open{display:flex;}
+.mod-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.mod-label{font-size:12px;font-weight:700;opacity:.7;min-width:70px;text-transform:uppercase;letter-spacing:.05em;}
+.mod-chip{padding:5px 13px;border-radius:20px;border:2px solid rgba(255,255,255,.25);font-family:'Fredoka',sans-serif;font-weight:600;font-size:13px;cursor:pointer;background:transparent;color:#fff;transition:all .15s;}
+.mod-chip:hover{border-color:rgba(255,255,255,.6)}
+.mod-chip.sel{background:rgba(255,255,255,.22);border-color:#fff;box-shadow:0 0 10px rgba(255,255,255,.25)}
+.mod-chip.sel{background:rgba(255,255,255,.2);border-color:#fff;}
+.mod-toggle{width:38px;height:22px;border-radius:11px;border:2px solid rgba(255,255,255,.3);background:rgba(255,255,255,.1);cursor:pointer;position:relative;transition:background .2s;}
+.mod-toggle.on{background:var(--green);border-color:var(--green);}
+.mod-toggle::after{content:'';position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:left .2s;}
+.mod-toggle.on::after{left:18px;}
+
+/* canvas / hud */
+#canvas-wrap{position:relative;width:min(480px,100vw);}
+#game-canvas{display:block;width:100%;height:auto;aspect-ratio:480/700;background:#050816;border-left:2px solid rgba(255,255,255,.1);border-right:2px solid rgba(255,255,255,.1);touch-action:none;}
+.hud-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;width:min(480px,100vw);padding:8px 6px;background:linear-gradient(180deg,rgba(0,0,0,.78),rgba(0,0,0,.55));border-bottom:1px solid rgba(255,255,255,.08);}
+.hud-cell{display:flex;flex-direction:column;align-items:center;padding:6px 4px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.09);border-radius:10px;}
+.hud-cell .lbl{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;opacity:.7}
+.hud-cell .val{font-family:'Fredoka',sans-serif;font-weight:700;font-size:18px;line-height:1.1}
+
+/* touch */
+.touch-row{display:none;grid-template-columns:repeat(4,1fr);gap:4px;width:min(480px,100vw);}
+@media (hover:none){.touch-row{display:grid}}
+.touch-btn{height:60px;font-family:'Fredoka',sans-serif;font-weight:700;font-size:22px;border:none;border-radius:0 0 10px 10px;cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:center;transition:filter .08s;color:#fff;touch-action:none;}
+.touch-btn:active{filter:brightness(1.5)}
+
+/* toast */
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(100px);background:rgba(10,14,42,.78);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);color:#fff;border:2px solid rgba(255,255,255,.25);padding:10px 20px;border-radius:14px;font-weight:700;font-size:13px;z-index:200;transition:transform .28s ease;pointer-events:none;box-shadow:0 10px 32px rgba(0,0,0,.45);}
+.toast.show{transform:translateX(-50%) translateY(0)}
+
+/* achievements */
+.ach-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;width:100%;max-width:560px;}
+.ach-card{border:2px solid;border-radius:16px;padding:12px 10px;text-align:center;transition:transform .15s;}
+.ach-card.unlocked{background:linear-gradient(160deg,rgba(255,210,63,.13),rgba(255,107,107,.05));}
+.ach-card.locked{opacity:.45;filter:grayscale(.85);}
+.ach-icon{width:46px;height:46px;margin:0 auto 7px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:24px;background:rgba(255,255,255,.07);border:1.5px solid rgba(255,255,255,.13)}
+.ach-card.unlocked .ach-icon{background:linear-gradient(135deg,rgba(255,210,63,.28),rgba(255,107,107,.22));border-color:rgba(255,210,63,.55)}
+
+/* leaderboard */
+.lb-row{display:flex;align-items:center;gap:10px;padding:9px 12px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:12px;margin-bottom:6px;}
+.lb-rank{font-family:'Fredoka',sans-serif;font-weight:700;font-size:20px;min-width:28px;text-align:center;}
+
+/* misc */
+@keyframes starPop{0%{transform:scale(0) rotate(-30deg)}60%{transform:scale(1.3)}100%{transform:scale(1)}}
+.star-lit{animation:starPop .4s ease forwards}
+.grade-ring{width:118px;height:118px;border-radius:50%;display:flex;align-items:center;justify-content:center;position:relative}
+.grade-ring::before{content:'';position:absolute;inset:-6px;border-radius:50%;background:var(--ring,#FFD700);filter:blur(18px);opacity:.3}
+.grade-ring-inner{width:100%;height:100%;border-radius:50%;background:rgba(5,8,22,.88);border:3px solid var(--ring,#FFD700);display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:inset 0 0 20px rgba(255,255,255,.05)}
+.grade-badge{font-family:'Fredoka',sans-serif;font-weight:700;font-size:52px;line-height:1;}
+.divider{width:100%;max-width:480px;height:1px;background:rgba(255,255,255,.12);margin:10px 0}
+.bg-shape{position:fixed;border-radius:50%;pointer-events:none;z-index:0;opacity:.07;animation:shapeFloat 14s ease-in-out infinite alternate}
+@keyframes shapeFloat{from{transform:translate(0,0) scale(1)}to{transform:translate(26px,-34px) scale(1.14)}}
+.bg-grid{position:fixed;inset:0;pointer-events:none;z-index:0;background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);background-size:44px 44px;-webkit-mask-image:radial-gradient(ellipse at 50% 0%,#000 0%,transparent 72%);mask-image:radial-gradient(ellipse at 50% 0%,#000 0%,transparent 72%)}
+.logo-shine{position:absolute;inset:0;border-radius:inherit;overflow:hidden;pointer-events:none}
+.logo-shine::after{content:'';position:absolute;top:0;bottom:0;left:-60%;width:45%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.55),transparent);animation:shine 3.4s ease-in-out infinite}
+@keyframes shine{from{transform:translateX(0) skewX(-18deg)}to{transform:translateX(430%) skewX(-18deg)}}
+@keyframes eqA{0%{height:8px}100%{height:40px}}
+@keyframes arrowFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
+.hero-arrow{position:absolute;pointer-events:none;opacity:.55;animation:arrowFloat 3.6s ease-in-out infinite;filter:drop-shadow(0 0 8px currentColor)}
+/* daily badge */
+.daily-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:8px;background:rgba(255,210,63,.2);border:1px solid var(--yellow);font-size:10px;font-weight:700;color:var(--yellow);}
+/* 모션 끄기 / 사용자 설정 줄이기 */
+body.fx-off .bg-shape,body.fx-off .logo-shine::after,body.fx-off .hero-arrow,body.fx-off .eq span{animation:none!important}
+@media (prefers-reduced-motion: reduce){
+  .bg-shape,.logo-shine::after,.hero-arrow,.eq span{animation:none!important}
+  .screen.active{animation:none}
+}
+</style>
+</head>
+<body>
+<div class="bg-shape" style="width:400px;height:400px;background:var(--coral);top:-100px;left:-120px"></div>
+<div class="bg-shape" style="width:300px;height:300px;background:var(--sky);bottom:-80px;right:-80px;animation-delay:-5s"></div>
+<div class="bg-shape" style="width:220px;height:220px;background:var(--purple);top:38%;right:-90px;animation-delay:-9s"></div>
+<div class="bg-grid"></div>
+<div id="app" style="position:relative;min-height:100vh;overflow:hidden">
+
+
+<!-- ── START SCREEN ── -->
+<div id="scr-start" class="screen active" style="background:linear-gradient(180deg,#0A0E2A 0%,#111830 100%);padding:0">
+  <div class="hero-arrow" style="color:var(--sky);top:15%;left:8%"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3l7 9h-4v9h-6v-9H5z"/></svg></div>
+  <div class="hero-arrow" style="color:var(--coral);top:22%;right:9%;animation-delay:-1.4s"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="transform:rotate(-90deg)"><path d="M12 3l7 9h-4v9h-6v-9H5z"/></svg></div>
+  <div class="hero-arrow" style="color:var(--yellow);bottom:22%;left:12%;animation-delay:-2.4s"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="transform:rotate(180deg)"><path d="M12 3l7 9h-4v9h-6v-9H5z"/></svg></div>
+  <div class="hero-arrow" style="color:var(--green);bottom:30%;right:13%;animation-delay:-.8s"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="transform:rotate(90deg)"><path d="M12 3l7 9h-4v9h-6v-9H5z"/></svg></div>
+  <div class="page" style="justify-content:center;gap:0">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:28px">
+      <div style="width:56px;height:56px;background:linear-gradient(135deg,var(--coral),var(--purple));border-radius:18px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 24px rgba(255,107,107,.5);position:relative;overflow:hidden">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="white"><path d="M9 19V6l12-3v13M9 19c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zm12 0c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2z"/></svg>
+        <div class="logo-shine"></div>
+      </div>
+      <div>
+        <div class="font-display" style="font-size:32px;font-weight:700;line-height:1">Beat<span class="neon-coral">Craft</span></div>
+        <div style="font-size:11px;opacity:.5;letter-spacing:.1em;text-transform:uppercase">DDR Edition</div>
+      </div>
+    </div>
+    <div class="eq" style="display:flex;gap:5px;align-items:flex-end;height:44px;margin-bottom:28px">
+      <span style="width:7px;border-radius:3px 3px 0 0;background:var(--coral);animation:eqA 0.7s ease-in-out infinite alternate"></span>
+      <span style="width:7px;border-radius:3px 3px 0 0;background:var(--yellow);animation:eqA 0.9s ease-in-out infinite alternate;animation-delay:-.3s"></span>
+      <span style="width:7px;border-radius:3px 3px 0 0;background:var(--green);animation:eqA 0.8s ease-in-out infinite alternate;animation-delay:-.5s"></span>
+      <span style="width:7px;border-radius:3px 3px 0 0;background:var(--sky);animation:eqA 1.1s ease-in-out infinite alternate;animation-delay:-.2s"></span>
+      <span style="width:7px;border-radius:3px 3px 0 0;background:var(--purple);animation:eqA 0.75s ease-in-out infinite alternate;animation-delay:-.7s"></span>
+      <span style="width:7px;border-radius:3px 3px 0 0;background:var(--coral);animation:eqA 0.95s ease-in-out infinite alternate;animation-delay:-.4s"></span>
+      <span style="width:7px;border-radius:3px 3px 0 0;background:var(--yellow);animation:eqA 0.65s ease-in-out infinite alternate;animation-delay:-.1s"></span>
+    </div>
+    <h1 class="font-display" style="font-size:clamp(52px,14vw,88px);font-weight:700;line-height:.95;text-align:center;margin-bottom:12px">BEAT<span class="neon-coral">CRAFT</span></h1>
+    <p class="font-display" style="font-size:20px;opacity:.7;text-align:center;margin-bottom:8px">오락실 DDR 스타일 리듬 게임</p>
+    <p style="font-size:13px;opacity:.5;text-align:center;max-width:340px;line-height:1.6;margin-bottom:32px">4개 레인, 화살표 노트, 홀드 노트<br>타이밍을 맞혀 콤보를 쌓고 S랭크를 노려라!</p>
+    <div style="display:flex;gap:10px;margin-bottom:8px">
+      <div style="width:50px;height:50px;border-radius:12px;background:var(--coral);display:flex;align-items:center;justify-content:center;font-family:Fredoka,sans-serif;font-weight:700;font-size:20px;box-shadow:0 0 12px rgba(255,107,107,.4)">D</div>
+      <div style="width:50px;height:50px;border-radius:12px;background:var(--yellow);color:var(--navy);display:flex;align-items:center;justify-content:center;font-family:Fredoka,sans-serif;font-weight:700;font-size:20px;box-shadow:0 0 12px rgba(255,210,63,.4)">F</div>
+      <div style="width:50px;height:50px;border-radius:12px;background:var(--green);color:var(--navy);display:flex;align-items:center;justify-content:center;font-family:Fredoka,sans-serif;font-weight:700;font-size:20px;box-shadow:0 0 12px rgba(74,222,128,.4)">J</div>
+      <div style="width:50px;height:50px;border-radius:12px;background:var(--sky);color:var(--navy);display:flex;align-items:center;justify-content:center;font-family:Fredoka,sans-serif;font-weight:700;font-size:20px;box-shadow:0 0 12px rgba(56,189,248,.4)">K</div>
+    </div>
+    <p style="font-size:11px;opacity:.4;margin-bottom:22px">키보드 D F J K · 또는 화면 터치</p>
+    <div id="start-stats" style="display:flex;gap:8px;margin-bottom:22px;font-size:12px;font-weight:700;flex-wrap:wrap;justify-content:center"></div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center">
+      <button class="btn primary" style="font-size:18px;padding:14px 32px" onclick="showLevels()">게임 시작 🎮</button>
+      <button class="btn" onclick="quickStart()" style="font-size:16px">바로 플레이 (Lv.1)</button>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;width:100%;max-width:480px;margin-top:28px">
+      <div style="background:rgba(255,215,0,.15);border:1px solid gold;border-radius:10px;padding:8px 4px;text-align:center"><div style="font-size:9px;font-weight:700;opacity:.7;text-transform:uppercase">PERFECT</div><div class="font-display" style="font-size:16px;color:gold">+100</div></div>
+      <div style="background:rgba(56,189,248,.12);border:1px solid var(--sky);border-radius:10px;padding:8px 4px;text-align:center"><div style="font-size:9px;font-weight:700;opacity:.7;text-transform:uppercase">GREAT</div><div class="font-display" style="font-size:16px;color:var(--sky)">+75</div></div>
+      <div style="background:rgba(74,222,128,.12);border:1px solid var(--green);border-radius:10px;padding:8px 4px;text-align:center"><div style="font-size:9px;font-weight:700;opacity:.7;text-transform:uppercase">GOOD</div><div class="font-display" style="font-size:16px;color:var(--green)">+50</div></div>
+      <div style="background:rgba(255,107,107,.12);border:1px solid var(--coral);border-radius:10px;padding:8px 4px;text-align:center"><div style="font-size:9px;font-weight:700;opacity:.7;text-transform:uppercase">BAD</div><div class="font-display" style="font-size:16px;color:var(--coral)">+10</div></div>
+      <div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.2);border-radius:10px;padding:8px 4px;text-align:center"><div style="font-size:9px;font-weight:700;opacity:.7;text-transform:uppercase">MISS</div><div class="font-display" style="font-size:16px;opacity:.5">0</div></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:24px">
+      <button id="btn-audio" class="btn icon" title="사운드 on/off" onclick="toggleAudio()"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M19 5a10 10 0 010 14M15.5 8.5a5 5 0 010 7"/></svg></button>
+      <button id="btn-motion" class="btn icon" title="모션 줄이기" onclick="toggleMotion()"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></button>
+      <button class="btn icon" title="도전과제" onclick="showAchievements()"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M17 8A5 5 0 017 8V3h10v5z"/><path d="M7 8H5a2 2 0 000 4h2M17 8h2a2 2 0 010 4h-2"/></svg></button>
+    </div>
+  </div>
+</div>
+
+<!-- ── LEVEL SELECT ── -->
+<div id="scr-levels" class="screen" style="background:linear-gradient(180deg,#0A0E2A,#0d1430)">
+  <div class="page" style="gap:0;align-items:center">
+    <div style="display:flex;align-items:center;justify-content:space-between;width:100%;max-width:560px;margin-bottom:14px">
+      <button class="btn icon" onclick="showStart()"><svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M15 19l-7-7 7-7"/></svg></button>
+      <div class="font-display" style="font-size:28px;font-weight:700">레벨 선택</div>
+      <div style="display:flex;gap:6px">
+        <button class="btn yellow" style="padding:8px 12px;font-size:13px" onclick="showDailyChallenge()">📅 데일리</button>
+        <button class="btn purple" style="padding:8px 12px;font-size:13px" onclick="showInfinite()">∞ 무한</button>
+      </div>
+    </div>
+
+    <!-- modifier panel -->
+    <div class="mod-panel" id="mod-panel">
+      <div class="mod-header" onclick="toggleModPanel()">
+        <div style="display:flex;align-items:center;gap:8px">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" stroke-linecap="round"><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/><circle cx="12" cy="12" r="4"/></svg>
+          <span style="font-family:'Fredoka',sans-serif;font-weight:600;font-size:15px">게임 설정</span>
+        </div>
+        <span id="mod-arrow" style="font-size:12px;opacity:.5;transition:transform .2s">▼</span>
+      </div>
+      <div class="mod-body" id="mod-body">
+        <div class="mod-row">
+          <span class="mod-label">속도</span>
+          <button class="mod-chip" data-speed="0.5" onclick="setSpeed(0.5)">0.5×</button>
+          <button class="mod-chip" data-speed="0.75" onclick="setSpeed(0.75)">0.75×</button>
+          <button class="mod-chip sel" data-speed="1" onclick="setSpeed(1)">1×</button>
+          <button class="mod-chip" data-speed="1.25" onclick="setSpeed(1.25)">1.25×</button>
+          <button class="mod-chip" data-speed="1.5" onclick="setSpeed(1.5)">1.5×</button>
+        </div>
+        <div class="mod-row">
+          <span class="mod-label">오프셋</span>
+          <button class="mod-chip" onclick="nudgeOffset(-20)">−20</button>
+          <span id="offset-val" style="font-family:'Fredoka',sans-serif;font-weight:600;font-size:13px;min-width:56px;text-align:center">0ms</span>
+          <button class="mod-chip" onclick="nudgeOffset(20)">+20</button>
+          <span style="font-size:12px;opacity:.6;margin-left:4px">판정 타이밍 보정 (±150ms)</span>
+        </div>
+        <div class="mod-row">
+          <span class="mod-label">미러</span>
+          <div class="mod-toggle" id="tog-mirror" onclick="toggleMirror()"></div>
+          <span style="font-size:12px;opacity:.6;margin-left:4px">레인 좌우 반전</span>
+        </div>
+        <div class="mod-row">
+          <span class="mod-label">무적</span>
+          <div class="mod-toggle" id="tog-nofail" onclick="toggleNofail()"></div>
+          <span style="font-size:12px;opacity:.6;margin-left:4px">HP 감소 없음</span>
+        </div>
+        <div class="mod-row">
+          <span class="mod-label">연습</span>
+          <div class="mod-toggle" id="tog-practice" onclick="togglePractice()"></div>
+          <span style="font-size:12px;opacity:.6;margin-left:4px">0.5× 속도 · HP없음 · 타이밍 표시</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- filter tabs -->
+    <div class="filter-tabs" id="filter-tabs">
+      <button class="filter-tab active" data-filter="ALL" style="border-color:rgba(255,255,255,.4);color:#fff" onclick="setFilter('ALL')">ALL</button>
+      <button class="filter-tab" data-filter="EASY" style="border-color:#4ADE80;color:#4ADE80" onclick="setFilter('EASY')">EASY</button>
+      <button class="filter-tab" data-filter="NORMAL" style="border-color:#38BDF8;color:#38BDF8" onclick="setFilter('NORMAL')">NORMAL</button>
+      <button class="filter-tab" data-filter="HARD" style="border-color:#FF6B6B;color:#FF6B6B" onclick="setFilter('HARD')">HARD</button>
+      <button class="filter-tab" data-filter="EXPERT" style="border-color:#A78BFA;color:#A78BFA" onclick="setFilter('EXPERT')">EXPERT</button>
+    </div>
+
+    <div id="level-grid" class="level-grid"></div>
+  </div>
+</div>
+
+<!-- ── GAME SCREEN ── -->
+<div id="scr-game" class="screen" style="background:#050816;align-items:center;justify-content:flex-start;padding:0">
+  <div class="hud-bar">
+    <div class="hud-cell"><div class="lbl">SCORE</div><div class="val" id="hud-score">0</div></div>
+    <div class="hud-cell"><div class="lbl">COMBO</div><div class="val" id="hud-combo" style="color:var(--yellow)">0</div></div>
+    <div class="hud-cell"><div class="lbl">ACC</div><div class="val" id="hud-acc" style="color:var(--green)">100%</div></div>
+    <div class="hud-cell"><div class="lbl">GRADE</div><div class="val" id="hud-grade" style="color:gold">S</div></div>
+  </div>
+  <div id="canvas-wrap">
+    <canvas id="game-canvas" width="480" height="700"></canvas>
+  </div>
+  <div class="touch-row" id="touch-row">
+    <button class="touch-btn" style="background:rgba(255,107,107,.25)" data-lane="0">←</button>
+    <button class="touch-btn" style="background:rgba(255,210,63,.2)" data-lane="1">↓</button>
+    <button class="touch-btn" style="background:rgba(74,222,128,.2)" data-lane="2">↑</button>
+    <button class="touch-btn" style="background:rgba(56,189,248,.2)" data-lane="3">→</button>
+  </div>
+  <div style="display:flex;align-items:center;justify-content:space-between;width:min(480px,100vw);padding:8px;background:rgba(0,0,0,.4)">
+    <button class="btn icon" onclick="quitGame()" title="그만하기 (Esc)"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24" stroke-linecap="round"><path d="M6 18L18 6M6 6l12 12"/></svg></button>
+    <div id="hud-timing" style="font-size:11px;opacity:.55">D F J K · Space=일시정지</div>
+    <button class="btn icon" onclick="togglePause()" title="일시정지 (Space)"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24" stroke-linecap="round"><path d="M10 4v16M18 4v16"/></svg></button>
+  </div>
+</div>
+
+<!-- ── RESULTS SCREEN ── -->
+<div id="scr-results" class="screen" style="background:linear-gradient(180deg,#0A0E2A,#0d1430);overflow-y:auto">
+  <div class="page" style="gap:10px;align-items:center">
+    <div id="res-title" class="font-display neon-coral" style="font-size:clamp(36px,10vw,56px);font-weight:700;text-align:center"></div>
+    <div id="res-sub" style="opacity:.6;font-size:14px;text-align:center"></div>
+    <div id="res-daily-badge" style="display:none;margin-bottom:4px"><span class="daily-badge">📅 데일리 챌린지</span></div>
+    <div id="res-grade-ring" class="grade-ring" style="--ring:#FFD700;margin:10px 0">
+      <div class="grade-ring-inner">
+        <div id="res-grade" class="grade-badge" style="color:gold"></div>
+        <div style="font-size:9px;opacity:.5;letter-spacing:.18em;margin-top:3px">RANK</div>
+      </div>
+    </div>
+    <div id="res-stars" style="display:flex;gap:6px;justify-content:center;margin-bottom:4px"></div>
+    <div style="background:rgba(255,255,255,.06);border:2px solid rgba(255,255,255,.15);border-radius:18px;padding:14px 32px;text-align:center;width:100%;max-width:320px">
+      <div style="font-size:10px;font-weight:700;opacity:.6;letter-spacing:.1em;text-transform:uppercase">FINAL SCORE</div>
+      <div id="res-score" class="font-display" style="font-size:52px;font-weight:700;color:var(--yellow);text-shadow:0 0 12px rgba(255,210,63,.5)">0</div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;width:100%;max-width:480px">
+      <div style="background:rgba(255,215,0,.1);border:1px solid gold;border-radius:10px;padding:8px 4px;text-align:center"><div style="font-size:9px;font-weight:700;opacity:.7">PERFECT</div><div id="res-perfect" class="font-display" style="font-size:20px;color:gold">0</div></div>
+      <div style="background:rgba(56,189,248,.1);border:1px solid var(--sky);border-radius:10px;padding:8px 4px;text-align:center"><div style="font-size:9px;font-weight:700;opacity:.7">GREAT</div><div id="res-great" class="font-display" style="font-size:20px;color:var(--sky)">0</div></div>
+      <div style="background:rgba(74,222,128,.1);border:1px solid var(--green);border-radius:10px;padding:8px 4px;text-align:center"><div style="font-size:9px;font-weight:700;opacity:.7">GOOD</div><div id="res-good" class="font-display" style="font-size:20px;color:var(--green)">0</div></div>
+      <div style="background:rgba(255,107,107,.1);border:1px solid var(--coral);border-radius:10px;padding:8px 4px;text-align:center"><div style="font-size:9px;font-weight:700;opacity:.7">BAD</div><div id="res-bad" class="font-display" style="font-size:20px;color:var(--coral)">0</div></div>
+      <div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:8px 4px;text-align:center"><div style="font-size:9px;font-weight:700;opacity:.7">MISS</div><div id="res-miss" class="font-display" style="font-size:20px;opacity:.5">0</div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%;max-width:480px">
+      <div style="background:rgba(255,255,255,.06);border-radius:12px;padding:10px;text-align:center"><div style="font-size:10px;opacity:.6;text-transform:uppercase;letter-spacing:.06em">Max Combo</div><div id="res-combo" class="font-display" style="font-size:26px;color:var(--yellow)">0</div></div>
+      <div style="background:rgba(255,255,255,.06);border-radius:12px;padding:10px;text-align:center"><div style="font-size:10px;opacity:.6;text-transform:uppercase;letter-spacing:.06em">Accuracy</div><div id="res-acc" class="font-display" style="font-size:26px;color:var(--green)">0%</div></div>
+    </div>
+    <div id="res-new-ach" style="display:none;width:100%;max-width:480px;background:rgba(255,210,63,.1);border:2px solid var(--yellow);border-radius:14px;padding:10px;text-align:center">
+      <div style="font-size:11px;font-weight:700;color:var(--yellow);margin-bottom:4px">🏆 도전과제 해제!</div>
+      <div id="res-ach-list" style="font-size:13px"></div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:6px">
+      <button class="btn" onclick="replayLevel()">다시 하기 🔄</button>
+      <button id="btn-next" class="btn primary" onclick="nextLevel()">다음 레벨 →</button>
+      <button class="btn yellow" onclick="showLevels()">레벨 선택</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── INFINITE MODE SCREEN ── -->
+<div id="scr-infinite" class="screen" style="background:linear-gradient(180deg,#0A0E2A,#120820)">
+  <div class="page" style="gap:0;align-items:center">
+    <div style="display:flex;align-items:center;justify-content:space-between;width:100%;max-width:560px;margin-bottom:20px">
+      <button class="btn icon" onclick="showLevels()"><svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M15 19l-7-7 7-7"/></svg></button>
+      <div class="font-display" style="font-size:28px;font-weight:700;color:var(--purple)">∞ 무한 모드</div>
+      <div style="width:46px"></div>
+    </div>
+    <div style="width:100%;max-width:480px;background:rgba(167,139,250,.1);border:2px solid var(--purple);border-radius:16px;padding:18px;margin-bottom:20px;text-align:center;box-shadow:0 0 32px rgba(167,139,250,.22)">
+      <div style="font-size:28px;margin-bottom:8px">🎯</div>
+      <div class="font-display" style="font-size:22px;margin-bottom:8px">살아남아라!</div>
+      <div style="font-size:13px;opacity:.7;line-height:1.7">시작 BPM: <b>90</b> → 15초마다 <b>+2</b> BPM 증가<br>HP가 0이 될 때까지 계속 진행<br>얼마나 오래 버틸 수 있을까?</div>
+    </div>
+    <div style="width:100%;max-width:480px;margin-bottom:20px">
+      <div class="font-display" style="font-size:16px;margin-bottom:10px;opacity:.7">🏆 베스트 기록</div>
+      <div id="inf-leaderboard"></div>
+    </div>
+    <button class="btn purple" style="font-size:20px;padding:16px 48px;font-weight:700" onclick="startInfiniteGame()">도전 시작! ∞</button>
+  </div>
+</div>
+
+<!-- ── INFINITE RESULTS ── -->
+<div id="scr-inf-results" class="screen" style="background:linear-gradient(180deg,#0A0E2A,#120820);overflow-y:auto">
+  <div class="page" style="gap:10px;align-items:center">
+    <div class="font-display neon-coral" style="font-size:clamp(36px,10vw,56px);font-weight:700;text-align:center">생존 종료!</div>
+    <div style="opacity:.6;font-size:14px;text-align:center">무한 모드</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%;max-width:480px;margin-top:10px">
+      <div style="background:rgba(167,139,250,.1);border:2px solid var(--purple);border-radius:16px;padding:14px;text-align:center">
+        <div style="font-size:11px;opacity:.6;text-transform:uppercase;letter-spacing:.06em">생존 시간</div>
+        <div id="inf-res-time" class="font-display" style="font-size:34px;color:var(--purple)">0s</div>
+      </div>
+      <div style="background:rgba(255,107,107,.1);border:2px solid var(--coral);border-radius:16px;padding:14px;text-align:center">
+        <div style="font-size:11px;opacity:.6;text-transform:uppercase;letter-spacing:.06em">최고 BPM</div>
+        <div id="inf-res-bpm" class="font-display" style="font-size:34px;color:var(--coral)">90</div>
+      </div>
+      <div style="background:rgba(255,210,63,.1);border:2px solid var(--yellow);border-radius:16px;padding:14px;text-align:center">
+        <div style="font-size:11px;opacity:.6;text-transform:uppercase;letter-spacing:.06em">최대 콤보</div>
+        <div id="inf-res-combo" class="font-display" style="font-size:34px;color:var(--yellow)">0</div>
+      </div>
+      <div style="background:rgba(74,222,128,.1);border:2px solid var(--green);border-radius:16px;padding:14px;text-align:center">
+        <div style="font-size:11px;opacity:.6;text-transform:uppercase;letter-spacing:.06em">점수</div>
+        <div id="inf-res-score" class="font-display" style="font-size:34px;color:var(--green)">0</div>
+      </div>
+    </div>
+    <div id="inf-res-rank" style="font-size:13px;opacity:.7;text-align:center;padding:6px"></div>
+    <div style="width:100%;max-width:480px;margin-top:6px">
+      <div class="font-display" style="font-size:15px;opacity:.7;margin-bottom:8px">🏆 리더보드</div>
+      <div id="inf-res-lb"></div>
+    </div>
+    <div id="inf-res-new-ach" style="display:none;width:100%;max-width:480px;background:rgba(255,210,63,.1);border:2px solid var(--yellow);border-radius:14px;padding:10px;text-align:center">
+      <div style="font-size:11px;font-weight:700;color:var(--yellow);margin-bottom:4px">🏆 도전과제 해제!</div>
+      <div id="inf-res-ach-list" style="font-size:13px"></div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:8px">
+      <button class="btn purple" onclick="startInfiniteGame()">다시 도전 ∞</button>
+      <button class="btn" onclick="showInfinite()">기록 보기</button>
+      <button class="btn yellow" onclick="showLevels()">레벨 선택</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── ACHIEVEMENTS SCREEN ── -->
+<div id="scr-achievements" class="screen" style="background:linear-gradient(180deg,#0A0E2A,#0d1430);overflow-y:auto">
+  <div class="page" style="gap:0;align-items:center">
+    <div style="display:flex;align-items:center;justify-content:space-between;width:100%;max-width:560px;margin-bottom:20px">
+      <button class="btn icon" onclick="showStart()"><svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M15 19l-7-7 7-7"/></svg></button>
+      <div class="font-display" style="font-size:28px;font-weight:700">🏆 도전과제</div>
+      <div style="width:46px"></div>
+    </div>
+    <div id="ach-progress-bar" style="width:100%;max-width:560px;margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;font-size:12px;opacity:.6;margin-bottom:6px">
+        <span>진행률</span><span id="ach-count">0/15</span>
+      </div>
+      <div style="height:8px;background:rgba(255,255,255,.1);border-radius:4px;overflow:hidden">
+        <div id="ach-bar-fill" style="height:100%;background:linear-gradient(90deg,var(--yellow),var(--coral));border-radius:4px;transition:width .5s"></div>
+      </div>
+    </div>
+    <div id="ach-grid" class="ach-grid"></div>
+  </div>
+</div>
+
+</div><!-- #app -->
+<div id="toast" class="toast"></div>
+
+
+<script>
+/* ═══════════════════════════════════════
+   STATE & DATA
+═══════════════════════════════════════ */
+const G = {
+  screen:'start',
+  currentLvl:null,
+  unlocked:[1],
+  highScores:{},
+  grades:{},
+  achievements:[],
+  infScores:[],
+  audioOn:true,
+  motionOn:true,
+  filter:'ALL',
+  isDaily:false,
+  // modifiers
+  speed:1,
+  mirror:false,
+  nofail:false,
+  practice:false,
+  offset:0
+};
+
+const LEVELS = [
+  {id:1, name:'First Pulse',  bpm:78,  dur:30, diff:'EASY',   density:.40, holdChance:.06, color:'coral'},
+  {id:2, name:'Sunny Step',   bpm:90,  dur:33, diff:'EASY',   density:.46, holdChance:.08, color:'yellow'},
+  {id:3, name:'Green Groove', bpm:100, dur:35, diff:'EASY',   density:.52, holdChance:.10, color:'green'},
+  {id:4, name:'Sky Walk',     bpm:110, dur:37, diff:'NORMAL', density:.58, holdChance:.12, color:'sky'},
+  {id:5, name:'Coral Riff',   bpm:118, dur:40, diff:'NORMAL', density:.63, holdChance:.14, color:'coral'},
+  {id:6, name:'Yellow Beat',  bpm:126, dur:42, diff:'NORMAL', density:.68, holdChance:.16, color:'yellow'},
+  {id:7, name:'Forest Run',   bpm:136, dur:44, diff:'HARD',   density:.74, holdChance:.18, color:'green'},
+  {id:8, name:'Ocean Drive',  bpm:146, dur:47, diff:'HARD',   density:.80, holdChance:.20, color:'sky'},
+  {id:9, name:'Master Craft', bpm:156, dur:52, diff:'EXPERT', density:.86, holdChance:.22, color:'coral'}
+];
+
+const ACHIEVEMENTS = [
+  {id:'first_clear',  icon:'🎮', name:'첫 클리어',       desc:'레벨을 처음으로 클리어',          check:g=>!g.gameOver},
+  {id:'combo50',      icon:'🔥', name:'콤보 50',          desc:'50 콤보 달성',                    check:g=>g.maxCombo>=50},
+  {id:'combo100',     icon:'💥', name:'콤보 100',         desc:'100 콤보 달성',                   check:g=>g.maxCombo>=100},
+  {id:'perfect_only', icon:'⭐', name:'퍼펙트 런',        desc:'PERFECT만으로 클리어 (Miss=0)',    check:g=>!g.gameOver&&g.judge.MISS===0&&g.judge.BAD===0&&g.judge.GOOD===0},
+  {id:'ss_rank',      icon:'👑', name:'SS 랭크',          desc:'SS 랭크 달성',                    check:g=>{const t=Object.values(g.judge).reduce((a,b)=>a+b,0);const acc=t===0?0:Math.round((g.judge.PERFECT*100+g.judge.GREAT*75+g.judge.GOOD*50+g.judge.BAD*10)/(t*100)*100);return acc>=99;}},
+  {id:'s_rank',       icon:'🌟', name:'S 랭크',           desc:'S 랭크 이상 달성',                check:g=>{const t=Object.values(g.judge).reduce((a,b)=>a+b,0);const acc=t===0?0:Math.round((g.judge.PERFECT*100+g.judge.GREAT*75+g.judge.GOOD*50+g.judge.BAD*10)/(t*100)*100);return acc>=95;}},
+  {id:'clear_all',    icon:'🏆', name:'전 레벨 클리어',   desc:'모든 9개 레벨 클리어',             check:()=>G.unlocked.length>=9},
+  {id:'expert',       icon:'💜', name:'익스퍼트 클리어',  desc:'EXPERT 레벨 클리어',               check:g=>!g.gameOver&&g.lvl&&g.lvl.diff==='EXPERT'},
+  {id:'daily',        icon:'📅', name:'데일리 챌린저',    desc:'데일리 챌린지 클리어',             check:g=>g.isDaily&&!g.gameOver},
+  {id:'inf30',        icon:'⏱️', name:'30초 생존',        desc:'무한 모드 30초 이상 생존',        check:g=>g._isInfinite&&g.elapsed>=30000},
+  {id:'inf60',        icon:'⏱️', name:'1분 생존',         desc:'무한 모드 60초 이상 생존',        check:g=>g._isInfinite&&g.elapsed>=60000},
+  {id:'inf120',       icon:'🚀', name:'2분 생존',         desc:'무한 모드 120초 이상 생존',       check:g=>g._isInfinite&&g.elapsed>=120000},
+  {id:'inf_bpm150',   icon:'🎸', name:'BPM 150 돌파',     desc:'무한 모드에서 BPM 150 도달',      check:g=>g._isInfinite&&g.currentBpm>=150},
+  {id:'score10k',     icon:'💰', name:'만점 돌파',        desc:'10000점 이상 달성',               check:g=>g.score>=10000},
+  {id:'nofail_clear', icon:'🛡️', name:'무적 클리어',      desc:'무적 모드로 클리어',               check:g=>G.nofail&&!g.gameOver}
+];
+
+/* ═══════════════════════════════════════
+   AUDIO
+═══════════════════════════════════════ */
+let actx=null;
+function getCtx(){
+  if(!actx) try{actx=new(window.AudioContext||window.webkitAudioContext)()}catch(e){}
+  if(actx&&actx.state==='suspended') actx.resume();
+  return actx;
+}
+function tone(freq,type,dur,vol,slide,atk=.003){
+  if(!G.audioOn) return;
+  const c=getCtx(); if(!c) return;
+  const t=c.currentTime;
+  const o=c.createOscillator(), g=c.createGain();
+  o.type=type; o.frequency.setValueAtTime(freq,t);
+  if(slide) o.frequency.exponentialRampToValueAtTime(slide,t+dur);
+  g.gain.setValueAtTime(0,t);
+  g.gain.linearRampToValueAtTime(vol,t+atk);
+  g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+  o.connect(g); g.connect(c.destination);
+  o.start(t); o.stop(t+dur+.02);
+}
+function noise(dur,vol,hp=4000){
+  if(!G.audioOn) return;
+  const c=getCtx(); if(!c) return;
+  const buf=c.createBuffer(1,c.sampleRate*dur,c.sampleRate);
+  const d=buf.getChannelData(0);
+  for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1);
+  const s=c.createBufferSource(); s.buffer=buf;
+  const f=c.createBiquadFilter(); f.type='highpass'; f.frequency.value=hp;
+  const g=c.createGain();
+  g.gain.setValueAtTime(vol,c.currentTime);
+  g.gain.exponentialRampToValueAtTime(.0001,c.currentTime+dur);
+  s.connect(f); f.connect(g); g.connect(c.destination); s.start();
+}
+function sfxKick(accent){ tone(accent?140:100,'sine',.18,accent?.45:.3,40); }
+function sfxHat(open){ noise(open?.06:.035, open?.07:.05, 7000); }
+function sfxClap(){ noise(.12,.18,800); tone(320,'triangle',.12,.06,200); }
+function sfxHit(lane,judge){
+  const freqs=[330,440,550,660];
+  const f=freqs[lane];
+  if(judge==='PERFECT'){ tone(f,'triangle',.12,.25,f*1.6,.001); tone(f*2,'sine',.18,.12,f*3,.001); }
+  else if(judge==='GREAT'){ tone(f,'triangle',.11,.2,f*1.4,.001); tone(f*2,'sine',.14,.08,0,.001); }
+  else if(judge==='GOOD'){ tone(f,'square',.1,.15,f*1.2,.002); }
+  else { tone(f*.7,'sawtooth',.1,.1,f*.5,.003); }
+}
+function sfxMiss(){ tone(160,'sawtooth',.18,.12,70,.003); }
+function sfxCountdown(n){
+  const freqs=[0,330,440,550];
+  if(n>0) tone(freqs[Math.min(n,3)],'triangle',.12,.18,0,.001);
+  else { tone(660,'triangle',.15,.25,880,.001); tone(880,'sine',.2,.15,0,.001); }
+}
+
+/* ═══════════════════════════════════════
+   CANVAS
+═══════════════════════════════════════ */
+const canvas=document.getElementById('game-canvas');
+const C=canvas.getContext('2d');
+const W=480, H=700;
+
+if(!CanvasRenderingContext2D.prototype.roundRect){
+  CanvasRenderingContext2D.prototype.roundRect=function(x,y,w,h,r){
+    if(typeof r==='number') r=[r,r,r,r];
+    this.beginPath();
+    this.moveTo(x+r[0],y);
+    this.arcTo(x+w,y,x+w,y+h,r[1]);
+    this.arcTo(x+w,y+h,x,y+h,r[2]);
+    this.arcTo(x,y+h,x,y,r[3]);
+    this.arcTo(x,y,x+w,y,r[0]);
+    this.closePath();
+    return this;
+  };
+}
+
+const LANE_COLORS=['#FF6B6B','#FFD23F','#4ADE80','#38BDF8'];
+const LANE_KEYS=['d','f','j','k'];
+const LANE_CODES={KeyD:0,KeyF:1,KeyJ:2,KeyK:3}; // 물리 키 코드: 한글 IME가 켜져 있어도 인식됨
+const NOTE_FALL_TIME=1600;
+const PERFECT_WIN=55, GREAT_WIN=110, GOOD_WIN=185, BAD_WIN=280;
+const LANE_W=W/4, HIT_Y=H-90;
+
+/* ═══════════════════════════════════════
+   VISUAL FX — 프리렌더 스프라이트 & 헬퍼
+═══════════════════════════════════════ */
+function shade(hex,amt){
+  const n=parseInt(hex.slice(1),16);
+  const r=Math.max(0,Math.min(255,(n>>16)+amt));
+  const g=Math.max(0,Math.min(255,((n>>8)&255)+amt));
+  const b=Math.max(0,Math.min(255,(n&255)+amt));
+  return `rgb(${r},${g},${b})`;
+}
+function _drawStar(c,cx,cy,R,N,r){
+  c.beginPath();
+  for(let i=0;i<N*2;i++){
+    const rad=i%2===0?R:r;
+    const a=(i*Math.PI)/N-Math.PI/2;
+    const x=cx+Math.cos(a)*rad,y=cy+Math.sin(a)*rad;
+    if(i===0)c.moveTo(x,y); else c.lineTo(x,y);
+  }
+  c.closePath();
+}
+function _arrowPathOn(g,s){
+  g.beginPath();
+  g.moveTo(0,-s);
+  g.lineTo(-s,0);
+  g.lineTo(-s*.42,0);
+  g.lineTo(-s*.42,s*.92);
+  g.lineTo(s*.42,s*.92);
+  g.lineTo(s*.42,0);
+  g.lineTo(s,0);
+  g.closePath();
+}
+const LANE_ROT=[-Math.PI/2,Math.PI,0,Math.PI/2];
+const ARROW_SPRITES=[];
+(function _buildArrowSprites(){
+  const S=96;
+  for(let lane=0;lane<4;lane++){
+    for(let p=0;p<2;p++){
+      const cv=document.createElement('canvas'); cv.width=S; cv.height=S;
+      const g=cv.getContext('2d');
+      const clr=LANE_COLORS[lane];
+      g.translate(S/2,S/2); g.rotate(LANE_ROT[lane]);
+      if(p) g.scale(1.08,1.08);
+      const s=27;
+      g.lineJoin='round';
+      g.save(); g.translate(0,5); g.fillStyle='rgba(0,0,0,.45)'; _arrowPathOn(g,s); g.fill(); g.restore();
+      g.lineWidth=7; g.strokeStyle='#0A0E2A'; _arrowPathOn(g,s); g.stroke();
+      const bg=g.createLinearGradient(0,-s,0,s);
+      bg.addColorStop(0,'#ffffff'); bg.addColorStop(.3,clr); bg.addColorStop(1,shade(clr,-60));
+      g.fillStyle=bg; _arrowPathOn(g,s); g.fill();
+      g.lineWidth=2.5; g.strokeStyle='rgba(255,255,255,.85)'; _arrowPathOn(g,s-4); g.stroke();
+      g.save(); _arrowPathOn(g,s); g.clip();
+      g.fillStyle='rgba(255,255,255,.4)';
+      g.beginPath(); g.ellipse(0,-s*.42,s*.8,s*.3,0,0,Math.PI*2); g.fill();
+      g.restore();
+      ARROW_SPRITES.push(cv);
+    }
+  }
+})();
+const VIGNETTE=(function(){
+  const cv=document.createElement('canvas'); cv.width=W; cv.height=H;
+  const g=cv.getContext('2d');
+  const rg=g.createRadialGradient(W/2,H*.42,H*.3,W/2,H*.5,H*.78);
+  rg.addColorStop(0,'rgba(0,0,0,0)'); rg.addColorStop(1,'rgba(0,0,0,.42)');
+  g.fillStyle=rg; g.fillRect(0,0,W,H);
+  return cv;
+})();
+
+/* AI 생성 픽셀아트 스프라이트 (상대경로 → file:// 에서도 동작, 로드 실패 시 기존 벡터 렌더로 폴백) */
+const SPRITES={noteBlue:new Image(),notePink:new Image(),starPerfect:new Image()};
+SPRITES.noteBlue.src='game-assets/beatcraft/note-blue.png';
+SPRITES.notePink.src='game-assets/beatcraft/note-pink.png';
+SPRITES.starPerfect.src='game-assets/beatcraft/star-perfect.png';
+function _spriteReady(img){ return img.complete&&img.naturalWidth>0; }
+
+let game=null;
+
+/* ═══════════════════════════════════════
+   GAME CLASS
+═══════════════════════════════════════ */
+class Game {
+  constructor(lvl){
+    this.lvl=lvl;
+    this.notes=[]; this.particles=[]; this.popups=[];
+    this.rings=[]; this.comboPulse=0;
+    this.stars=Array.from({length:26},()=>({x:Math.random()*W,y:Math.random()*H,s:Math.random()<.3?2:1.4,a:.15+Math.random()*.3,tw:.5+Math.random()*2,ph:Math.random()*6}));
+    this.laneGlow=[0,0,0,0]; this.lanePress=[false,false,false,false];
+    this.holdState=[null,null,null,null];
+    this.score=0; this.combo=0; this.maxCombo=0; this.hp=100;
+    this.judge={PERFECT:0,GREAT:0,GOOD:0,BAD:0,MISS:0};
+    this.elapsed=0; this.startTime=0; this.totalPause=0; this.pauseStart=0;
+    this.paused=false; this.running=false;
+    this.lastBeat=-1; this.beatPulse=0; this.bgPulse=0;
+    this.endTime=(lvl.dur+2)*1000;
+    this.cdMs=2100; this.counting=true; this.shake=0; this.gameOver=false; this.isDaily=false;
+    this.lastFrame=0; this.lastCdBeat=-1;
+    this.lastTimingMs=null; // for practice mode timing display
+    this._generate();
+  }
+
+  _getLane(rawLane){
+    return G.mirror?3-rawLane:rawLane;
+  }
+
+  _generate(){
+    const speedMult = G.practice ? 0.5 : G.speed;
+    const bpm = this.lvl.bpm * speedMult;
+    const beatMs=60000/bpm;
+    const subMs=beatMs/2;
+    const total=Math.floor(this.lvl.dur*1000/subMs);
+    let lastLane=-1;
+    for(let i=0;i<total;i++){
+      const time=i*subMs+2200;
+      if(time>this.endTime-300) break; // 종료 직후에 무의미하게 사라질 노트는 아예 생성하지 않음
+      if(Math.random()<this.lvl.density){
+        let lane;
+        do{ lane=Math.floor(Math.random()*4); }while(lane===lastLane&&Math.random()<.5);
+        lastLane=lane;
+        const mappedLane=this._getLane(lane);
+        const isHold=Math.random()<this.lvl.holdChance;
+        const holdDur=isHold?(beatMs*(1+Math.floor(Math.random()*2))):0;
+        this.notes.push({time,lane:mappedLane,hit:false,missed:false,isHold,holdDur,holdHeld:false,holdComplete:false,holdStart:0});
+        if(this.lvl.diff!=='EASY'&&Math.random()<.10){
+          let l2; do{ l2=Math.floor(Math.random()*4); }while(l2===mappedLane);
+          this.notes.push({time,lane:l2,hit:false,missed:false,isHold:false,holdDur:0,holdHeld:false,holdComplete:false,holdStart:0});
+        }
+      }
+    }
+  }
+
+  start(){ getCtx(); this.running=true; this.lastFrame=performance.now(); requestAnimationFrame(t=>this._loop(t)); }
+  pause(){ if(this.paused||!this.running) return; this.paused=true; this.pauseStart=performance.now(); }
+  resume(){ if(!this.paused) return; this.totalPause+=performance.now()-this.pauseStart; this.paused=false; }
+
+  _loop(now){
+    if(!this.running) return;
+    const dt=Math.min(now-this.lastFrame,50);
+    this.lastFrame=now;
+    if(!this.paused){
+      if(this.counting){
+        this.cdMs-=dt;
+        const cdBeat=Math.ceil(this.cdMs/700);
+        if(cdBeat!==this.lastCdBeat&&cdBeat>=0){ this.lastCdBeat=cdBeat; sfxCountdown(cdBeat>0?cdBeat:0); }
+        if(this.cdMs<=0){ this.counting=false; this.startTime=now; }
+      } else {
+        this.elapsed=now-this.startTime-this.totalPause;
+        this._tick(dt);
+      }
+    }
+    this._render();
+    this._updateHUD();
+    requestAnimationFrame(t=>this._loop(t));
+  }
+
+  _tick(dt){
+    const speedMult = G.practice ? 0.5 : G.speed;
+    const bpm = this.lvl.bpm * speedMult;
+    const beatMs=60000/bpm;
+    const beatIdx=Math.floor(this.elapsed/beatMs);
+    if(beatIdx!==this.lastBeat&&beatIdx>=0){
+      this.lastBeat=beatIdx; this.beatPulse=1; this.bgPulse=1;
+      sfxKick(beatIdx%4===0);
+      if(beatIdx%2===1) sfxHat(false);
+      if(beatIdx%4===2) sfxClap();
+    }
+    this.beatPulse=Math.max(0,this.beatPulse-.06);
+    this.bgPulse=Math.max(0,this.bgPulse-.04);
+
+    for(let i=0;i<4;i++){
+      const hn=this.holdState[i];
+      if(hn&&this.lanePress[i]){
+        hn.holdHeld=true;
+        this.score+=Math.floor(dt*.05);
+      }
+    }
+    for(const n of this.notes){
+      if(n.hit||n.missed) continue;
+      if(this.elapsed-n.time>BAD_WIN){ n.missed=true; this._registerMiss(n.lane); }
+    }
+    for(let i=0;i<4;i++){
+      const hn=this.holdState[i];
+      if(hn&&!hn.missed){
+        const endTime=hn.time+hn.holdDur;
+        if(this.elapsed>=endTime){
+          if(hn.holdHeld){
+            this.score+=100; this.combo++; this.maxCombo=Math.max(this.maxCombo,this.combo);
+            this._popup(i,'HOLD OK','#A78BFA'); this._spawnParticles(i,8,'GREAT');
+          }
+          this.holdState[i]=null;
+        }
+      }
+    }
+    for(let i=this.particles.length-1;i>=0;i--){
+      const p=this.particles[i]; p.x+=p.vx; p.y+=p.vy; p.vy+=.3; p.vx*=.97; p.life--; p.rot+=p.vr;
+      if(p.life<=0) this.particles.splice(i,1);
+    }
+    for(let i=this.popups.length-1;i>=0;i--){
+      const p=this.popups[i]; p.y-=1.2; p.life--;
+      if(p.life<=0) this.popups.splice(i,1);
+    }
+    for(let i=0;i<4;i++) this.laneGlow[i]*=.82;
+    this.shake*=.78;
+    this.comboPulse=Math.max(0,this.comboPulse-.08);
+    for(let i=this.rings.length-1;i>=0;i--){ const r=this.rings[i]; r.r+=3.4; r.life-=.07; if(r.life<=0) this.rings.splice(i,1); }
+    if(G.motionOn) for(const st of this.stars){ st.y+=st.s*.12; if(st.y>H) st.y=-2; }
+    if(this.elapsed>=this.endTime){ this._finish(false); return; }
+    if(this.hp<=0){ this._finish(true); return; }
+  }
+
+  handleKey(lane,down){
+    if(!this.running||this.paused) return;
+    if(this.counting){ this.lanePress[lane]=down; return; }
+    this.lanePress[lane]=down;
+    if(!down){
+      const hn=this.holdState[lane];
+      if(hn&&!hn.holdComplete){
+        const endTime=hn.time+hn.holdDur;
+        if(this.elapsed<endTime-100) this._popup(lane,'HOLD BREAK','#FF6B6B');
+        this.holdState[lane]=null;
+      }
+      return;
+    }
+    this.laneGlow[lane]=1;
+    let nearest=null, dist=Infinity;
+    for(const n of this.notes){
+      if(n.lane!==lane||n.hit||n.missed) continue;
+      const d=Math.abs(n.time+G.offset-this.elapsed);
+      if(d<dist){ dist=d; nearest=n; }
+    }
+    if(nearest&&dist<BAD_WIN){
+      nearest.hit=true;
+      let judge='BAD';
+      if(dist<PERFECT_WIN) judge='PERFECT';
+      else if(dist<GREAT_WIN) judge='GREAT';
+      else if(dist<GOOD_WIN) judge='GOOD';
+      this.lastTimingMs=(this.elapsed-nearest.time-G.offset); // positive=late, negative=early
+      this._registerHit(lane,judge,nearest);
+      if(nearest.isHold) this.holdState[lane]=nearest;
+    }
+  }
+
+  _registerHit(lane,judge,note){
+    const pts={PERFECT:100,GREAT:75,GOOD:50,BAD:10};
+    const hpGain={PERFECT:4,GREAT:3,GOOD:2,BAD:0};
+    const cbBonus=Math.floor(this.combo/10)*10;
+    this.score+=pts[judge]+cbBonus;
+    if(!G.nofail&&!G.practice) this.hp=Math.min(100,this.hp+hpGain[judge]);
+    this.combo++; this.maxCombo=Math.max(this.maxCombo,this.combo); this.comboPulse=1;
+    this.judge[judge]++;
+    if(judge==='PERFECT'||judge==='GREAT') this.rings.push({x:lane*LANE_W+LANE_W/2,y:HIT_Y,r:10,life:1,clr:judge==='PERFECT'?'#FFD700':LANE_COLORS[lane]});
+    this._spawnParticles(lane,judge==='PERFECT'?18:judge==='GREAT'?12:8,judge);
+    this._popup(lane,judge,judge==='PERFECT'?'gold':judge==='GREAT'?'#38BDF8':judge==='GOOD'?'#4ADE80':'#FF6B6B');
+    sfxHit(lane,judge);
+    if(navigator.vibrate) navigator.vibrate(judge==='PERFECT'?30:15);
+  }
+
+  _registerMiss(lane){
+    this.combo=0;
+    if(!G.nofail&&!G.practice) this.hp=Math.max(0,this.hp-8);
+    this.judge.MISS++; this.shake=10;
+    this._popup(lane,'MISS','rgba(255,100,100,.9)');
+    sfxMiss();
+    if(navigator.vibrate) navigator.vibrate([20,25,20]);
+  }
+
+  _popup(lane,text,color){
+    this.popups.push({x:lane*LANE_W+LANE_W/2,y:HIT_Y-60,text,color,life:55});
+  }
+
+  _spawnParticles(lane,count,judge){
+    if(!G.motionOn) count=Math.min(4,count);
+    const cx=lane*LANE_W+LANE_W/2, cy=HIT_Y;
+    const baseColor=LANE_COLORS[lane];
+    for(let i=0;i<count;i++){
+      const ang=(Math.PI*2*i/count)+Math.random()*.5;
+      const sp=2.5+Math.random()*5;
+      const isGold=judge==='PERFECT'&&Math.random()<.4;
+      this.particles.push({x:cx,y:cy,vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp-3,size:4+Math.random()*8,color:isGold?'gold':(Math.random()<.3?'#fff':baseColor),life:25+Math.random()*25,rot:Math.random()*Math.PI*2,vr:(Math.random()-.5)*.5,shape:(isGold||Math.random()<.35)?'star':'spark'});
+    }
+  }
+
+  _finish(gameover){
+    if(!this.running) return;
+    this.running=false; this.gameOver=gameover;
+    showResults(this);
+  }
+
+  _updateHUD(){
+    const total=this.judge.PERFECT+this.judge.GREAT+this.judge.GOOD+this.judge.BAD+this.judge.MISS;
+    const acc=total===0?100:Math.round((this.judge.PERFECT*100+this.judge.GREAT*75+this.judge.GOOD*50+this.judge.BAD*10)/(total*100)*100);
+    const grade=acc>=99?'SS':acc>=95?'S':acc>=90?'A':acc>=80?'B':acc>=70?'C':acc>=60?'D':'E';
+    document.getElementById('hud-score').textContent=this.score;
+    document.getElementById('hud-combo').textContent=this.combo;
+    document.getElementById('hud-acc').textContent=acc+'%';
+    document.getElementById('hud-grade').textContent=grade;
+    document.getElementById('hud-grade').style.color=grade==='SS'||grade==='S'?'gold':grade==='A'?'#4ADE80':grade==='B'?'#38BDF8':'#FF6B6B';
+    // practice timing display
+    if(G.practice&&this.lastTimingMs!==null){
+      const ms=Math.round(this.lastTimingMs);
+      document.getElementById('hud-timing').textContent=ms>0?`+${ms}ms (늦음)`:ms<0?`${ms}ms (빠름)`:'완벽한 타이밍!';
+    }
+  }
+
+  _render(){
+    const c=C;
+    c.save();
+    if(this.shake>.3&&G.motionOn) c.translate((Math.random()-.5)*this.shake,(Math.random()-.5)*this.shake);
+    this._renderStage(c);
+    for(let i=0;i<4;i++){
+      const x=i*LANE_W;
+      c.fillStyle=i%2===0?'rgba(255,255,255,.02)':'rgba(255,255,255,.045)'; c.fillRect(x,0,LANE_W,H);
+      if(i>0){ c.strokeStyle='rgba(255,255,255,.1)'; c.lineWidth=1.5; c.beginPath(); c.moveTo(x,0); c.lineTo(x,H); c.stroke(); }
+    }
+    for(let i=0;i<4;i++){
+      const g=this.laneGlow[i];
+      if(g>.04){
+        const grad=c.createLinearGradient(0,HIT_Y-220,0,HIT_Y+80);
+        grad.addColorStop(0,'rgba(0,0,0,0)'); grad.addColorStop(1,LANE_COLORS[i]);
+        c.globalAlpha=g*.5; c.fillStyle=grad; c.fillRect(i*LANE_W,HIT_Y-220,LANE_W,300); c.globalAlpha=1;
+      }
+    }
+    // hold bodies (활성)
+    for(const n of this.notes){
+      if(!n.isHold||n.missed||!n.hit) continue;
+      const endTime=n.time+n.holdDur;
+      if(this.elapsed>endTime+200) continue;
+      const progress=1-(n.time-this.elapsed)/NOTE_FALL_TIME, noteY=progress*HIT_Y;
+      const endProg=1-(endTime-this.elapsed)/NOTE_FALL_TIME, endY=Math.min(HIT_Y,endProg*HIT_Y);
+      const x=n.lane*LANE_W+LANE_W*.25, nw=LANE_W*.5, clr=LANE_COLORS[n.lane];
+      const hg=c.createLinearGradient(0,endY,0,noteY); hg.addColorStop(0,clr+'33'); hg.addColorStop(1,clr+'CC');
+      c.fillStyle=hg; c.beginPath(); c.roundRect(x,endY,nw,noteY-endY,8); c.fill();
+      c.fillStyle='rgba(255,255,255,.28)';
+      const cy0=Math.max(0,endY), cy1=Math.max(0,noteY);
+      if(cy1>cy0) c.fillRect(x+nw*.34,cy0,nw*.32,cy1-cy0);
+      c.strokeStyle=clr; c.lineWidth=3; c.globalAlpha=.75; c.beginPath(); c.roundRect(x,endY,nw,noteY-endY,8); c.stroke(); c.globalAlpha=1;
+    }
+    // hold bodies (대기 중)
+    for(const n of this.notes){
+      if(!n.isHold||n.hit||n.missed) continue;
+      const dt=n.time-this.elapsed;
+      if(dt>NOTE_FALL_TIME||dt<-BAD_WIN-100) continue;
+      const progress=1-(dt/NOTE_FALL_TIME), noteY=progress*HIT_Y;
+      const endTime=n.time+n.holdDur, endDt=endTime-this.elapsed;
+      const endProgress=1-(endDt/NOTE_FALL_TIME), endY=endProgress*HIT_Y;
+      if(noteY<-80&&endY<-80) continue;
+      const x=n.lane*LANE_W+LANE_W*.25, nw=LANE_W*.5, clr=LANE_COLORS[n.lane];
+      c.fillStyle=clr+'44'; c.beginPath(); c.roundRect(x,Math.max(-20,endY),nw,noteY-Math.max(-20,endY),8); c.fill();
+      c.strokeStyle=clr; c.lineWidth=2; c.globalAlpha=.6; c.beginPath(); c.roundRect(x,Math.max(-20,endY),nw,noteY-Math.max(-20,endY),8); c.stroke(); c.globalAlpha=1;
+    }
+    // receptors
+    for(let i=0;i<4;i++){
+      const x=i*LANE_W, pressed=this.lanePress[i], glow=this.laneGlow[i], clr=LANE_COLORS[i];
+      const pg=c.createLinearGradient(0,HIT_Y-34,0,HIT_Y+34);
+      pg.addColorStop(0,`rgba(255,255,255,${(.05+glow*.25).toFixed(3)})`);
+      pg.addColorStop(1,`rgba(255,255,255,${(.01+glow*.1).toFixed(3)})`);
+      c.globalAlpha=.5+glow*.5; c.fillStyle=pg; c.strokeStyle=clr; c.lineWidth=2.5;
+      c.beginPath(); c.roundRect(x+7,HIT_Y-34,LANE_W-14,68,16); c.fill(); c.stroke();
+      c.globalAlpha=1;
+      this._drawArrow(i,x+LANE_W/2,HIT_Y,pressed?1:.4+glow*.6,pressed?1.12:1);
+    }
+    // tap notes
+    for(const n of this.notes){
+      if(n.hit) continue;
+      const dt=n.time-this.elapsed;
+      if(dt>NOTE_FALL_TIME) continue;
+      if(n.missed&&dt<-BAD_WIN-150) continue;
+      const progress=1-(dt/NOTE_FALL_TIME), noteY=progress*HIT_Y;
+      if(noteY<-50) continue;
+      this._drawNote(n.lane,n.lane*LANE_W+LANE_W/2,noteY,n.missed?.3:1,n.missed?.92:1);
+    }
+    // shockwave rings
+    for(const r of this.rings){
+      c.globalAlpha=Math.max(0,r.life)*.7; c.lineWidth=1+3*r.life; c.strokeStyle=r.clr;
+      c.beginPath(); c.arc(r.x,r.y,r.r,0,Math.PI*2); c.stroke();
+    }
+    c.globalAlpha=1;
+    // particles
+    for(const p of this.particles){
+      c.save(); c.translate(p.x,p.y); c.rotate(p.rot);
+      c.globalAlpha=Math.min(1,p.life/25);
+      if(p.shape==='star'){
+        c.fillStyle=p.color; _drawStar(c,0,0,p.size*.75,5,p.size*.32); c.fill();
+      } else {
+        c.fillStyle=p.color; c.fillRect(-p.size*.8,-p.size*.2,p.size*1.6,p.size*.4);
+        c.strokeStyle='rgba(0,0,0,.3)'; c.lineWidth=1; c.strokeRect(-p.size*.8,-p.size*.2,p.size*1.6,p.size*.4);
+      }
+      c.restore();
+    }
+    c.globalAlpha=1;
+    // vignette
+    c.drawImage(VIGNETTE,0,0);
+    // popups
+    for(const p of this.popups){
+      c.save(); c.translate(p.x,p.y);
+      const t=1-p.life/55; const sc=t<.18?.5+2.8*t:1;
+      c.scale(sc,sc); c.globalAlpha=Math.min(1,p.life/25);
+      if(p.text==='PERFECT'&&_spriteReady(SPRITES.starPerfect)){
+        const ss=28; c.imageSmoothingEnabled=false;
+        c.drawImage(SPRITES.starPerfect,-ss/2,-30,ss,ss);
+      }
+      c.font='800 22px Fredoka,sans-serif'; c.textAlign='center';
+      c.lineWidth=5; c.strokeStyle='rgba(0,0,0,.85)'; c.strokeText(p.text,0,0);
+      c.fillStyle=p.color; c.fillText(p.text,0,0); c.restore();
+    }
+    // combo
+    if(this.combo>=4){
+      c.save(); const scale=1+Math.min(.2,this.combo*.004)+this.comboPulse*.2;
+      c.translate(W/2,65); c.scale(scale,scale);
+      c.font='800 32px Fredoka,sans-serif'; c.textAlign='center';
+      const cg=c.createLinearGradient(0,-18,0,18); cg.addColorStop(0,'#FFD23F'); cg.addColorStop(1,'#FF6B6B');
+      c.lineWidth=6; c.strokeStyle='rgba(0,0,0,.75)'; c.strokeText(this.combo+' COMBO',0,0);
+      c.shadowColor='rgba(255,210,63,.6)'; c.shadowBlur=10+this.comboPulse*18;
+      c.fillStyle=cg; c.fillText(this.combo+' COMBO',0,0); c.restore();
+    }
+    // HP bar
+    const hpW=W-32;
+    c.fillStyle='rgba(255,255,255,.1)'; c.beginPath(); c.roundRect(16,H-14,hpW,7,3.5); c.fill();
+    if(!G.nofail&&!G.practice){
+      const hpColor=this.hp>60?'#4ADE80':this.hp>30?'#FFD23F':'#FF6B6B';
+      c.shadowColor=hpColor; c.shadowBlur=7;
+      c.fillStyle=hpColor; c.beginPath(); c.roundRect(16,H-14,hpW*(this.hp/100),7,3.5); c.fill();
+      c.shadowBlur=0;
+      if(G.motionOn&&this.hp<30){ c.globalAlpha=.08+Math.sin(Date.now()*.01)*.06; c.fillStyle='#FF6B6B'; c.fillRect(0,0,W,H); c.globalAlpha=1; }
+    } else {
+      c.fillStyle='#A78BFA'; c.beginPath(); c.roundRect(16,H-14,hpW,7,3.5); c.fill();
+    }
+    // progress bar
+    const prog=Math.min(1,Math.max(0,this.elapsed/this.endTime));
+    c.fillStyle='rgba(255,255,255,.12)'; c.beginPath(); c.roundRect(16,10,hpW,5,2.5); c.fill();
+    if(prog>.01){
+      const pg3=c.createLinearGradient(16,0,W-16,0); pg3.addColorStop(0,'#38BDF8'); pg3.addColorStop(1,'#A78BFA');
+      c.fillStyle=pg3; c.beginPath(); c.roundRect(16,10,hpW*prog,5,2.5); c.fill();
+    }
+    // countdown
+    if(this.counting){
+      c.fillStyle='rgba(5,8,22,.75)'; c.fillRect(0,0,W,H);
+      const num=Math.ceil(this.cdMs/700); const label=num>0?String(num):'GO!';
+      c.save(); c.translate(W/2,H/2);
+      const phase=(this.cdMs%700)/700; const sc=1+(1-phase)*.6;
+      c.scale(sc,sc); c.globalAlpha=phase*.85+.15;
+      c.font='bold 110px Fredoka,sans-serif'; c.textAlign='center'; c.textBaseline='middle';
+      c.lineWidth=8; c.strokeStyle='rgba(0,0,0,.8)'; c.strokeText(label,0,0);
+      c.fillStyle=label==='GO!'?'#4ADE80':'#FFD23F'; c.fillText(label,0,0);
+      c.restore(); c.globalAlpha=1; c.textBaseline='alphabetic';
+      c.font='600 16px Plus Jakarta Sans,sans-serif'; c.textAlign='center';
+      c.fillStyle='rgba(255,255,255,.6)'; c.fillText('준비하세요!',W/2,H/2+80);
+    }
+    // pause
+    if(this.paused){
+      c.fillStyle='rgba(5,8,22,.82)'; c.fillRect(0,0,W,H);
+      c.font='bold 52px Fredoka,sans-serif'; c.textAlign='center'; c.fillStyle='#fff'; c.fillText('일시정지',W/2,H/2);
+      c.font='600 15px Plus Jakarta Sans,sans-serif'; c.fillStyle='rgba(255,255,255,.6)'; c.fillText('Space 또는 버튼으로 재개',W/2,H/2+38);
+    }
+    c.restore();
+  }
+
+  _renderStage(c){
+    const bp=this.bgPulse, isDark=(this.hp<30);
+    const grad=c.createLinearGradient(0,0,0,H);
+    if(isDark){ grad.addColorStop(0,'#1a0d18'); grad.addColorStop(1,'#050816'); }
+    else { grad.addColorStop(0,'#0e1636'); grad.addColorStop(1,'#050816'); }
+    c.fillStyle=grad; c.fillRect(0,0,W,H);
+    // 히트라인 비트 글로우
+    const glow=c.createRadialGradient(W/2,HIT_Y,20,W/2,HIT_Y,W*.8);
+    glow.addColorStop(0,`rgba(255,210,63,${(.05+bp*.1).toFixed(3)})`);
+    glow.addColorStop(.55,`rgba(255,107,107,${(.02+bp*.05).toFixed(3)})`);
+    glow.addColorStop(1,'rgba(0,0,0,0)');
+    c.fillStyle=glow; c.fillRect(0,0,W,H);
+    if(G.motionOn){
+      // 별 배경
+      for(const st of this.stars){
+        c.globalAlpha=st.a*(.5+.5*Math.sin(Date.now()*.002*st.tw+st.ph));
+        c.fillStyle='#fff'; c.fillRect(st.x,st.y,st.s,st.s);
+      }
+      c.globalAlpha=1;
+      // 떨어지는 비트 라인
+      const bpm=this._isInfinite?this.currentBpm:this.lvl.bpm*(G.practice?0.5:G.speed);
+      const beatMs=60000/bpm;
+      const firstK=Math.max(0,Math.ceil(this.elapsed/beatMs));
+      c.strokeStyle='rgba(255,255,255,.07)'; c.lineWidth=1;
+      for(let k=firstK;k*beatMs-this.elapsed<NOTE_FALL_TIME;k++){
+        const y=(1-(k*beatMs-this.elapsed)/NOTE_FALL_TIME)*HIT_Y;
+        c.beginPath(); c.moveTo(0,y); c.lineTo(W,y); c.stroke();
+      }
+    }
+  }
+
+  _drawArrow(lane,cx,cy,alpha,scale){
+    const spr=ARROW_SPRITES[lane*2+(scale>1.04?1:0)];
+    const S=spr.width, c=C;
+    c.save(); c.globalAlpha*=Math.max(0,Math.min(1,alpha));
+    c.drawImage(spr,cx-S*scale/2,cy-S*scale/2,S*scale,S*scale);
+    c.restore();
+  }
+
+  _drawNote(lane,cx,cy,alpha,scale){
+    // 레인 교대로 스프라이트 노트 사용 (짝수=파랑, 홀수=핑크), 미로드 시 기존 화살표로 폴백
+    const img=lane%2===0?SPRITES.noteBlue:SPRITES.notePink;
+    if(!_spriteReady(img)){ this._drawArrow(lane,cx,cy,alpha,scale); return; }
+    const S=ARROW_SPRITES[0].width, c=C; // 기존 노트와 동일한 크기 유지
+    c.save(); c.globalAlpha*=Math.max(0,Math.min(1,alpha));
+    c.imageSmoothingEnabled=false; // 32px 픽셀아트 선명 확대
+    c.drawImage(img,cx-S*scale/2,cy-S*scale/2,S*scale,S*scale);
+    c.restore();
+  }
+}
+
+
+
+/* ═══════════════════════════════════════
+   INFINITE GAME CLASS
+═══════════════════════════════════════ */
+class InfiniteGame extends Game {
+  constructor(){
+    // Create a pseudo-level starting at BPM 90
+    const infLvl={id:'inf',name:'무한',bpm:90,dur:99999,diff:'HARD',density:.60,holdChance:.12,color:'coral'};
+    super(infLvl);
+    this._isInfinite=true;
+    this.currentBpm=90;
+    this.endTime=Infinity;
+    this.lastBpmStep=0; // tracks elapsed ms at last BPM increase
+    this.gameOver=false;
+  }
+
+  // Override _generate for infinite: generate notes in chunks dynamically.
+  // NOTE: runs inside super() before currentBpm is assigned, so fall back to lvl.bpm.
+  _generate(){
+    const bpm=this.currentBpm||this.lvl.bpm;
+    const beatMs=60000/bpm;
+    const subMs=beatMs/2;
+    const chunkDur=30000;
+    const offset=2200;
+    const total=Math.floor(chunkDur/subMs);
+    let lastLane=-1;
+    for(let i=0;i<total;i++){
+      const time=offset+i*subMs;
+      if(Math.random()<.60){
+        let lane; do{ lane=Math.floor(Math.random()*4); }while(lane===lastLane&&Math.random()<.5);
+        lastLane=lane;
+        const mappedLane=this._getLane(lane);
+        const isHold=Math.random()<.12;
+        const holdDur=isHold?(beatMs*(1+Math.floor(Math.random()*2))):0;
+        this.notes.push({time,lane:mappedLane,hit:false,missed:false,isHold,holdDur,holdHeld:false,holdComplete:false,holdStart:0});
+      }
+    }
+    this._genUpTo=offset+chunkDur;
+  }
+
+  _regenerateChunk(){
+    const bpm=this.currentBpm;
+    const beatMs=60000/bpm;
+    const subMs=beatMs/2;
+    const chunkDur=30000;
+    const offset=Math.max(this.elapsed+3000,(this._genUpTo||0)+400);
+    const total=Math.floor(chunkDur/subMs);
+    let lastLane=-1;
+    const density=Math.min(.90,.60+this.currentBpm*.001);
+    for(let i=0;i<total;i++){
+      const time=offset+i*subMs;
+      if(Math.random()<density){
+        let lane; do{ lane=Math.floor(Math.random()*4); }while(lane===lastLane&&Math.random()<.5);
+        lastLane=lane;
+        const mappedLane=this._getLane(lane);
+        const isHold=Math.random()<.14;
+        const holdDur=isHold?(beatMs*(1+Math.floor(Math.random()*2))):0;
+        this.notes.push({time,lane:mappedLane,hit:false,missed:false,isHold,holdDur,holdHeld:false,holdComplete:false,holdStart:0});
+      }
+    }
+    this._genUpTo=offset+chunkDur;
+  }
+
+  _tick(dt){
+    // 노트가 떨어지기 전에 미리 다음 청크를 보충 (워터마크로 청크 겹침 방지)
+    if(this._genUpTo<this.elapsed+NOTE_FALL_TIME+1500) this._regenerateChunk();
+    // BPM escalation: +2 every 15 seconds
+    const step=Math.floor(this.elapsed/15000);
+    if(step>this.lastBpmStep){
+      const inc=(step-this.lastBpmStep)*2;
+      this.currentBpm=Math.min(220,this.currentBpm+inc);
+      this.lastBpmStep=step;
+      toast('BPM '+this.currentBpm+'! 🔥');
+    }
+
+    // Game Over from HP
+    if(this.hp<=0&&!G.nofail){
+      this.hp=0;
+      this.running=false;
+      showInfiniteResults(this);
+      return;
+    }
+
+    // Prune consumed notes to keep memory lean (upcoming notes + recent hold bodies 유지)
+    if(this.notes.length>600){
+      this.notes=this.notes.filter(n=>n.time>this.elapsed-3000||(!n.hit&&!n.missed));
+    }
+
+    // Call parent tick behavior
+    const speedMult=G.speed;
+    const bpm=this.currentBpm;
+    const beatMs=60000/bpm;
+    const beatIdx=Math.floor(this.elapsed/beatMs);
+    if(beatIdx!==this.lastBeat&&beatIdx>=0){
+      this.lastBeat=beatIdx; this.beatPulse=1; this.bgPulse=1;
+      sfxKick(beatIdx%4===0);
+      if(beatIdx%2===1) sfxHat(false);
+      if(beatIdx%4===2) sfxClap();
+    }
+    this.beatPulse=Math.max(0,this.beatPulse-.05*dt/16);
+    this.bgPulse=Math.max(0,this.bgPulse-.02*dt/16);
+    this.shake=Math.max(0,this.shake-dt*.15);
+    for(const p of this.particles){ p.x+=p.vx*(dt/16); p.y+=p.vy*(dt/16); p.vy+=.3; p.life-=dt/16; p.rot+=.08; }
+    this.particles=this.particles.filter(p=>p.life>0);
+    for(const p of this.popups){ p.y-=.7*(dt/16); p.life-=dt/16; }
+    this.popups=this.popups.filter(p=>p.life>0);
+    for(let i=0;i<4;i++) this.laneGlow[i]=Math.max(0,this.laneGlow[i]-.05*(dt/16));
+    this.comboPulse=Math.max(0,this.comboPulse-.08);
+    for(let i=this.rings.length-1;i>=0;i--){ const r=this.rings[i]; r.r+=3.4*(dt/16); r.life-=.07*(dt/16); if(r.life<=0) this.rings.splice(i,1); }
+    if(G.motionOn) for(const st of this.stars){ st.y+=st.s*.12*(dt/16); if(st.y>H) st.y=-2; }
+    // Miss detection
+    for(const n of this.notes){
+      if(n.hit||n.missed) continue;
+      const diff=this.elapsed-n.time;
+      if(diff>BAD_WIN+150){
+        n.missed=true;
+        this._registerMiss(n.lane);
+      }
+    }
+    // Hold release
+    for(let i=0;i<4;i++){
+      if(this.holdState[i]&&!this.lanePress[i]){
+        const n=this.holdState[i];
+        const endTime=n.time+n.holdDur;
+        if(this.elapsed<endTime-100){
+          this._registerMiss(i);
+        } else {
+          n.holdComplete=true;
+          this.score+=50; this.combo++;
+          this.maxCombo=Math.max(this.maxCombo,this.combo);
+          if(G.motionOn) this._spawnParticles(i,5,'GOOD');
+        }
+        this.holdState[i]=null;
+      }
+    }
+  }
+
+  _render(){
+    // Override progress bar: show BPM instead
+    super._render();
+    // Overwrite progress bar area with BPM display
+    const c=C;
+    c.fillStyle='rgba(5,8,22,.7)'; c.fillRect(0,0,W,18);
+    c.fillStyle='rgba(255,255,255,.08)'; c.beginPath(); c.roundRect(16,10,W-32,5,2.5); c.fill();
+    // BPM fill: map 90-220 range
+    const bpmFrac=Math.min(1,(this.currentBpm-90)/130);
+    const bpmColor=bpmFrac<.4?'#4ADE80':bpmFrac<.7?'#FFD23F':'#FF6B6B';
+    c.shadowColor=bpmColor; c.shadowBlur=6;
+    c.fillStyle=bpmColor; c.beginPath(); c.roundRect(16,10,(W-32)*bpmFrac,5,2.5); c.fill();
+    c.shadowBlur=0;
+  }
+
+  _updateHUD(){
+    super._updateHUD();
+    // Override timing display with BPM info
+    const el=document.getElementById('hud-timing');
+    if(el) el.textContent='BPM '+this.currentBpm+' · Space=일시정지';
+  }
+}
+
+/* ═══════════════════════════════════════
+   NAVIGATION
+═══════════════════════════════════════ */
+function showScreen(name){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  const el=document.getElementById('scr-'+name);
+  if(el) el.classList.add('active');
+  G.screen=name;
+}
+
+function showStart(){ _refreshStartStats(); showScreen('start'); }
+
+function _refreshStartStats(){
+  const el=document.getElementById('start-stats'); if(!el) return;
+  const chip='background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.16);padding:5px 13px;border-radius:20px;opacity:.85';
+  const clears=Math.max(0,G.unlocked.length-1);
+  el.innerHTML=`<span style="${chip}">⚡ 클리어 ${clears}/${LEVELS.length}</span><span style="${chip}">🏆 ${G.achievements.length}/${ACHIEVEMENTS.length}</span>`;
+}
+
+function showLevels(){
+  _renderLevels();
+  showScreen('levels');
+}
+
+function quickStart(){
+  startLevel(1);
+}
+
+/* ═══════════════════════════════════════
+   LEVEL RENDERING
+═══════════════════════════════════════ */
+const COLOR_MAP={coral:'#FF6B6B',yellow:'#FFD23F',green:'#4ADE80',sky:'#38BDF8'};
+const DIFF_COLOR={EASY:'#4ADE80',NORMAL:'#38BDF8',HARD:'#FF6B6B',EXPERT:'#A78BFA'};
+const GRADE_COLORS={S:'gold',A:'#4ADE80',B:'#38BDF8',C:'#FFD23F',D:'#FF6B6B'};
+
+function _renderLevels(){
+  const grid=document.getElementById('level-grid');
+  if(!grid) return;
+  const filtered=G.filter==='ALL'?LEVELS:LEVELS.filter(l=>l.diff===G.filter);
+  const html=filtered.map(lvl=>{
+    const locked=!G.unlocked.includes(lvl.id);
+    const clr=COLOR_MAP[lvl.color]||'#FF6B6B';
+    const dc=DIFF_COLOR[lvl.diff]||'#fff';
+    const hs=G.highScores[lvl.id]||0;
+    const grade=G.grades[lvl.id]||null;
+    const gradeHtml=grade?`<div class="card-grade" style="color:${GRADE_COLORS[grade[0]]||'#fff'};border-color:${GRADE_COLORS[grade[0]]||'#fff'}66">${grade}</div>`:'';
+    const action=locked?"toast('이전 레벨을 클리어하면 잠금 해제됩니다!')":`startLevel(${lvl.id})`;
+    const diffDots={'EASY':1,'NORMAL':2,'HARD':4,'EXPERT':5}[lvl.diff]||3;
+    const dots=Array.from({length:5},(_,i)=>`<span class="${i<diffDots?'on':''}"></span>`).join('');
+    return `
+    <div class="level-card${locked?' locked':''}" style="border-color:${clr}55;color:${clr}"
+         onclick="${action}">
+      <div class="card-pattern" style="color:${clr}"></div>
+      ${gradeHtml}
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
+        <div style="font-size:10px;font-weight:800;letter-spacing:.08em;color:${dc};text-transform:uppercase">${lvl.diff}</div>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="${clr}" opacity=".95"><path d="M12 3l7 9h-4v9h-6v-9H5z"/></svg>
+      </div>
+      <div style="font-family:'Fredoka',sans-serif;font-weight:700;font-size:16px;line-height:1.2;color:#fff;margin-bottom:3px">${lvl.name}</div>
+      <div style="font-size:11px;opacity:.6;color:#fff">BPM ${lvl.bpm} · ${lvl.dur}s</div>
+      <div class="diff-dots" style="color:${dc}">${dots}</div>
+      ${hs>0?`<div style="font-size:10px;opacity:.6;margin-top:6px;color:#fff">최고 ${hs.toLocaleString()}점</div>`:''}
+      ${locked?'<div class="lock-veil"><div style="font-size:22px;filter:drop-shadow(0 2px 6px rgba(0,0,0,.6))">🔒</div></div>':''}
+    </div>`;
+  }).join('');
+  grid.innerHTML=html||'<div style="opacity:.4;text-align:center;padding:20px">해당 난이도 없음</div>';
+}
+
+function setFilter(f){
+  G.filter=f;
+  document.querySelectorAll('.filter-tab').forEach(btn=>{
+    btn.classList.toggle('active',btn.dataset.filter===f);
+    if(btn.dataset.filter===f) btn.style.background=btn.style.color||'';
+    else btn.style.background='transparent';
+  });
+  _renderLevels();
+}
+
+/* ═══════════════════════════════════════
+   DAILY CHALLENGE
+═══════════════════════════════════════ */
+function _seededRand(seed){
+  let x=seed;
+  return function(){
+    x=((x*1664525+1013904223)&0xFFFFFFFF)>>>0;
+    return x/4294967296;
+  };
+}
+
+function getDailyLevel(){
+  const now=new Date();
+  const dateStr=`${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}`;
+  const seed=parseInt(dateStr,10);
+  const rng=_seededRand(seed);
+  const idx=Math.floor(rng()*LEVELS.length);
+  return LEVELS[idx];
+}
+
+function showDailyChallenge(){
+  const lvl=getDailyLevel();
+  toast('📅 오늘의 레벨: '+lvl.name+' ('+lvl.diff+')');
+  // 시작 직전에 플래그를 설정해 뒤로 가기 후 일반 레벨 오작동을 방지
+  setTimeout(()=>{ G.isDaily=true; startLevel(lvl.id); },800);
+}
+
+/* ═══════════════════════════════════════
+   INFINITE MODE
+═══════════════════════════════════════ */
+function showInfinite(){
+  _renderLeaderboard('inf-leaderboard');
+  showScreen('infinite');
+}
+
+function startInfiniteGame(){
+  if(game&&game.running){ game.running=false; }
+  game=new InfiniteGame();
+  G.isDaily=false;
+  G.currentLvl=null;
+  showScreen('game');
+  game.start();
+}
+
+function showInfiniteResults(g){
+  if(!g) return;
+  const timeS=Math.floor(g.elapsed/1000);
+  const mins=Math.floor(timeS/60);
+  const secs=timeS%60;
+  const timeStr=mins>0?`${mins}분 ${secs}초`:`${secs}초`;
+
+  document.getElementById('inf-res-time').textContent=timeStr;
+  document.getElementById('inf-res-bpm').textContent=g.currentBpm;
+  document.getElementById('inf-res-combo').textContent=g.maxCombo;
+  document.getElementById('inf-res-score').textContent=g.score.toLocaleString();
+
+  // Save to leaderboard
+  G.infScores.push({time:g.elapsed,bpm:g.currentBpm,combo:g.maxCombo,score:g.score,date:new Date().toLocaleDateString('ko-KR')});
+  G.infScores.sort((a,b)=>b.time-a.time);
+  G.infScores=G.infScores.slice(0,10);
+  try{ localStorage.setItem('bc_inf',JSON.stringify(G.infScores)); }catch(e){}
+
+  // Rank
+  const myRank=G.infScores.findIndex(s=>s.time===g.elapsed)+1;
+  const rankEl=document.getElementById('inf-res-rank');
+  if(rankEl) rankEl.textContent=myRank>0?`🏆 리더보드 ${myRank}위`:'';
+
+  // Show leaderboard
+  _renderLeaderboard('inf-res-lb');
+
+  // Check achievements
+  const newAch=checkAchievements(g);
+  const achBox=document.getElementById('inf-res-new-ach');
+  const achList=document.getElementById('inf-res-ach-list');
+  if(newAch.length>0&&achBox&&achList){
+    achBox.style.display='block';
+    achList.textContent=newAch.map(a=>a.icon+' '+a.name).join(' · ');
+  } else if(achBox){
+    achBox.style.display='none';
+  }
+
+  showScreen('inf-results');
+}
+
+function _renderLeaderboard(containerId){
+  const el=document.getElementById(containerId);
+  if(!el) return;
+  if(!G.infScores||G.infScores.length===0){
+    el.innerHTML='<div style="opacity:.4;text-align:center;padding:12px;font-size:13px">기록 없음 — 도전해보세요!</div>';
+    return;
+  }
+  el.innerHTML=G.infScores.slice(0,10).map((s,i)=>{
+    const timeS=Math.floor(s.time/1000);
+    const mins=Math.floor(timeS/60);
+    const secs=timeS%60;
+    const timeStr=mins>0?`${mins}분 ${secs}초`:`${secs}초`;
+    const medals=['🥇','🥈','🥉'];
+    const rankLabel=medals[i]||`${i+1}`;
+    return `<div class="lb-row">
+      <div class="lb-rank">${rankLabel}</div>
+      <div style="flex:1">
+        <div style="font-weight:700;font-size:14px">${timeStr}</div>
+        <div style="font-size:11px;opacity:.55">BPM ${s.bpm} · ${s.score.toLocaleString()}점 · ${s.date||''}</div>
+      </div>
+      <div style="font-family:'Fredoka',sans-serif;font-size:16px;color:var(--yellow)">콤보 ${s.combo}</div>
+    </div>`;
+  }).join('');
+}
+
+/* ═══════════════════════════════════════
+   ACHIEVEMENTS
+═══════════════════════════════════════ */
+function showAchievements(){
+  const grid=document.getElementById('ach-grid');
+  const countEl=document.getElementById('ach-count');
+  const barFill=document.getElementById('ach-bar-fill');
+  const total=ACHIEVEMENTS.length;
+  const unlocked=ACHIEVEMENTS.filter(a=>G.achievements.includes(a.id));
+
+  if(countEl) countEl.textContent=`${unlocked.length}/${total}`;
+  if(barFill) barFill.style.width=`${Math.round(unlocked.length/total*100)}%`;
+
+  if(grid){
+    grid.innerHTML=ACHIEVEMENTS.map(a=>{
+      const done=G.achievements.includes(a.id);
+      const borderColor=done?'#FFD23F':'rgba(255,255,255,.15)';
+      return `<div class="ach-card ${done?'unlocked':'locked'}" style="border-color:${borderColor}">
+        <div class="ach-icon">${a.icon}</div>
+        <div style="font-family:'Fredoka',sans-serif;font-weight:700;font-size:14px;margin-bottom:2px">${a.name}</div>
+        <div style="font-size:11px;opacity:.6;line-height:1.4">${a.desc}</div>
+        ${done?'<div style="font-size:10px;color:var(--yellow);margin-top:4px;font-weight:700">✓ 달성</div>':''}
+      </div>`;
+    }).join('');
+  }
+  showScreen('achievements');
+}
+
+function checkAchievements(g){
+  const before=[...G.achievements];
+  for(const a of ACHIEVEMENTS){
+    if(G.achievements.includes(a.id)) continue;
+    try{
+      if(a.check(g)) G.achievements.push(a.id);
+    }catch(e){}
+  }
+  const newly=ACHIEVEMENTS.filter(a=>!before.includes(a.id)&&G.achievements.includes(a.id));
+  if(newly.length>0){
+    try{ localStorage.setItem('bc_ach',JSON.stringify(G.achievements)); }catch(e){}
+    newly.forEach(a=>toast('🏆 도전과제 해제: '+a.name));
+  }
+  return newly;
+}
+
+/* ═══════════════════════════════════════
+   GAME CONTROL
+═══════════════════════════════════════ */
+function startLevel(id){
+  const lvl=LEVELS.find(l=>l.id===id);
+  if(!lvl) return;
+  if(!G.unlocked.includes(id)&&!G.isDaily){ toast('이전 레벨을 먼저 클리어하세요!'); return; }
+  G.currentLvl=lvl;
+  if(game&&game.running) game.running=false;
+  game=new Game(lvl);
+  game.isDaily=G.isDaily;
+  const ht=document.getElementById('hud-timing');
+  if(ht) ht.textContent='D F J K · Space=일시정지';
+  showScreen('game');
+  game.start();
+}
+
+function quitGame(){
+  if(game) game.running=false;
+  game=null;
+  showLevels();
+}
+
+function togglePause(){
+  if(!game) return;
+  if(game.paused) game.resume();
+  else game.pause();
+}
+
+function replayLevel(){
+  const lvl=G.currentLvl;
+  if(!lvl&&!(game&&game._isInfinite)){
+    showLevels(); return;
+  }
+  if(game&&game._isInfinite){
+    startInfiniteGame();
+    return;
+  }
+  if(lvl) startLevel(lvl.id);
+}
+
+function nextLevel(){
+  if(!G.currentLvl){ showLevels(); return; }
+  const nextId=G.currentLvl.id+1;
+  const next=LEVELS.find(l=>l.id===nextId);
+  if(!next){ toast('마지막 레벨입니다! 🎉'); showLevels(); return; }
+  startLevel(next.id);
+}
+
+/* ═══════════════════════════════════════
+   RESULTS
+═══════════════════════════════════════ */
+function showResults(g){
+  // Calculate accuracy
+  const j=g.judge;
+  const total=Object.values(j).reduce((a,b)=>a+b,0);
+  const weighted=(j.PERFECT*100+j.GREAT*75+j.GOOD*50+j.BAD*10);
+  const acc=total===0?100:Math.round(weighted/(total*100)*100);
+
+  // Grade
+  const gradeMap=[
+    [99,'SS'],[95,'S'],[88,'A'],[75,'B'],[60,'C'],[0,'D']
+  ];
+  let grade='D';
+  for(const [th,gr] of gradeMap){ if(acc>=th){ grade=gr; break; } }
+
+  // Stars (1-3)
+  const stars=acc>=95?3:acc>=80?2:acc>=60?1:0;
+
+  // Save high score
+  if(g.lvl&&!g._isInfinite){
+    const lid=g.lvl.id;
+    if(!G.highScores[lid]||g.score>G.highScores[lid]){
+      G.highScores[lid]=g.score;
+      try{ localStorage.setItem('bc_scores',JSON.stringify(G.highScores)); }catch(e){}
+    }
+    // Save grade
+    const prevGrade=G.grades[lid];
+    const gradeOrder=['SS','S','A','B','C','D'];
+    if(!prevGrade||gradeOrder.indexOf(grade)<gradeOrder.indexOf(prevGrade)){
+      G.grades[lid]=grade;
+      try{ localStorage.setItem('bc_grades',JSON.stringify(G.grades)); }catch(e){}
+    }
+    // Unlock next level if cleared
+    if(!g.gameOver){
+      const nextId=lid+1;
+      if(!G.unlocked.includes(nextId)&&LEVELS.find(l=>l.id===nextId)){
+        G.unlocked.push(nextId);
+        try{ localStorage.setItem('bc_unlocked',JSON.stringify(G.unlocked)); }catch(e){}
+        toast('레벨 '+(nextId)+' 해제! 🔓');
+      }
+    }
+  }
+
+  // Fill results screen
+  const title=g.gameOver?'게임 오버':'클리어!';
+  const titleEl=document.getElementById('res-title');
+  if(titleEl){ titleEl.textContent=title; titleEl.className='font-display '+(g.gameOver?'neon-coral':'neon-green'); }
+  const lvlName=g.lvl?g.lvl.name:'?';
+  const subEl=document.getElementById('res-sub');
+  if(subEl){
+    const effBpm=g.lvl?Math.round(g.lvl.bpm*(G.practice?0.5:G.speed)):0;
+    subEl.textContent=lvlName+(g.lvl?' · BPM '+effBpm+(effBpm!==g.lvl.bpm?' (기준 '+g.lvl.bpm+')':''):'');
+  }
+
+  // Daily badge
+  const dailyBadge=document.getElementById('res-daily-badge');
+  if(dailyBadge) dailyBadge.style.display=G.isDaily?'block':'none';
+  G.isDaily=false; // reset after showing
+
+  const resGrade=document.getElementById('res-grade');
+  resGrade.textContent=grade;
+  const gc=grade==='SS'||grade==='S'?'gold':grade==='A'?'#4ADE80':grade==='B'?'#38BDF8':grade==='C'?'#FFD23F':'#FF6B6B';
+  resGrade.style.color=gc;
+  resGrade.style.textShadow=`0 0 20px ${gc},0 0 40px ${gc}`;
+  const ringEl=document.getElementById('res-grade-ring');
+  if(ringEl) ringEl.style.setProperty('--ring',gc);
+  document.getElementById('res-score').textContent=g.score.toLocaleString();
+  document.getElementById('res-perfect').textContent=j.PERFECT;
+  document.getElementById('res-great').textContent=j.GREAT;
+  document.getElementById('res-good').textContent=j.GOOD;
+  document.getElementById('res-bad').textContent=j.BAD;
+  document.getElementById('res-miss').textContent=j.MISS;
+  document.getElementById('res-combo').textContent=g.maxCombo;
+  document.getElementById('res-acc').textContent=acc+'%';
+
+  // Stars
+  const starsEl=document.getElementById('res-stars');
+  if(starsEl){
+    starsEl.innerHTML='';
+    for(let i=0;i<3;i++){
+      const s=document.createElement('div');
+      s.style.cssText='font-size:32px;transition:all .4s;'+( i<stars?'':'opacity:.2;filter:grayscale(1)' );
+      s.textContent='⭐';
+      if(i<stars) setTimeout(()=>s.classList.add('star-lit'),i*150);
+      starsEl.appendChild(s);
+    }
+  }
+
+  // Next button
+  const btnNext=document.getElementById('btn-next');
+  if(btnNext){
+    const nextExists=G.currentLvl&&LEVELS.find(l=>l.id===G.currentLvl.id+1);
+    btnNext.style.display=nextExists?'inline-flex':'none';
+  }
+
+  // Achievements
+  const newAch=checkAchievements(g);
+  const achBox=document.getElementById('res-new-ach');
+  const achList=document.getElementById('res-ach-list');
+  if(achBox&&achList){
+    if(newAch.length>0){
+      achBox.style.display='block';
+      achList.textContent=newAch.map(a=>a.icon+' '+a.name).join(' · ');
+    } else {
+      achBox.style.display='none';
+    }
+  }
+
+  showScreen('results');
+}
+
+/* ═══════════════════════════════════════
+   MODIFIER FUNCTIONS
+═══════════════════════════════════════ */
+function toggleModPanel(){
+  const body=document.getElementById('mod-body');
+  const arrow=document.getElementById('mod-arrow');
+  if(!body) return;
+  const open=body.classList.toggle('open');
+  if(arrow) arrow.style.transform=open?'rotate(180deg)':'';
+}
+
+function setSpeed(s){
+  G.speed=s;
+  document.querySelectorAll('.mod-chip[data-speed]').forEach(c=>{
+    c.classList.toggle('sel',parseFloat(c.dataset.speed)===s);
+  });
+  saveSettings();
+}
+
+function toggleMirror(){
+  G.mirror=!G.mirror;
+  const tog=document.getElementById('tog-mirror');
+  if(tog) tog.classList.toggle('on',G.mirror);
+  saveSettings();
+}
+
+function toggleNofail(){
+  G.nofail=!G.nofail;
+  const tog=document.getElementById('tog-nofail');
+  if(tog) tog.classList.toggle('on',G.nofail);
+  saveSettings();
+}
+
+function togglePractice(){
+  G.practice=!G.practice;
+  const tog=document.getElementById('tog-practice');
+  if(tog) tog.classList.toggle('on',G.practice);
+  if(G.practice&&!G.nofail){ G.nofail=true; const t=document.getElementById('tog-nofail'); if(t) t.classList.add('on'); }
+  saveSettings();
+}
+
+function nudgeOffset(d){ setOffset(G.offset+d); }
+function setOffset(v){
+  G.offset=Math.max(-150,Math.min(150,Math.round(v)));
+  const el=document.getElementById('offset-val');
+  if(el) el.textContent=(G.offset>0?'+':'')+G.offset+'ms';
+  saveSettings();
+}
+
+/* ═══════════════════════════════════════
+   SETTINGS
+═══════════════════════════════════════ */
+function toggleAudio(){
+  G.audioOn=!G.audioOn;
+  const btn=document.getElementById('btn-audio');
+  if(btn) btn.style.opacity=G.audioOn?'1':'.4';
+  toast(G.audioOn?'🔊 사운드 켜짐':'🔇 사운드 꺼짐');
+  saveSettings();
+}
+
+function toggleMotion(){
+  G.motionOn=!G.motionOn;
+  const btn=document.getElementById('btn-motion');
+  if(btn) btn.style.opacity=G.motionOn?'1':'.4';
+  document.body.classList.toggle('fx-off',!G.motionOn);
+  toast(G.motionOn?'✨ 모션 켜짐':'🪨 모션 꺼짐');
+  saveSettings();
+}
+
+function saveSettings(){
+  try{
+    localStorage.setItem('bc_settings',JSON.stringify({audioOn:G.audioOn,motionOn:G.motionOn,speed:G.speed,mirror:G.mirror,nofail:G.nofail,practice:G.practice,offset:G.offset}));
+  }catch(e){}
+}
+
+function _syncSettingsUI(){
+  document.querySelectorAll('.mod-chip[data-speed]').forEach(c=>c.classList.toggle('sel',parseFloat(c.dataset.speed)===G.speed));
+  const tm=document.getElementById('tog-mirror'); if(tm) tm.classList.toggle('on',G.mirror);
+  const tn=document.getElementById('tog-nofail'); if(tn) tn.classList.toggle('on',G.nofail);
+  const tp=document.getElementById('tog-practice'); if(tp) tp.classList.toggle('on',G.practice);
+  const ba=document.getElementById('btn-audio'); if(ba) ba.style.opacity=G.audioOn?'1':'.4';
+  const bm=document.getElementById('btn-motion'); if(bm) bm.style.opacity=G.motionOn?'1':'.4';
+  setOffset(G.offset);
+}
+
+/* ═══════════════════════════════════════
+   TOAST
+═══════════════════════════════════════ */
+let _toastTimer=null;
+function toast(msg){
+  const el=document.getElementById('toast');
+  if(!el) return;
+  el.textContent=msg;
+  el.classList.add('show');
+  if(_toastTimer) clearTimeout(_toastTimer);
+  _toastTimer=setTimeout(()=>el.classList.remove('show'),2200);
+}
+
+/* ═══════════════════════════════════════
+   FINISH CALLBACK (patch Game prototype so showResults is in scope)
+═══════════════════════════════════════ */
+// The original Game._finish calls showResults(this) but showResults is defined
+// after the class, so we patch it here to ensure it's always available.
+Game.prototype._finish=function(gameover){
+  if(!this.running) return;
+  this.running=false; this.gameOver=!!gameover;
+  if(this._isInfinite){
+    showInfiniteResults(this);
+  } else {
+    showResults(this);
+  }
+};
+
+/* ═══════════════════════════════════════
+   INPUT HANDLERS
+═══════════════════════════════════════ */
+document.addEventListener('keydown',e=>{
+  if(e.repeat) return;
+  const k=e.key.toLowerCase();
+  if(G.screen==='game'&&game){
+    if(k===' '||e.code==='Space'){ e.preventDefault(); togglePause(); return; }
+    if(k==='escape'){ quitGame(); return; }
+    const li=LANE_CODES[e.code]??LANE_KEYS.indexOf(k);
+    if(li>=0){ game.handleKey(li,true); return; }
+  }
+});
+
+document.addEventListener('keyup',e=>{
+  if(G.screen==='game'&&game){
+    const li=LANE_CODES[e.code]??LANE_KEYS.indexOf(e.key.toLowerCase());
+    if(li>=0) game.handleKey(li,false);
+  }
+});
+
+// Touch buttons
+document.getElementById('touch-row')&&document.getElementById('touch-row').querySelectorAll('.touch-btn').forEach(btn=>{
+  const lane=parseInt(btn.dataset.lane);
+  btn.addEventListener('pointerdown',e=>{ e.preventDefault(); if(game) game.handleKey(lane,true); });
+  btn.addEventListener('pointerup',e=>{ e.preventDefault(); if(game) game.handleKey(lane,false); });
+  btn.addEventListener('pointerleave',e=>{ if(game) game.handleKey(lane,false); });
+  btn.addEventListener('pointercancel',e=>{ if(game) game.handleKey(lane,false); });
+});
+
+// Canvas tap (treat tap position as lane). Release is tracked window-wide so
+// the lane never sticks when the pointer is lifted outside the canvas.
+const gameCanvas=document.getElementById('game-canvas');
+let canvasPointer=null;
+gameCanvas.addEventListener('pointerdown',e=>{
+  if(!game||G.screen!=='game') return;
+  const rect=gameCanvas.getBoundingClientRect();
+  const x=e.clientX-rect.left;
+  const scaledX=x/rect.width*W;
+  const lane=Math.floor(scaledX/LANE_W);
+  if(lane>=0&&lane<4){ game.handleKey(lane,true); canvasPointer={id:e.pointerId,lane}; }
+});
+function _releaseCanvasPointer(e){
+  if(!canvasPointer||e.pointerId!==canvasPointer.id) return;
+  if(game&&G.screen==='game') game.handleKey(canvasPointer.lane,false);
+  canvasPointer=null;
+}
+window.addEventListener('pointerup',_releaseCanvasPointer);
+window.addEventListener('pointercancel',_releaseCanvasPointer);
+
+// 탭을 백그라운드로 전환하면 자동 일시정지 (일괄 MISS 방지)
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden&&G.screen==='game'&&game&&game.running&&!game.paused) game.pause();
+});
+
+/* ═══════════════════════════════════════
+   INIT
+═══════════════════════════════════════ */
+(function init(){
+  try{
+    const sc=localStorage.getItem('bc_scores'); if(sc) G.highScores=JSON.parse(sc);
+    const ul=localStorage.getItem('bc_unlocked'); if(ul) G.unlocked=JSON.parse(ul);
+    const gr=localStorage.getItem('bc_grades'); if(gr) G.grades=JSON.parse(gr);
+    const ac=localStorage.getItem('bc_ach'); if(ac) G.achievements=JSON.parse(ac);
+    const inf=localStorage.getItem('bc_inf'); if(inf) G.infScores=JSON.parse(inf);
+    const st=localStorage.getItem('bc_settings'); if(st){
+      const s=JSON.parse(st);
+      if(typeof s.audioOn==='boolean') G.audioOn=s.audioOn;
+      if(typeof s.motionOn==='boolean') G.motionOn=s.motionOn;
+      if(typeof s.speed==='number') G.speed=s.speed;
+      if(typeof s.mirror==='boolean') G.mirror=s.mirror;
+      if(typeof s.nofail==='boolean') G.nofail=s.nofail;
+      if(typeof s.practice==='boolean') G.practice=s.practice;
+      if(typeof s.offset==='number') G.offset=s.offset;
+    }
+  }catch(e){}
+  if(G.practice&&!G.nofail) G.nofail=true;
+  if(Array.isArray(G.unlocked)) G.unlocked=[...new Set(G.unlocked.map(Number).filter(n=>!isNaN(n)))];
+  // Ensure level 1 is always unlocked
+  if(!G.unlocked.includes(1)) G.unlocked.push(1);
+  _syncSettingsUI();
+  document.body.classList.toggle('fx-off',!G.motionOn);
+  _refreshStartStats();
+  _renderLevels();
+})();
+
+</script>
+</body>
+</html>

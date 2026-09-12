@@ -1,0 +1,82 @@
+{
+  "id": "polaris-games",
+  "name": "폴라리스 게임 센터 — 아케이드 · 두마당 보드게임",
+  "short_name": "폴라리스 게임",
+  "description": "주식회사 폴라리스의 게임 컬렉션. 뱀파이어 키우기, 식물 vs 좀비, BeatCraft 리듬게임과 두마당 바둑·오목·알까기·기보까지 한 곳에서.",
+  "lang": "ko",
+  "dir": "ltr",
+  "start_url": "index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0d1021",
+  "theme_color": "#0d1021",
+  "categories": [
+    "games",
+    "entertainment"
+  ],
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "뱀파이어 키우기",
+      "short_name": "뱀서",
+      "url": "vampire-survivors.html",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "식물 vs 좀비",
+      "short_name": "식물좀비",
+      "url": "plants-vs-zombies.html",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "BeatCraft 리듬게임",
+      "short_name": "BeatCraft",
+      "url": "beatcraft.html",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "바둑 대국",
+      "short_name": "바둑",
+      "url": "suiji-go.html",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "오목",
+      "short_name": "오목",
+      "url": "suiji-omok.html",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "알까기",
+      "short_name": "알까기",
+      "url": "suiji-alkkagi.html",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "기보 분석",
+      "short_name": "기보",
+      "url": "suiji-kifu.html",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

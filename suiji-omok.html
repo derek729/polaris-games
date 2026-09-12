@@ -1,0 +1,1145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>오목 • 두마당</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#e8edf3">
+<meta name="description" content="실제 규칙의 바둑, 오목, 알까기, AI 기보 분석까지 — 두마당 보드게임 모음">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="두마당">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/favicon-64.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,500&family=Spline+Sans:wght@300;400;500;600;700&family=Noto+Serif+JP:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="suiji-theme.css?v=15">
+<style>
+.main-grid {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr) 300px;
+  gap: 22px;
+  align-items: start;
+}
+@media (max-width: 1180px) {
+  .main-grid { grid-template-columns: 260px 1fr; }
+  .right-col { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+}
+@media (max-width: 820px) {
+  .main-grid { grid-template-columns: 1fr; }
+  .right-col { grid-column: 1; grid-template-columns: 1fr; }
+  .app { padding: 16px 16px 100px; }
+  .brand h1 { font-size: 30px; }
+}
+
+.board-section { min-width: 0; }
+.board-wrap {
+  background: linear-gradient(180deg, var(--paper) 0%, var(--paper-2) 100%);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 18px 18px 22px;
+  box-shadow: 0 10px 30px var(--shadow);
+  position: relative;
+}
+.board-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.player-tags { display: flex; gap: 10px; }
+.player-tag {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 14px 7px 8px;
+  background: var(--paper-dark);
+  border-radius: 999px;
+  font-size: 13px;
+  color: var(--ink-2);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid transparent;
+}
+.player-tag.active {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+  box-shadow: 0 4px 14px rgba(31, 20, 16, 0.25);
+  transform: translateY(-1px);
+}
+.player-tag .stone-icon { width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0; }
+.player-tag .stone-icon.black {
+  background: radial-gradient(circle at 30% 25%, #6a6a72 0%, #1a1a1e 50%, #000 100%);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.3), inset -2px -2px 3px rgba(0,0,0,0.5);
+}
+.player-tag .stone-icon.white {
+  background: radial-gradient(circle at 30% 25%, #ffffff 0%, #f5efdc 60%, #c8c0a8 100%);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.2), inset -1px -1px 2px rgba(120,100,70,0.2);
+}
+.player-tag .role { font-weight: 500; }
+.board-controls { display: flex; gap: 6px; flex-wrap: wrap; }
+.canvas-wrap { position: relative; display: flex; justify-content: center; border-radius: 8px; overflow: hidden; }
+canvas#board {
+  display: block;
+  width: 100%;
+  max-width: 620px;
+  aspect-ratio: 1;
+  height: auto;
+  cursor: crosshair;
+  touch-action: none;
+}
+.mode-note { font-size: 11px; color: var(--ink-light); font-style: italic; margin-top: 10px; text-align: center; font-family: 'Cormorant Garamond', serif; font-size: 14px; }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <header class="header">
+    <div class="brand">
+      <div class="seal">五</div>
+      <div>
+        <h1>오목</h1>
+        <div class="tagline">오목 한판<span class="dot">·</span>프리스타일</div>
+      </div>
+    </div>
+
+    <div class="header-controls">
+      <div class="seg-group" id="modeSelector">
+        <div class="seg-badge active" data-mode="ai">
+          <span class="num seg-name">vs AI</span><span class="sub">Solo</span>
+        </div>
+        <div class="seg-badge" data-mode="pvp">
+          <span class="num seg-name">2 Players</span><span class="sub">Duel</span>
+        </div>
+        <div class="seg-badge" data-mode="online">
+          <span class="num seg-name">Online</span><span class="sub">친구와</span>
+        </div>
+      </div>
+      <div class="rank-selector" id="rankSelector">
+        <div class="rank-badge" data-level="1">
+          <div class="medal">初</div>
+          <div class="label"><span class="name">Beginner</span><span class="meta">Learns slowly</span></div>
+        </div>
+        <div class="rank-badge active" data-level="2">
+          <div class="medal">中</div>
+          <div class="label"><span class="name">Club</span><span class="meta">Solid shapes</span></div>
+        </div>
+        <div class="rank-badge" data-level="3">
+          <div class="medal">高</div>
+          <div class="label"><span class="name">Master</span><span class="meta">Reads two moves</span></div>
+        </div>
+      </div>
+      <button class="btn icon-only" id="btnSound" title="Toggle sound"><i class="fa-solid fa-volume-high"></i></button>
+    </div>
+  </header>
+
+  <div class="main-grid">
+
+    <aside class="left-col">
+      <div class="panel" id="onlinePanel" hidden>
+        <h3 class="panel-title">Online Match <span class="panel-sub">친구와</span></h3>
+        <div id="netMount"></div>
+      </div>
+
+      <div class="panel">
+        <h3 class="panel-title">Match</h3>
+        <div class="info-row">
+          <span class="label">Board</span>
+          <span class="value">15 × 15</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Rule</span>
+          <span class="value">Freestyle · 5 to win</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Your record</span>
+          <span class="value mono" id="recordInfo">—</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Moves</span>
+          <span class="value mono" id="moveCounter">0</span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3 class="panel-title">Move Record</h3>
+        <div class="move-list" id="moveList">
+          <div class="move-empty">Place the first stone.</div>
+        </div>
+      </div>
+    </aside>
+
+    <section class="board-section">
+      <div class="board-wrap">
+        <div class="board-status">
+          <div class="player-tags">
+            <div class="player-tag active" id="playerBlack">
+              <div class="stone-icon black"></div>
+              <span class="role" id="roleBlack">You</span>
+              <span class="clock-chip" id="clockBlack" hidden>--:--</span>
+            </div>
+            <div class="player-tag" id="playerWhite">
+              <div class="stone-icon white"></div>
+              <span class="role" id="roleWhite">AI</span>
+              <span class="clock-chip" id="clockWhite" hidden>--:--</span>
+            </div>
+          </div>
+          <div class="board-controls">
+            <button class="btn" id="btnHint" title="Ask for a suggestion"><i class="fa-solid fa-lightbulb"></i> Hint</button>
+            <button class="btn" id="btnUndo" title="Undo"><i class="fa-solid fa-rotate-left"></i> Undo</button>
+            <button class="btn" id="btnView" title="2D / 3D 전환"><i class="fa-solid fa-cube"></i> <span id="viewLabel">3D</span></button>
+            <button class="btn primary" id="btnNew" title="New game"><i class="fa-solid fa-rotate"></i> New</button>
+          </div>
+        </div>
+
+        <div class="canvas-wrap">
+          <canvas id="board"></canvas>
+          <div class="coord-hint" id="coordHint"></div>
+          <div class="thinking-overlay" id="thinkingOverlay">
+            <div class="thinking-content">
+              <div class="thinking-spinner">
+                <div class="orbit-stone black" style="animation-delay: 0s"></div>
+                <div class="orbit-stone white" style="animation-delay: -0.4s"></div>
+              </div>
+              <div class="thinking-text">Thinking…</div>
+              <div class="thinking-sub">Reading the lines</div>
+            </div>
+          </div>
+        </div>
+        <div class="mode-note">First to five in a row — straight or diagonal — takes the game.</div>
+      </div>
+    </section>
+
+    <aside class="right-col">
+      <div class="panel">
+        <h3 class="panel-title">AI Insight <span class="panel-sub" id="insightMove">Move 0</span></h3>
+        <div class="intent-panel">
+          <div class="intent-label">Position Read</div>
+          <div class="intent-text" id="intentText">Black opens — the centre is worth the most.</div>
+          <div class="intent-meta" id="intentMeta"><span>Awaiting the first move</span></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3 class="panel-title">Shape Threats</h3>
+        <div id="threatList">
+          <div class="move-empty">No threats on the board.</div>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<div class="game-over-card" id="gameOverCard">
+  <div class="game-over-inner">
+    <div class="game-over-sub" id="goSub">Game Complete</div>
+    <h2 class="game-over-title" id="goTitle">Black Wins</h2>
+    <div class="game-over-score" id="goScore">
+      <span id="goDetail">Five in a row</span>
+    </div>
+    <div class="game-over-actions">
+      <button class="btn primary" id="goNew"><i class="fa-solid fa-rotate"></i> New Game</button>
+    </div>
+  </div>
+</div>
+
+<script src="suiji-engine.js?v=15"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="suiji-3d.js?v=15"></script>
+<script src="suiji-common.js?v=15"></script>
+<script src="suiji-net.js?v=15"></script>
+<script>
+const { BoardRenderer, makeWoodTexture } = SuijiEngine;
+
+// ============================================
+// OMOK AI — pattern evaluation + 2-ply search
+// ============================================
+class OmokAI {
+  constructor(size) { this.size = size; }
+
+  static SHAPES(count, open) {
+    if (count >= 5) return 10000000;
+    if (count === 4) return open === 2 ? 1000000 : (open === 1 ? 100000 : 0);
+    if (count === 3) return open === 2 ? 50000 : (open === 1 ? 6000 : 0);
+    if (count === 2) return open === 2 ? 1600 : (open === 1 ? 200 : 0);
+    if (count === 1) return open === 2 ? 120 : (open === 1 ? 20 : 0);
+    return 0;
+  }
+
+  // Value of placing `color` on empty (x,y): sum of the four line shapes created
+  lineScore(board, x, y, color) {
+    const n = this.size;
+    let total = 0;
+    const dirs = [[1, 0], [0, 1], [1, 1], [1, -1]];
+    for (const [dx, dy] of dirs) {
+      let cnt = 1, open = 0;
+      // forward
+      let i = 1;
+      while (true) {
+        const nx = x + dx * i, ny = y + dy * i;
+        if (nx < 0 || nx >= n || ny < 0 || ny >= n) break;
+        if (board[nx][ny] === color) { cnt++; i++; continue; }
+        if (board[nx][ny] === 0) open++;
+        break;
+      }
+      // backward
+      let j = 1;
+      while (true) {
+        const nx = x - dx * j, ny = y - dy * j;
+        if (nx < 0 || nx >= n || ny < 0 || ny >= n) break;
+        if (board[nx][ny] === color) { cnt++; j++; continue; }
+        if (board[nx][ny] === 0) open++;
+        break;
+      }
+      total += OmokAI.SHAPES(cnt, open);
+    }
+    return total;
+  }
+
+  candidates(board) {
+    const n = this.size;
+    const cands = [];
+    let any = false;
+    for (let x = 0; x < n; x++) {
+      for (let y = 0; y < n; y++) {
+        if (board[x][y] !== 0) { any = true; continue; }
+      }
+    }
+    if (!any) return [{ x: (n - 1) >> 1, y: (n - 1) >> 1 }];
+    for (let x = 0; x < n; x++) {
+      for (let y = 0; y < n; y++) {
+        if (board[x][y] !== 0) continue;
+        let near = false;
+        for (let dx = -2; dx <= 2 && !near; dx++) {
+          for (let dy = -2; dy <= 2 && !near; dy++) {
+            const nx = x + dx, ny = y + dy;
+            if (nx >= 0 && nx < n && ny >= 0 && ny < n && board[nx][ny] !== 0) near = true;
+          }
+        }
+        if (near) cands.push({ x, y });
+      }
+    }
+    return cands;
+  }
+
+  // Number of distinct live open-threes (both ends empty) — fork danger sign
+  openThreeCount(board, color) {
+    const n = this.size;
+    const found = new Set();
+    const dirs = [[1, 0], [0, 1], [1, 1], [1, -1]];
+    for (let x = 0; x < n; x++) {
+      for (let y = 0; y < n; y++) {
+        if (board[x][y] !== color) continue;
+        for (const [dx, dy] of dirs) {
+          const px = x - dx, py = y - dy;
+          if (px >= 0 && px < n && py >= 0 && py < n && board[px][py] === color) continue;
+          let cnt = 0, cx = x, cy = y;
+          while (cx >= 0 && cx < n && cy >= 0 && cy < n && board[cx][cy] === color) { cnt++; cx += dx; cy += dy; }
+          if (cnt !== 3) continue;
+          const bx = x - dx, by = y - dy;
+          const ax = cx, ay = cy;
+          const openBefore = bx >= 0 && bx < n && by >= 0 && by < n && board[bx][by] === 0;
+          const openAfter = ax >= 0 && ax < n && ay >= 0 && ay < n && board[ax][ay] === 0;
+          if (openBefore && openAfter) found.add(`${x},${y},${dx},${dy}`);
+        }
+      }
+    }
+    return found.size;
+  }
+
+  // Full evaluation of a candidate for `color`
+  evalCell(board, x, y, color) {
+    const opp = color === 1 ? 2 : 1;
+    return this.lineScore(board, x, y, color) + 0.9 * this.lineScore(board, x, y, opp);
+  }
+
+  bestMove(board, color, level) {
+    const cands = this.candidates(board);
+    if (!cands.length) return null;
+
+    // Score every candidate
+    const scored = cands.map(c => ({ ...c, score: this.evalCell(board, c.x, c.y, color) }));
+    scored.sort((a, b) => b.score - a.score);
+
+    // Level 1: plays like a learner — usually picks a decent-looking point at random
+    if (level === 1 && Math.random() < 0.86) {
+      const width = Math.random() < 0.75 ? 10 : 20;
+      const pool = scored.slice(0, Math.min(width, scored.length));
+      return pool[Math.floor(Math.random() * pool.length)];
+    }
+
+    // Level 3: three-ply greedy read — my move, opponent's best reply, my follow-up
+    if (level === 3) {
+      const opp = color === 1 ? 2 : 1;
+      const top = scored.slice(0, 8);
+      for (const c of top) {
+        if (c.score >= 5000000) { c.score2 = c.score; continue; } // winning move — no need to read
+        board[c.x][c.y] = color;
+        let oppBestV = -1, oppBest = null;
+        for (const r of this.candidates(board)) {
+          const v = this.evalCell(board, r.x, r.y, opp);
+          if (v > oppBestV) { oppBestV = v; oppBest = r; }
+        }
+        let value = c.score - 0.85 * oppBestV;
+        // if the reply doesn't decide the game, value our best follow-up too
+        if (oppBest && oppBestV < 5000000) {
+          board[oppBest.x][oppBest.y] = opp;
+          let myBest = 0;
+          for (const f of this.candidates(board)) {
+            const v = this.evalCell(board, f.x, f.y, color);
+            if (v > myBest) myBest = v;
+          }
+          // allowing a double open three (fork) is nearly fatal
+          const forks = this.openThreeCount(board, opp);
+          if (forks >= 2) value -= 500000;
+          board[oppBest.x][oppBest.y] = 0;
+          value += 0.75 * myBest;
+        }
+        board[c.x][c.y] = 0;
+        c.score2 = value;
+      }
+      top.sort((a, b) => b.score2 - a.score2);
+      return top[0];
+    }
+
+    return scored[0];
+  }
+}
+
+// ============================================
+// APP
+// ============================================
+const SIZE = 15;
+let board = Array(SIZE).fill(0).map(() => Array(SIZE).fill(0));
+let history = [];        // {x, y, color}
+let current = 1;         // 1 black, 2 white
+let mode = 'ai';         // 'ai' | 'pvp'
+let level = 2;
+let gameOver = false;
+let winLine = null;
+let aiThinking = false;
+let hintMark = null;
+let lastIntent = null;
+let generation = 0;
+
+// online match state
+let onlineActive = false;
+let myColor = 1;
+let wantRematch = false, peerWantsRematch = false;
+
+const boardAI = new OmokAI(SIZE);
+
+const view = {
+  size: SIZE,
+  board,
+  lastMove: null,
+  gameOver: false,
+  scoringMode: false,
+  currentPlayer: 1,
+  canPlace: (x, y) => board[x][y] === 0 && !gameOver
+};
+
+class OmokRenderer extends BoardRenderer {
+  render() {
+    super.render();
+    if (winLine) this.drawWinLine();
+    if (hintMark) {
+      if (performance.now() > hintMark.until) hintMark = null;
+      else {
+        const px = this.padding + hintMark.x * this.cellSize;
+        const py = this.padding + hintMark.y * this.cellSize;
+        const pulse = (Math.sin(this.lastMovePulse * 0.15) + 1) / 2;
+        const ctx = this.ctx;
+        ctx.save();
+        ctx.strokeStyle = `rgba(165, 40, 40, ${0.65 + pulse * 0.35})`;
+        ctx.lineWidth = 2.5;
+        ctx.setLineDash([5, 4]);
+        ctx.beginPath();
+        ctx.arc(px, py, this.stoneRadius * (1.05 + pulse * 0.12), 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+  }
+  drawWinLine() {
+    const ctx = this.ctx;
+    const a = winLine[0], b = winLine[winLine.length - 1];
+    const ax = this.padding + a[0] * this.cellSize;
+    const ay = this.padding + a[1] * this.cellSize;
+    const bx = this.padding + b[0] * this.cellSize;
+    const by = this.padding + b[1] * this.cellSize;
+    const pulse = (Math.sin(this.lastMovePulse * 0.1) + 1) / 2;
+    ctx.save();
+    ctx.strokeStyle = `rgba(200, 168, 56, ${0.75 + pulse * 0.25})`;
+    ctx.lineWidth = this.cellSize * 0.16;
+    ctx.lineCap = 'round';
+    ctx.shadowColor = 'rgba(200, 168, 56, 0.8)';
+    ctx.shadowBlur = 12;
+    ctx.beginPath();
+    ctx.moveTo(ax, ay);
+    ctx.lineTo(bx, by);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+class OmokBoard3D extends Suiji3D.BoardRenderer3D {
+  constructor(canvas, game, opts) { super(canvas, game, opts); }
+  drawOverlay3D() {
+    if (winLine && winLine.length >= 2) {
+      const a = winLine[0], b = winLine[winLine.length - 1];
+      this.overlayGroup.add(this.bar3D(a[0], a[1], b[0], b[1], 0xe8b64c, 0.11));
+    }
+  }
+}
+
+const els = {
+  board: document.getElementById('board'),
+  coordHint: document.getElementById('coordHint'),
+  thinkingOverlay: document.getElementById('thinkingOverlay'),
+  moveList: document.getElementById('moveList'),
+  moveCounter: document.getElementById('moveCounter'),
+  recordInfo: document.getElementById('recordInfo'),
+  playerBlack: document.getElementById('playerBlack'),
+  playerWhite: document.getElementById('playerWhite'),
+  roleBlack: document.getElementById('roleBlack'),
+  roleWhite: document.getElementById('roleWhite'),
+  intentText: document.getElementById('intentText'),
+  intentMeta: document.getElementById('intentMeta'),
+  insightMove: document.getElementById('insightMove'),
+  threatList: document.getElementById('threatList'),
+  modeSelector: document.getElementById('modeSelector'),
+  rankSelector: document.getElementById('rankSelector'),
+  onlinePanel: document.getElementById('onlinePanel'),
+  btnView: document.getElementById('btnView'),
+  viewLabel: document.getElementById('viewLabel'),
+  clockBlack: document.getElementById('clockBlack'),
+  clockWhite: document.getElementById('clockWhite'),
+  btnHint: document.getElementById('btnHint'),
+  btnUndo: document.getElementById('btnUndo'),
+  btnNew: document.getElementById('btnNew'),
+  btnSound: document.getElementById('btnSound'),
+  gameOverCard: document.getElementById('gameOverCard'),
+  goTitle: document.getElementById('goTitle'),
+  goSub: document.getElementById('goSub'),
+  goDetail: document.getElementById('goDetail'),
+  goNew: document.getElementById('goNew'),
+};
+
+let renderer = null;
+
+function init() {
+  Suiji.nav('omok');
+  renderer = makeOmokRenderer();
+
+function makeOmokRenderer() {
+  const want3D = localStorage.getItem('dumadang.view3d') === '1';
+  if (want3D && window.Suiji3D && Suiji3D.available) {
+    try {
+      const r = new OmokBoard3D(els.board, view, {
+        onPick: (x, y) => { if (canLocalPlay() && board[x][y] === 0) playerMove(x, y); }
+      });
+      els.board.removeEventListener('click', onCanvasClick);
+      els.board.removeEventListener('touchstart', onTouchStart);
+      return r;
+    } catch (e) { /* WebGL unavailable → 2D */ }
+  }
+  els.board.addEventListener('click', onCanvasClick);
+  els.board.addEventListener('touchstart', onTouchStart, { passive: false });
+  return new OmokRenderer(els.board, view);
+}
+
+function swapOmokView() {
+  const is3D = window.Suiji3D && renderer instanceof Suiji3D.BoardRenderer3D;
+  localStorage.setItem('dumadang.view3d', (!is3D) ? '1' : '0');
+  renderer.destroy();
+  renderer = makeOmokRenderer();
+  els.viewLabel.textContent = (!is3D) ? '2D' : '3D';
+  Suiji.toast((!is3D) ? '3D 전개 — 드래그로 회전, 휠로 줌' : '2D 전개로 되돌아왔습니다');
+}
+
+  els.board.addEventListener('mousemove', onMouseMove);
+  els.board.addEventListener('mouseleave', () => {
+    renderer.setHover(null);
+    els.coordHint.classList.remove('show');
+  });
+  els.board.addEventListener('click', onCanvasClick);
+  els.board.addEventListener('touchstart', onTouchStart, { passive: false });
+
+  els.btnNew.addEventListener('click', onNewButton);
+  els.btnUndo.addEventListener('click', onUndo);
+  els.btnHint.addEventListener('click', onHint);
+  els.btnView.addEventListener('click', swapOmokView);
+  // 3D board picking — page-level capture (reliable across renderer swaps)
+  document.addEventListener('click', (e) => {
+    if (!(window.Suiji3D && renderer instanceof Suiji3D.BoardRenderer3D)) return;
+    if (e.target !== els.board) return;
+    const g = renderer.pixelToGrid(e.clientX, e.clientY);
+    if (g && canLocalPlay() && board[g.x][g.y] === 0) playerMove(g.x, g.y);
+  }, true);
+  if (window.Suiji3D && renderer instanceof Suiji3D.BoardRenderer3D) els.viewLabel.textContent = '2D';
+  els.goNew.addEventListener('click', () => {
+    els.gameOverCard.classList.remove('show');
+    setTimeout(onNewButton, 300);
+  });
+  els.btnSound.addEventListener('click', () => {
+    const on = Suiji.sound.toggle();
+    els.btnSound.querySelector('i').className = on ? 'fa-solid fa-volume-high' : 'fa-solid fa-volume-xmark';
+  });
+  els.btnSound.querySelector('i').className = Suiji.sound.enabled ? 'fa-solid fa-volume-high' : 'fa-solid fa-volume-xmark';
+
+  els.modeSelector.querySelectorAll('.seg-badge').forEach(b => {
+    b.addEventListener('click', () => {
+      if (b.dataset.mode === mode) return;
+      if (mode === 'online' && onlineActive) { Suiji.net.leave(); onlineActive = false; }
+      mode = b.dataset.mode;
+      els.modeSelector.querySelectorAll('.seg-badge').forEach(x => x.classList.toggle('active', x === b));
+      els.rankSelector.style.opacity = mode === 'ai' ? '1' : '0.35';
+      els.rankSelector.style.pointerEvents = mode === 'ai' ? 'auto' : 'none';
+      els.onlinePanel.hidden = mode !== 'online';
+      newGame();
+    });
+  });
+
+  els.rankSelector.querySelectorAll('.rank-badge').forEach(b => {
+    b.addEventListener('click', () => {
+      els.rankSelector.querySelectorAll('.rank-badge').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      level = parseInt(b.dataset.level);
+      Suiji.toast(`AI level set to ${b.querySelector('.name').textContent}`);
+    });
+  });
+
+  // ---- online multiplayer panel ----
+  Suiji.net.createPanel(document.getElementById('netMount'), {
+    game: 'omok',
+    timeControls: [
+      [null, '시간 제한 없음'],
+      [{ main: 60, byo: 10 }, '1분 + 10초 초읽기'],
+      [{ main: 180, byo: 20 }, '3분 + 20초 초읽기']
+    ],
+    onStart: onNetStart,
+    onRemote: onNetRemote,
+    onRematch: onNetRematch,
+    onPeerLeft: onNetPeerLeft,
+    onClock: onNetClock,
+    onTimeout: onNetTimeoutOmok,
+    onLeave: () => {
+      onlineActive = false;
+      mode = 'ai';
+      els.modeSelector.querySelectorAll('.seg-badge').forEach(x => x.classList.toggle('active', x.dataset.mode === 'ai'));
+      els.rankSelector.style.opacity = '1';
+      els.rankSelector.style.pointerEvents = 'auto';
+      els.onlinePanel.hidden = true;
+      setRoles();
+      newGame();
+    }
+  });
+
+  let resizeTimer;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      renderer.setupCanvas();
+      renderer.woodTexture = makeWoodTexture(renderer.displayWidth, renderer.displayHeight);
+    }, 200);
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'u' && !e.ctrlKey) onUndo();
+    if (e.key === 'n' && e.ctrlKey) { newGame(); e.preventDefault(); }
+  });
+
+  refreshRecord();
+  updateUI();
+}
+
+function refreshRecord() {
+  els.recordInfo.textContent = Suiji.stats.text('omok');
+}
+
+// ============ ONLINE MULTIPLAYER ============
+function setRoles() {
+  if (mode === 'online' && onlineActive) {
+    els.roleBlack.textContent = myColor === 1 ? 'You' : '친구';
+    els.roleWhite.textContent = myColor === 2 ? 'You' : '친구';
+  } else {
+    els.roleBlack.textContent = 'You';
+    els.roleWhite.textContent = mode === 'ai' ? 'AI' : 'Player 2';
+  }
+}
+
+function onNetStart(color) {
+  onlineActive = true;
+  myColor = color;
+  wantRematch = peerWantsRematch = false;
+  // guests arrive via invite link without touching the mode selector
+  mode = 'online';
+  els.modeSelector.querySelectorAll('.seg-badge').forEach(x => x.classList.toggle('active', x.dataset.mode === 'online'));
+  els.rankSelector.style.opacity = '0.35';
+  els.rankSelector.style.pointerEvents = 'none';
+  els.onlinePanel.hidden = false;
+  if (!Suiji.net.reconnecting) resetBoard();
+  setRoles();
+  aiThinking = false;
+  els.thinkingOverlay.classList.remove('show');
+  setIntent(color === 1
+    ? '온라인 대국 시작 — 당신이 흑으로 선수입니다.'
+    : '온라인 대국 시작 — 당신은 백입니다. 상대의 선수를 기다리세요.',
+    'Online', 0);
+  updateUI();
+  Suiji.sound.stone(0.7);
+  Suiji.toast(color === 1 ? '상대 입장! 흑으로 시작합니다' : '상대 입장! 당신은 백입니다');
+  if (arguments[1]) { // host: 대국 설정 전송 (시계 시작)
+    Suiji.net.init({ tc: Suiji.net.getTc() });
+  }
+}
+
+function onNetRemote(data) {
+  if (!data) return;
+  if (data.k === 'm') applyRemoteMove(data.x, data.y);
+  else if (data.k === 'rm') onNetRematch();
+  else if (data.k === 'sync') applyNetSnapshotOmok(data);
+}
+
+// 끊김 복구: 수순 재생으로 복원
+function applyNetSnapshotOmok(s) {
+  if (!s || !Array.isArray(s.moves)) return;
+  resetBoard();
+  for (const m of s.moves) {
+    board[m.x][m.y] = m.c;
+    history.push({ x: m.x, y: m.y, color: m.c });
+  }
+  const last = history[history.length - 1];
+  view.lastMove = last ? { x: last.x, y: last.y, color: last.color } : null;
+  current = history.length % 2 === 0 ? 1 : 2;
+  updateUI();
+  showToast('대국이 복원되었습니다');
+}
+
+function buildNetSnapshotOmok() {
+  return { kind: 'omok', moves: history.map(m => ({ x: m.x, y: m.y, c: m.color })) };
+}
+
+function applyRemoteMove(x, y) {
+  if (gameOver || board[x] === undefined || board[x][y] !== 0) return;
+  const winCells = place(x, y, current);
+  afterMove(winCells);
+  if (!gameOver && !isBoardFull()) current = current === 1 ? 2 : 1;
+  updateUI();
+}
+
+function onNetRematch() {
+  if (wantRematch) { doOnlineRematch(); }
+  else {
+    peerWantsRematch = true;
+    Suiji.toast('상대가 재대국을 요청했습니다 — New 버튼으로 수락');
+  }
+}
+
+function doOnlineRematch() {
+  myColor = 3 - myColor; // swap colours, like a real rematch
+  wantRematch = peerWantsRematch = false;
+  resetBoard();
+  setRoles();
+  setIntent(`재대국 시작 — 당신은 ${myColor === 1 ? '흑' : '백'}입니다.`, 'Rematch', 0);
+  updateUI();
+  Suiji.toast('재대국 시작!');
+}
+
+function onNetClock(d) {
+  if (!onlineActive) return;
+  renderClock(els.clockBlack, d[1], d.turn === 1);
+  renderClock(els.clockWhite, d[2], d.turn === 2);
+}
+function renderClock(el, side, active) {
+  if (!el) return;
+  el.hidden = false;
+  el.classList.toggle('byo', !!side.byo);
+  el.textContent = side.byo ? `+${side.period}초` : fmtClock(side.main);
+  el.style.opacity = active ? '1' : '0.55';
+}
+function fmtClock(sec) {
+  const m = Math.floor(sec / 60), s = sec % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+function onNetTimeoutOmok(loserColor) {
+  if (gameOver) return;
+  const winner = 3 - loserColor;
+  winLine = null;
+  gameOver = true; view.gameOver = true;
+  els.gameOverCard.classList.add('show');
+  const goTitle = els.goTitle;
+  goTitle.textContent = winner === 1 ? 'Black Wins' : 'White Wins';
+  els.goSub.textContent = loserColor === myColor ? '시간 초과 패배' : '상대 시간 초과';
+  els.goDetail.textContent = ` timeout · ${history.length}수`;
+  if (mode === 'ai' || mode === 'online') {
+    Suiji.stats.record('omok', winner === myColor ? 'w' : 'l');
+    if (winner === myColor) Suiji.sound.win(); else Suiji.sound.lose();
+  }
+  refreshRecord();
+}
+
+function onNetPeerLeft(disconnected, rejoinable) {
+  if (rejoinable) {
+    setIntent('상대의 연결이 끊겼습니다. 5분 내 재접속하면 대국이 이어집니다.', 'Waiting', history.length);
+    showToast('상대 재접속 대기 중 (5분)');
+    return;
+  }
+  onlineActive = false;
+  wantRematch = peerWantsRematch = false;
+  setRoles();
+  updateUI();
+  Suiji.toast(disconnected ? '서버와의 연결이 끊겼습니다' : '상대가 방을 나갔습니다');
+  if (mode === 'online') {
+    setIntent('상대가 나갔습니다. 새 상대를 기다리거나 다른 모드로 전환해 보세요.', 'Offline', history.length);
+  }
+}
+
+function onNewButton() {
+  if (mode === 'online' && onlineActive) {
+    if (wantRematch) { Suiji.toast('이미 재대국을 요청했습니다 — 상대의 수락을 기다리는 중'); return; }
+    if (peerWantsRematch) {
+      doOnlineRematch();
+      Suiji.net.send({ k: 'rm' });
+      return;
+    }
+    wantRematch = true;
+    Suiji.net.send({ k: 'rm' });
+    Suiji.toast('재대국을 요청했습니다');
+    return;
+  }
+  newGame();
+}
+
+function resetBoard() {
+  for (let x = 0; x < SIZE; x++) for (let y = 0; y < SIZE; y++) board[x][y] = 0;
+  history = [];
+  current = 1;
+  gameOver = false;
+  winLine = null;
+  hintMark = null;
+  view.lastMove = null;
+  els.gameOverCard.classList.remove('show');
+}
+
+function newGame() {
+  generation++;
+  aiThinking = false;
+  els.thinkingOverlay.classList.remove('show');
+  resetBoard();
+  renderer.animatingStones.clear();
+  setIntent('Black opens — the centre is worth the most.', 'Awaiting the first move', 0);
+  updateUI();
+}
+
+function checkWin(x, y, color) {
+  const dirs = [[1, 0], [0, 1], [1, 1], [1, -1]];
+  for (const [dx, dy] of dirs) {
+    const cells = [[x, y]];
+    for (const sign of [1, -1]) {
+      let i = 1;
+      while (true) {
+        const nx = x + dx * i * sign, ny = y + dy * i * sign;
+        if (nx < 0 || nx >= SIZE || ny < 0 || ny >= SIZE || board[nx][ny] !== color) break;
+        cells.push([nx, ny]);
+        i++;
+      }
+    }
+    if (cells.length >= 5) {
+      cells.sort((p, q) => (p[0] - q[0]) * dx + (p[1] - q[1]) * dy);
+      return cells;
+    }
+  }
+  return null;
+}
+
+function place(x, y, color) {
+  board[x][y] = color;
+  history.push({ x, y, color });
+  view.lastMove = { x, y, color };
+  renderer.animateStoneDrop(x, y, color);
+  Suiji.sound.stone();
+  return checkWin(x, y, color);
+}
+
+function isBoardFull() {
+  return history.length >= SIZE * SIZE;
+}
+
+// whose turn may the LOCAL user play, given the current mode
+function canLocalPlay() {
+  if (gameOver || aiThinking) return false;
+  if (mode === 'ai') return current === 1;
+  if (mode === 'online') return onlineActive && current === myColor && !Suiji.net.reconnecting;
+  return true;
+}
+
+function onCanvasClick(e) {
+  if (!canLocalPlay()) return;
+  const rect = els.board.getBoundingClientRect();
+  const grid = renderer.pixelToGrid(e.clientX - rect.left, e.clientY - rect.top);
+  if (!grid || board[grid.x][grid.y] !== 0) return;
+  playerMove(grid.x, grid.y);
+}
+
+function onTouchStart(e) {
+  e.preventDefault();
+  if (!canLocalPlay()) return;
+  const touch = e.touches[0];
+  const rect = els.board.getBoundingClientRect();
+  const grid = renderer.pixelToGrid(touch.clientX - rect.left, touch.clientY - rect.top);
+  if (!grid || board[grid.x][grid.y] !== 0) return;
+  playerMove(grid.x, grid.y);
+}
+
+function playerMove(x, y) {
+  const winCells = place(x, y, current);
+  if (mode === 'online' && onlineActive) Suiji.net.move({ k: 'm', x, y });
+  afterMove(winCells);
+  if (!gameOver && !isBoardFull()) {
+    current = current === 1 ? 2 : 1;
+    if (mode === 'ai' && current === 2) setTimeout(() => aiTurn(), 450);
+  }
+  updateUI();
+}
+
+function afterMove(winCells) {
+  updateUI();
+  if (winCells) {
+    winLine = winCells;
+    gameOver = true;
+    view.gameOver = true;
+    declareWinner(winCells[0] && history[history.length - 1].color);
+    return;
+  }
+  if (isBoardFull()) {
+    gameOver = true;
+    view.gameOver = true;
+    declareWinner(0);
+  }
+}
+
+function declareWinner(color) {
+  const title = els.goTitle;
+  if (color === 0) {
+    title.textContent = 'Draw';
+    els.goSub.textContent = 'The board filled up';
+    els.goDetail.textContent = 'All 225 points played — nobody made five';
+    if (mode === 'ai') Suiji.stats.record('omok', 'd');
+  } else {
+    const humanWon = mode === 'pvp' ? true : color === 1;
+    title.textContent = color === 1 ? 'Black Wins' : 'White Wins';
+    els.goSub.textContent = mode === 'pvp'
+      ? (color === 1 ? 'Player 1 takes it' : 'Player 2 takes it')
+      : mode === 'online'
+        ? (color === myColor ? '당신이 이겼습니다!' : '상대가 이겼습니다')
+        : (color === 1 ? 'You beat the AI' : 'The AI takes it');
+    els.goDetail.textContent = `Five in a row in ${history.length} moves`;
+    if (mode === 'ai') {
+      Suiji.stats.record('omok', humanWon ? 'w' : 'l');
+      if (humanWon) Suiji.sound.win(); else Suiji.sound.lose();
+    } else if (mode === 'online') {
+      Suiji.stats.record('omok', color === myColor ? 'w' : 'l');
+      if (color === myColor) Suiji.sound.win(); else Suiji.sound.lose();
+    } else {
+      Suiji.sound.win();
+    }
+  }
+  refreshRecord();
+  els.gameOverCard.classList.add('show');
+}
+
+async function aiTurn() {
+  if (gameOver) return;
+  const gen = generation;
+  aiThinking = true;
+  els.thinkingOverlay.classList.add('show');
+  updateUI();
+
+  await new Promise(r => setTimeout(r, 500 + Math.random() * 500));
+  if (gen !== generation) { aiThinking = false; return; }
+
+  const mv = boardAI.bestMove(board, 2, level);
+  aiThinking = false;
+  els.thinkingOverlay.classList.remove('show');
+  if (!mv) { updateUI(); return; }
+
+  const winCells = place(mv.x, mv.y, 2);
+  setIntent(describeAiMove(mv), `White ${coordName(mv.x, mv.y)}`, history.length);
+  updateThreats();
+  updateUI();
+  afterMove(winCells);
+  if (!gameOver && !isBoardFull()) current = 1;
+  updateUI();
+}
+
+function describeAiMove(mv) {
+  if (mv.score >= 10000000) return 'Five! The AI closes the line.';
+  if (mv.score >= 1000000) return 'An open four — there is no stopping this.';
+  if (mv.score >= 100000) return 'A four — you are forced to answer.';
+  if (mv.score >= 50000) return 'An open three, building unstoppable pressure.';
+  if (mv.score >= 6000) return 'Extending a developing line of stones.';
+  return 'A balanced move, contesting the key points.';
+}
+
+function onUndo() {
+  if (aiThinking || history.length === 0) return;
+  if (mode === 'online') { Suiji.toast('온라인 대국에서는 무르기를 쓸 수 없습니다'); return; }
+  generation++; // cancels any pending aiTurn
+  const steps = mode === 'ai' ? (history.length >= 2 && current === 1 ? 2 : 1) : 1;
+  for (let i = 0; i < steps && history.length; i++) {
+    const m = history.pop();
+    board[m.x][m.y] = 0;
+  }
+  gameOver = false;
+  view.gameOver = false;
+  winLine = null;
+  hintMark = null;
+  els.gameOverCard.classList.remove('show');
+  const last = history[history.length - 1];
+  view.lastMove = last ? { x: last.x, y: last.y, color: last.color } : null;
+  current = history.length % 2 === 0 ? 1 : 2;
+  renderer.animatingStones.clear();
+  setIntent('Move undone — play again.', 'Undo', history.length);
+  updateUI();
+}
+
+function onHint() {
+  if (aiThinking || gameOver) return;
+  const mv = boardAI.bestMove(board, current, 3);
+  if (!mv) return;
+  hintMark = { x: mv.x, y: mv.y, until: performance.now() + 2600 };
+  Suiji.sound.stone(0.4);
+  setIntent(`Hint — this point scores ${fmtScore(mv.score)} for you.`, `Suggested ${coordName(mv.x, mv.y)}`, history.length + 1);
+}
+
+function fmtScore(s) {
+  if (s >= 10000000) return 'a winning five';
+  if (s >= 1000000) return 'an open four';
+  if (s >= 100000) return 'a forcing four';
+  if (s >= 50000) return 'an open three';
+  if (s >= 6000) return 'a three';
+  if (s >= 1500) return 'an open two';
+  return 'a quiet point';
+}
+
+function updateThreats() {
+  // List the biggest live shapes on the board
+  const threats = [];
+  const seen = new Set();
+  const dirs = [[1, 0], [0, 1], [1, 1], [1, -1]];
+  for (let x = 0; x < SIZE; x++) {
+    for (let y = 0; y < SIZE; y++) {
+      const color = board[x][y];
+      if (!color) continue;
+      for (const [dx, dy] of dirs) {
+        const key = `${color}|${dx},${dy}|`;
+        // anchor = leftmost/topmost stone of the run
+        const px = x - dx, py = y - dy;
+        if (px >= 0 && px < SIZE && py >= 0 && py < SIZE && board[px][py] === color) continue;
+        let cnt = 0, cx = x, cy = y;
+        let openEnds = 0;
+        while (cx >= 0 && cx < SIZE && cy >= 0 && cy < SIZE && board[cx][cy] === color) {
+          cnt++; cx += dx; cy += dy;
+        }
+        if (board[cx] && board[cx][cy] === 0) openEnds++;
+        const bx = x - dx, by = y - dy;
+        if (board[bx] && board[bx][by] === 0) openEnds++;
+        if (cnt >= 3 && cnt + openEnds >= 3) {
+          const name = cnt >= 5 ? 'five' : cnt === 4 ? (openEnds === 2 ? 'open four' : 'four') : (openEnds === 2 ? 'open three' : 'three');
+          threats.push({ color, cnt, name, score: OmokAI.SHAPES(cnt, openEnds) });
+        }
+      }
+    }
+  }
+  threats.sort((a, b) => b.score - a.score);
+  const top = threats.slice(0, 4);
+  if (!top.length) {
+    els.threatList.innerHTML = '<div class="move-empty">No threats on the board.</div>';
+    return;
+  }
+  els.threatList.innerHTML = top.map(t => `
+    <div class="info-row">
+      <span class="label"><span class="move-stone ${t.color === 1 ? 'black' : 'white'}" style="display:inline-block;vertical-align:middle;margin-right:6px;"></span>${t.color === 1 ? 'Black' : 'White'}</span>
+      <span class="value">${t.name} <span style="color:var(--ink-light);font-size:11px;">×${t.cnt}</span></span>
+    </div>`).join('');
+}
+
+function onMouseMove(e) {
+  if (!canLocalPlay()) {
+    renderer.setHover(null);
+    return;
+  }
+  const rect = els.board.getBoundingClientRect();
+  const grid = renderer.pixelToGrid(e.clientX - rect.left, e.clientY - rect.top);
+  renderer.setHover(grid);
+  if (grid) {
+    els.coordHint.textContent = coordName(grid.x, grid.y);
+    els.coordHint.style.left = `${renderer.padding + grid.x * renderer.cellSize}px`;
+    els.coordHint.style.top = `${renderer.padding + grid.y * renderer.cellSize}px`;
+    els.coordHint.classList.add('show');
+  } else {
+    els.coordHint.classList.remove('show');
+  }
+}
+
+function coordName(x, y) {
+  return Suiji.coordName(x, y, SIZE);
+}
+
+function setPlayerTags() {
+  els.playerBlack.classList.toggle('active', current === 1 && !aiThinking && !gameOver);
+  els.playerWhite.classList.toggle('active', (current === 2 || aiThinking) && !gameOver);
+}
+
+function setIntent(text, meta, moveNum) {
+  els.intentText.textContent = text;
+  els.insightMove.textContent = `Move ${moveNum}`;
+  if (meta) {
+    const parts = meta.split(' · ');
+    els.intentMeta.innerHTML = parts.map((p, i) =>
+      i < parts.length - 1 ? `<span>${p}</span><span class="sep">·</span>` : `<span>${p}</span>`
+    ).join('');
+  }
+}
+
+function updateUI() {
+  setPlayerTags();
+  setRoles();
+  els.moveCounter.textContent = history.length;
+  els.btnUndo.disabled = aiThinking || history.length === 0 || mode === 'online';
+  els.btnHint.disabled = aiThinking || gameOver || (mode === 'online' && !onlineActive);
+  renderMoveList();
+  updateThreats();
+}
+
+function renderMoveList() {
+  if (history.length === 0) {
+    els.moveList.innerHTML = '<div class="move-empty">Place the first stone.</div>';
+    return;
+  }
+  els.moveList.innerHTML = history.slice().reverse().map((m, ri) => {
+    const i = history.length - 1 - ri;
+    const cls = i === history.length - 1 && !gameOver ? 'current' : '';
+    return `<div class="move-row ${cls}">
+      <span class="move-num">${i + 1}</span>
+      <span class="move-stone ${m.color === 1 ? 'black' : 'white'}"></span>
+      <span class="move-coord">${coordName(m.x, m.y)}</span>
+      <span></span>
+    </div>`;
+  }).join('');
+  els.moveList.scrollTop = 0;
+}
+
+init();
+</script>
+</body>
+</html>
