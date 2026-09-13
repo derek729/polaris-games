@@ -568,6 +568,8 @@ const LANE_KEYS=['d','f','j','k'];
 const LANE_CODES={KeyD:0,KeyF:1,KeyJ:2,KeyK:3}; // 물리 키 코드: 한글 IME가 켜져 있어도 인식됨
 const NOTE_FALL_TIME=1600;
 const PERFECT_WIN=45, GREAT_WIN=90, GOOD_WIN=135, BAD_WIN=180;
+// 랭크 컷 단일 진실 원천: HUD(_updateHUD)와 결과(showResults)가 공유 (BACKLOG #1 정합성 수정)
+const GRADE_CUTS=[[99,'SS'],[95,'S'],[88,'A'],[75,'B'],[60,'C'],[0,'D']];
 const LANE_W=W/4, HIT_Y=H-90;
 
 /* ═══════════════════════════════════════
@@ -904,7 +906,7 @@ class Game {
   _updateHUD(){
     const total=this.judge.PERFECT+this.judge.GREAT+this.judge.GOOD+this.judge.BAD+this.judge.MISS;
     const acc=total===0?100:Math.round((this.judge.PERFECT*100+this.judge.GREAT*75+this.judge.GOOD*50+this.judge.BAD*10)/(total*100)*100);
-    const grade=acc>=99?'SS':acc>=95?'S':acc>=90?'A':acc>=80?'B':acc>=70?'C':acc>=60?'D':'E';
+    const grade=GRADE_CUTS.find(([th])=>acc>=th)[1];
     document.getElementById('hud-score').textContent=this.score;
     document.getElementById('hud-combo').textContent=this.combo;
     document.getElementById('hud-acc').textContent=acc+'%';
@@ -1594,11 +1596,8 @@ function showResults(g){
   const acc=total===0?100:Math.round(weighted/(total*100)*100);
 
   // Grade
-  const gradeMap=[
-    [99,'SS'],[95,'S'],[88,'A'],[75,'B'],[60,'C'],[0,'D']
-  ];
   let grade='D';
-  for(const [th,gr] of gradeMap){ if(acc>=th){ grade=gr; break; } }
+  for(const [th,gr] of GRADE_CUTS){ if(acc>=th){ grade=gr; break; } }
 
   // Stars (1-3)
   const stars=acc>=95?3:acc>=80?2:acc>=60?1:0;
