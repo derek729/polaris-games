@@ -1361,10 +1361,12 @@ function drawPickups(){
       ctx.fillStyle = `rgba(232,182,76,${gl})`;
       circle(k.x, k.y + bob, 30);
     }
-    const cimg = k.kind === "chest" ? SPRITES["item-chest"] : null;
+    // BACKLOG #8: 치유 아이템(chicken)도 물약 스프라이트 렌더 — 26px 유지, 미로딩 시 기존 이모지 폴백
+    const cimg = k.kind === "chest" ? SPRITES["item-chest"] : k.kind === "chicken" ? SPRITES["item-potion"] : null;
+    const csz = k.kind === "chest" ? 44 : 26;
     if (spriteReady(cimg)){
       ctx.save(); ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(cimg, k.x - 22, k.y + bob - 22, 44, 44);
+      ctx.drawImage(cimg, k.x - csz / 2, k.y + bob - csz / 2, csz, csz);
       ctx.restore();
     } else
       emoji(k.kind === "chest" ? "🎁" : k.kind === "magnet" ? "🧲" : k.kind === "chicken" ? "🍗" : "💣",

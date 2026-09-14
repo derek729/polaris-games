@@ -569,7 +569,8 @@ const LANE_CODES={KeyD:0,KeyF:1,KeyJ:2,KeyK:3}; // 물리 키 코드: 한글 IME
 const NOTE_FALL_TIME=1600;
 const PERFECT_WIN=45, GREAT_WIN=90, GOOD_WIN=135, BAD_WIN=180;
 // 랭크 컷 단일 진실 원천: HUD(_updateHUD)와 결과(showResults)가 공유 (BACKLOG #1 정합성 수정)
-const GRADE_CUTS=[[99,'SS'],[95,'S'],[88,'A'],[75,'B'],[60,'C'],[0,'D']];
+// BACKLOG #2: 상위 랭크 1% 간격 세분화(SS>S+>S->S) — 재도전 유도. 업적 ss_rank(≥99)·s_rank(≥95) 컷 불변.
+const GRADE_CUTS=[[99,'SS'],[98,'S+'],[96,'S-'],[95,'S'],[88,'A'],[75,'B'],[60,'C'],[0,'D']];
 const LANE_W=W/4, HIT_Y=H-90;
 
 /* ═══════════════════════════════════════
@@ -911,7 +912,7 @@ class Game {
     document.getElementById('hud-combo').textContent=this.combo;
     document.getElementById('hud-acc').textContent=acc+'%';
     document.getElementById('hud-grade').textContent=grade;
-    document.getElementById('hud-grade').style.color=grade==='SS'||grade==='S'?'gold':grade==='A'?'#4ADE80':grade==='B'?'#38BDF8':'#FF6B6B';
+    document.getElementById('hud-grade').style.color=grade[0]==='S'?'gold':grade==='A'?'#4ADE80':grade==='B'?'#38BDF8':'#FF6B6B'; // SS·S+·S-·S 모두 gold 계열 (BACKLOG #2)
     // practice timing display
     if(G.practice&&this.lastTimingMs!==null){
       const ms=Math.round(this.lastTimingMs);
@@ -1335,7 +1336,7 @@ function quickStart(){
 ═══════════════════════════════════════ */
 const COLOR_MAP={coral:'#FF6B6B',yellow:'#FFD23F',green:'#4ADE80',sky:'#38BDF8'};
 const DIFF_COLOR={EASY:'#4ADE80',NORMAL:'#38BDF8',HARD:'#FF6B6B',EXPERT:'#A78BFA'};
-const GRADE_COLORS={S:'gold',A:'#4ADE80',B:'#38BDF8',C:'#FFD23F',D:'#FF6B6B'};
+const GRADE_COLORS={'SS':'gold','S+':'gold','S-':'gold',S:'gold',A:'#4ADE80',B:'#38BDF8',C:'#FFD23F',D:'#FF6B6B'}; // BACKLOG #2: S+·S- gold 계열 추가
 
 function _renderLevels(){
   const grid=document.getElementById('level-grid');
@@ -1347,7 +1348,7 @@ function _renderLevels(){
     const dc=DIFF_COLOR[lvl.diff]||'#fff';
     const hs=G.highScores[lvl.id]||0;
     const grade=G.grades[lvl.id]||null;
-    const gradeHtml=grade?`<div class="card-grade" style="color:${GRADE_COLORS[grade[0]]||'#fff'};border-color:${GRADE_COLORS[grade[0]]||'#fff'}66">${grade}</div>`:'';
+    const gradeHtml=grade?`<div class="card-grade" style="color:${GRADE_COLORS[grade]||GRADE_COLORS[grade[0]]||'#fff'};border-color:${GRADE_COLORS[grade]||GRADE_COLORS[grade[0]]||'#fff'}66">${grade}</div>`:'';
     const fcMark=(G.fcs&&G.fcs[lvl.id])||null;
     const fcHtml=fcMark?`<div style="position:absolute;top:${grade?'38px':'10px'};right:10px;font-family:'Fredoka',sans-serif;font-weight:700;font-size:10px;line-height:1;padding:3px 6px;border-radius:7px;background:rgba(5,8,22,.55);border:1.5px solid ${fcMark==='PFC'?'#FFD700':'#C0C0C0'};color:${fcMark==='PFC'?'#FFD700':'#C0C0C0'}">${fcMark}</div>`:'';
     const action=locked?"toast('이전 레벨을 클리어하면 잠금 해제됩니다!')":`startLevel(${lvl.id})`;
@@ -1612,9 +1613,9 @@ function showResults(g){
       G.highScores[lid]=g.score;
       try{ localStorage.setItem('bc_scores',JSON.stringify(G.highScores)); }catch(e){}
     }
-    // Save grade
+    // Save grade (BACKLOG #2: S+·S- 추가 — 미추가 시 indexOf가 -1을 반환해 SS 저장분이 S+로 덮어써지는 버그 발생)
     const prevGrade=G.grades[lid];
-    const gradeOrder=['SS','S','A','B','C','D'];
+    const gradeOrder=['SS','S+','S-','S','A','B','C','D'];
     if(!prevGrade||gradeOrder.indexOf(grade)<gradeOrder.indexOf(prevGrade)){
       G.grades[lid]=grade;
       try{ localStorage.setItem('bc_grades',JSON.stringify(G.grades)); }catch(e){}
@@ -1653,7 +1654,7 @@ function showResults(g){
 
   const resGrade=document.getElementById('res-grade');
   resGrade.textContent=grade;
-  const gc=grade==='SS'||grade==='S'?'gold':grade==='A'?'#4ADE80':grade==='B'?'#38BDF8':grade==='C'?'#FFD23F':'#FF6B6B';
+  const gc=grade[0]==='S'?'gold':grade==='A'?'#4ADE80':grade==='B'?'#38BDF8':grade==='C'?'#FFD23F':'#FF6B6B'; // SS·S+·S-·S 모두 gold 계열 (BACKLOG #2)
   resGrade.style.color=gc;
   resGrade.style.textShadow=`0 0 20px ${gc},0 0 40px ${gc}`;
   const ringEl=document.getElementById('res-grade-ring');
