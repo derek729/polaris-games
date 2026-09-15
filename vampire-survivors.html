@@ -561,6 +561,138 @@ function director(dt){
   }
 }
 
+/* ---------------- 보스 특수공격 텔레그래프 (BACKLOG #6 — 경고 원 · 돌진 예고선 · 탄막 링 예고) ---------------- */
+// 보스별 예고 → 실행: 슬라임 킹=원형 충격파(경고 원 1.5초) · 버섯 대왕=포자 탄막(빨간 외곽선 플래시 0.8초) · 죽음 군주=돌진(예고선 1초)
+// 기존 보스 AI(추격·접촉 피해)는 그대로 두고, 예고가 끝난 뒤에만 특수공격을 "추가" 실행한다.
+const BOSS_ATTACKS = {
+  slimeking:  { tele:"circle", dur:1.5, cd:6.0, first:2.5, range:300, rad:150 },        // 경고 원 — 원형 충격파
+  shroomking: { tele:"ring",   dur:0.8, cd:5.0, first:3.0, range:0,   n:16, bSpd:150 }, // 탄막 링 예고 — 360° 포자 탄환
+  reaper:     { tele:"charge", dur:1.0, cd:7.0, first:2.0, range:460, dashSpd:640 },    // 돌진 예고선 — 고정 지점 돌진
+};
+// 예고 상태 갱신: 쿨다운 → 사거리 진입 시 telegraph 부여 → dur 경과 후 실행 (일시정지 시 G.t도 멈춰 안전)
+function updateBossTelegraphs(dt){
+  if (!G.ebullets) G.ebullets = []; // 보스 탄환 저장소 (지연 초기화)
+  updateEbullets(dt);               // 보스 사망 후에도 남은 탄환은 계속 진행
+  const b = G.boss, P = G.p;
+  if (!b || b.dead) return;
+  const A = BOSS_ATTACKS[b.type];
+  if (!A) return; // 특수공격이 없는 보스는 우아하게 스킵
+  if (b.dash){ // 돌진 진행: 예고 때 고정한 목표 지점으로 고속 이동 (피해는 기존 접촉 판정 사용)
+    b.dash.t -= dt;
+    b.x += b.dash.vx * dt; b.y += b.dash.vy * dt;
+    if (b.dash.t <= 0 || dist2(b.x, b.y, b.dash.tx, b.dash.ty) < sq(18)) b.dash = null;
+    return; // 돌진 중에는 새 예고를 시작하지 않는다
+  }
+  if (b.telegraph){ // 예고 진행 중 — 시간이 차면 공격 실행
+    if (G.t - b.telegraph.start >= b.telegraph.dur){
+      const tg = b.telegraph;
+      b.telegraph = null;
+      execBossAttack(b, A, tg);
+      b.atkCd = A.cd; // 실행 후 쿨다운
+    }
+    return;
+  }
+  b.atkCd = (b.atkCd === undefined ? A.first : b.atkCd - dt); // 첫 예고는 등장 후 여유를 준다
+  if (b.atkCd > 0) return;
+  if (A.range && Math.hypot(P.x - b.x, P.y - b.y) > A.range) return; // 사거리 밖이면 대기
+  // 예고 시작: targetX/Y는 시작 시점 플레이어 위치로 고정 → 플레이어는 움직여서 회피 가능
+  b.telegraph = { type:A.tele, start:G.t, dur:A.dur, x:P.x, y:P.y };
+  if (A.tele === "circle") b.telegraph.rad = A.rad;
+  throttled("bossTele", 250, () => tone(980, 430, 0.2, "square", 0.13)); // 예고 경고음
+}
+// 예고 종료 — 보스별 특수공격 실행 (신규 추가 공격: 기존 공격·피해 로직은 수정 없음)
+function execBossAttack(b, A, tg){
+  const P = G.p;
+  if (tg.type === "circle"){ // 슬라임 킹: 예고 원 내부에 플레이어가 있으면 피해
+    if (dist2(P.x, P.y, tg.x, tg.y) < sq(tg.rad)) damagePlayer(Math.round(b.dmg * 1.25));
+    G.effects.push({ type:"ring", x:tg.x, y:tg.y, r:tg.rad, t:0.4, max:0.4 });
+    burst(tg.x, tg.y, "#8ee08e", 16, 220);
+    SFX.boom(); G.shake = Math.min(10, G.shake + 6);
+  } else if (tg.type === "ring"){ // 버섯 대왕: 360° 포자 탄환
+    const dmg = Math.max(8, Math.round(b.dmg * 0.45));
+    for (let i = 0; i < A.n; i++){
+      const a = i / A.n * TAU + rand(-0.04, 0.04);
+      G.ebullets.push({ x:b.x, y:b.y, vx:Math.cos(a) * A.bSpd, vy:Math.sin(a) * A.bSpd, r:7, dmg, t:3.2 });
+    }
+    if (G.ebullets.length > 140) G.ebullets.splice(0, G.ebullets.length - 140); // 안전 상한
+    SFX.splash();
+  } else if (tg.type === "charge"){ // 죽음 군주: 고정 지점으로 돌진 (통과 시 기존 접촉 피해)
+    const d = Math.hypot(tg.x - b.x, tg.y - b.y) || 1;
+    b.dash = { vx:(tg.x - b.x) / d * A.dashSpd, vy:(tg.y - b.y) / d * A.dashSpd,
+               t:d / A.dashSpd + 0.1, tx:tg.x, ty:tg.y };
+    SFX.boom(); G.shake = Math.min(10, G.shake + 4);
+  }
+}
+// 보스 탄환: 이동 + 플레이어 충돌 (피해·무적시간 처리는 기존 damagePlayer 재사용)
+function updateEbullets(dt){
+  const P = G.p, bs = G.ebullets;
+  for (let i = bs.length - 1; i >= 0; i--){
+    const bl = bs[i];
+    bl.t -= dt; bl.x += bl.vx * dt; bl.y += bl.vy * dt;
+    if (bl.t <= 0){ bs.splice(i, 1); continue; }
+    if (dist2(bl.x, bl.y, P.x, P.y) < sq(bl.r + 12)){ bs.splice(i, 1); damagePlayer(bl.dmg); }
+  }
+}
+/* 텔레그래프 렌더 — 지면 레벨 (render()에서 엔티티 렌더 전에 호출) */
+function drawTelegraphs(){
+  const b = G.boss;
+  if (!b || b.dead || !b.telegraph) return;
+  const tg = b.telegraph;
+  const p = clamp((G.t - tg.start) / tg.dur, 0, 1);   // 예고 경과율 0→1
+  const pulse = 0.5 + 0.5 * Math.sin(G.animT * 10);   // sin파 맥동
+  if (tg.type === "circle"){ // 경고 원: 반투명 붉은 원(채움 + 외곽선) + 경과율 링
+    ctx.fillStyle = `rgba(255,60,60,${0.3 + 0.15 * pulse})`;
+    circle(tg.x, tg.y, tg.rad);
+    ctx.strokeStyle = `rgba(255,96,96,${0.4 + 0.2 * pulse})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(tg.x, tg.y, tg.rad, 0, TAU); ctx.stroke();
+    ctx.strokeStyle = `rgba(255,214,200,${0.45 + 0.25 * pulse})`; // 링이 가득 차면 실행
+    ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(tg.x, tg.y, tg.rad * p, 0, TAU); ctx.stroke();
+  } else if (tg.type === "charge"){ // 돌진 예고선: 보스 → 고정 목표 붉은 점선 + 화살촉
+    ctx.save();
+    ctx.setLineDash([16, 12]);
+    ctx.lineDashOffset = -G.animT * 70; // 흐르는 점선
+    ctx.strokeStyle = `rgba(255,70,70,${0.35 + 0.2 * pulse})`;
+    ctx.lineWidth = 4; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(tg.x, tg.y); ctx.stroke();
+    ctx.setLineDash([]);
+    const ang = Math.atan2(tg.y - b.y, tg.x - b.x);
+    ctx.strokeStyle = `rgba(255,96,96,${0.5 + 0.25 * pulse})`;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(tg.x, tg.y, 13 + 5 * pulse, 0, TAU); ctx.stroke(); // 목표 표식
+    ctx.beginPath(); // 화살촉
+    ctx.moveTo(tg.x - Math.cos(ang - 0.5) * 18, tg.y - Math.sin(ang - 0.5) * 18);
+    ctx.lineTo(tg.x, tg.y);
+    ctx.lineTo(tg.x - Math.cos(ang + 0.5) * 18, tg.y - Math.sin(ang + 0.5) * 18);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+/* 탄막 링 예고(보스 빨간 외곽선 플래시) + 보스 탄환 — 엔티티 위에 그려야 하므로 render() 후반에 호출 */
+function drawBossTelegraphTop(){
+  drawEbullets();
+  const b = G.boss;
+  if (!b || b.dead || !b.telegraph || b.telegraph.type !== "ring") return;
+  const pulse = 0.5 + 0.5 * Math.sin(G.animT * 18); // 빠른 플래시
+  ctx.strokeStyle = `rgba(255,60,60,${0.35 + 0.3 * pulse})`;
+  ctx.lineWidth = 3.5;
+  ctx.beginPath(); ctx.arc(b.x, b.y, b.r * 1.3, 0, TAU); ctx.stroke();
+  ctx.strokeStyle = `rgba(255,60,60,${0.18 + 0.18 * pulse})`; // 바깥 보조 링
+  ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(b.x, b.y, b.r * 1.5, 0, TAU); ctx.stroke();
+}
+// 보스 탄환 렌더 (플레이어 탄환과 구별되는 붉은 계열)
+function drawEbullets(){
+  const bs = G.ebullets || [];
+  for (const bl of bs){
+    ctx.fillStyle = "rgba(255,90,90,0.3)";
+    circle(bl.x, bl.y, bl.r + 3);
+    ctx.fillStyle = "#ffc0b0";
+    circle(bl.x, bl.y, bl.r * 0.55);
+  }
+}
+
 /* ---------------- 전투 헬퍼 ---------------- */
 function addText(x, y, txt, col, crit){
   if (G.texts.length > 80) G.texts.shift();
@@ -957,6 +1089,7 @@ function update(dt){
   updatePlayer(dt);
   updateWeapons(dt);
   updateEnemies(dt);
+  updateBossTelegraphs(dt); // BACKLOG #6: 보스 특수공격 예고 → 실행 (기존 보스 AI 이후에 추가)
   updateBullets(dt);
   updatePools(dt);
   updateGems(dt);
@@ -2012,12 +2145,14 @@ function render(now){
   drawFloor();
   drawPools();
   drawGarlic();
+  drawTelegraphs(); // BACKLOG #6: 보스 텔레그래프(경고 원·돌진 예고선) — 지면 레벨, 엔티티 렌더 전
   drawGems();
   drawPickups();
   const ents = G.enemies.slice();
   ents.push(G.p);
   ents.sort((a, b) => a.y - b.y);
   for (const e of ents){ if (e === G.p) drawPlayer(); else drawEnemy(e); }
+  drawBossTelegraphTop(); // BACKLOG #6: 탄막 링 예고(보스 외곽선 플래시) + 보스 탄환 — 엔티티 위 렌더
   drawBullets();
   drawBooks();
   drawEffects();
