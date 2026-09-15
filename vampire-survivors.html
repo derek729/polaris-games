@@ -425,10 +425,12 @@ window.addEventListener("keydown", e => {
   if (scene === "levelup" && e.code === "KeyR") doReroll();
   if (scene === "levelup" && e.code === "KeyX") doSkip();
   if (scene === "chest" && (e.code === "Space" || e.code === "Enter")) chestAdvance();
+  if (scene === "chestspin") skipChestSpin(); // 슬롯 연출 스킵 (아무 키)
   if (scene === "title" && (e.code === "Enter" || e.code === "Space")) setScene("char");
 });
 window.addEventListener("keyup", e => { keys[e.code] = false; });
 canvas.addEventListener("pointerdown", e => {
+  if (scene === "chestspin"){ skipChestSpin(); return; } // 슬롯 연출 스킵 (클릭)
   if (scene !== "play") return;
   joyId = e.pointerId; joyOrigin = { x:e.clientX, y:e.clientY }; joyVec = { x:0, y:0 };
   const j = $("joy"); j.classList.remove("hidden");
@@ -456,7 +458,7 @@ document.addEventListener("visibilitychange", () => { if (document.hidden && sce
 window.addEventListener("blur", () => { if (scene === "play") setScene("pause"); });
 
 /* ---------------- 게임 상태 ---------------- */
-let scene = "title";   // title | char | play | levelup | chest | pause | over | win
+let scene = "title";   // title | char | play | levelup | chest | chestspin | pause | over | win
 let G = null;
 let eid = 0;
 
@@ -475,6 +477,7 @@ function newGame(charId){
     spawnT:1.2, flockIdx:0, eliteIdx:0, bossIdx:0, boss:null,
     rushFlag:false, slotsDirty:true, chestData:null, chestPhase:"closed", chestApplied:false,
   };
+  spinFx = null; // 슬롯 연출 오버레이 상태 초기화 (안전망)
   recalcStats();
   G.p.hp = G.p.maxHp;
 }
@@ -1080,8 +1083,8 @@ function openChest(){
   const ready = G.weapons.filter(w => !w.evolved && w.lv >= 8 && (G.passives[EVO[w.id].passive] || 0) > 0);
   G.chestData = ready.length ? { evoId:ready[0].id } : { gold:100, heal:40 };
   G.chestPhase = "closed"; G.chestApplied = false;
-  setScene("chest");
   SFX.chest(); playSfx("powerup", { playbackRate: 0.7 });
+  startChestSpin(); // BACKLOG #5: 슬롯머신 연출 후 기존 결과 화면으로 전환
 }
 function chestAdvance(){
   if (scene !== "chest") return;
@@ -1125,10 +1128,184 @@ function buildChest(){
   }
 }
 
+/* ---------------- 보물상자 슬롯머신 연출 (BACKLOG #5 — 캔버스 오버레이, 총 ~2.5초) ---------------- */
+// 희귀도 메타: common=흰색 · rare=파랑 · epic=보라 · legendary=금색
+const RARITY = {
+  common:    { col:"#ececf4", rgb:"236,236,244", label:"일반" },
+  rare:      { col:"#4d9fff", rgb:"77,159,255", label:"희귀" },
+  epic:      { col:"#b06bff", rgb:"176,107,255", label:"영웅" },
+  legendary: { col:"#e8b64c", rgb:"232,182,76", label:"전설" },
+};
+let spinFx = null; // 슬롯 연출 오버레이 상태 (씬 "chestspin" 동안만 존재)
+const backOut = p => { const c1 = 1.70158; return 1 + (c1 + 1) * Math.pow(p - 1, 3) + c1 * Math.pow(p - 1, 2); };
+// 희귀도 결정: 진화 상자는 항상 전설, 그 외엔 진행도(G.t/GOAL) 비례 가중 랜덤
+function rollChestRarity(){
+  const k = clamp(G.t / GOAL, 0, 1), r = Math.random();
+  if (r < 0.50 - 0.35 * k) return "common";
+  if (r < 0.85 - 0.25 * k) return "rare";
+  return "epic";
+}
+function startChestSpin(){
+  const evoId = G.chestData.evoId || null;
+  const rarity = evoId ? "legendary" : rollChestRarity();
+  const icons = Object.keys(WEAPONS).map(id => WEAPONS[id].icon);
+  // 릴 최종 조합 = 희귀도 표현 (트리플=epic, 페어=rare, 노페어=common, 진화 아이콘 트리플=legendary)
+  let finals;
+  if (evoId){ const ic = EVO[evoId].icon; finals = [ic, ic, ic]; }
+  else if (rarity === "epic"){ const ic = pick(icons); finals = [ic, ic, ic]; }
+  else if (rarity === "rare"){
+    const ic = pick(icons), o = pick(icons.filter(i => i !== ic));
+    finals = Math.random() < 0.5 ? [ic, ic, o] : [ic, o, ic];
+  } else finals = shuffle(icons.slice()).slice(0, 3);
+  const reels = finals.map((fic, i) => {
+    const strip = shuffle(evoId ? [...icons, EVO[evoId].icon] : icons.slice());
+    const turns = 9 + i * 4, fin = strip.indexOf(fic); // 왼쪽 → 가운데 → 오른쪽 순 정지
+    return { strip, turns, fin, start: ((fin - turns) % strip.length + strip.length) % strip.length,
+             stopAt: 1250 + i * 375, landed: false, flashT: 0 };
+  });
+  spinFx = { t0: performance.now(), last: performance.now(), rarity, R: RARITY[rarity], evoId, reels,
+             revealed: false, shake: 0, confetti: [] };
+  setScene("chestspin");
+}
+function skipChestSpin(){ if (scene === "chestspin" && spinFx) finishChestSpin(); }
+function finishChestSpin(){
+  if (!spinFx || !G) return;
+  spinFx = null;
+  if (!G.chestApplied){ // 보상 확정 — 기존 chestAdvance 개봉 로직과 동일
+    G.chestApplied = true;
+    if (G.chestData.evoId){
+      const w = owned(G.chestData.evoId);
+      w.evolved = true; G.slotsDirty = true;
+      G.effects.push({ type:"ring", x:G.p.x, y:G.p.y, r:140, t:0.6, max:0.6 });
+      SFX.evo();
+    } else {
+      G.gold += G.chestData.gold;
+      G.p.hp = Math.min(G.p.maxHp, G.p.hp + G.chestData.heal);
+    }
+  }
+  G.chestPhase = "open";
+  setScene("chest"); // 기존 결과(무기 진화/재화) 화면으로 전환
+}
+// 오버레이 렌더: 타임스탬프 기반 (0-800ms 상자 확대 → 800-2000ms 릴 스핀 → 2000-2500ms 결과 플래시)
+function drawChestSpin(now){
+  const s = spinFx, el = now - s.t0;
+  const dt = clamp((now - s.last) / 1000, 0, 0.05);
+  s.last = now;
+  const cx = vw / 2, cy = vh / 2, RR = s.R;
+  // 배경 암전 (페이즈 1과 함께 진행)
+  ctx.fillStyle = `rgba(8,5,16,${0.82 * clamp(el / 800, 0, 1)})`;
+  ctx.fillRect(0, 0, vw, vh);
+  ctx.save();
+  ctx.translate((Math.random() - 0.5) * s.shake, (Math.random() - 0.5) * s.shake); // "thunk" 흔들림
+  // ---- 페이즈 1: 상자가 화면 중앙으로 확대 (스프라이트 우선, 미로딩 시 이모지 폴백) ----
+  if (el < 900){
+    const p = clamp(el / 800, 0, 1), sz = 46 * lerp(1, 3.1, backOut(p));
+    const a = clamp(1 - (el - 800) / 100, 0, 1);
+    ctx.save(); ctx.globalAlpha = a;
+    const gl = ctx.createRadialGradient(cx, cy, 8, cx, cy, sz * 1.7);
+    gl.addColorStop(0, `rgba(232,182,76,${0.4 * a})`); gl.addColorStop(1, "rgba(232,182,76,0)");
+    ctx.fillStyle = gl; ctx.fillRect(cx - sz * 1.7, cy - sz * 1.7, sz * 3.4, sz * 3.4);
+    const cimg = SPRITES["item-chest"];
+    if (spriteReady(cimg)){ ctx.imageSmoothingEnabled = false; ctx.drawImage(cimg, cx - sz, cy - sz, sz * 2, sz * 2); }
+    else emoji("🎁", cx, cy, sz * 1.5);
+    ctx.restore();
+  } else if (el < 1150){ // 개봉 링 버스트
+    const q = (el - 800) / 350;
+    ctx.strokeStyle = `rgba(255,224,138,${0.8 * (1 - q)})`; ctx.lineWidth = 6 * (1 - q) + 1;
+    ctx.beginPath(); ctx.arc(cx, cy, 30 + q * 190, 0, TAU); ctx.stroke();
+  }
+  // ---- 페이즈 2: 슬롯 릴 3개 (감속 스핀, 왼쪽부터 차례 정지 + thunk 흔들림) ----
+  const rw = Math.min(106, vw * 0.23), rh = 96, gap = 14, pad = 16;
+  const mw = rw * 3 + gap * 2, mh = rh + pad * 2;
+  const mx = cx - mw / 2, my = cy - mh / 2 + 14;
+  if (el >= 800){
+    const sc = backOut(clamp((el - 800) / 240, 0, 1));
+    ctx.save(); ctx.translate(cx, cy); ctx.scale(sc, sc); ctx.translate(-cx, -cy);
+    ctx.fillStyle = "rgba(34,26,51,0.96)"; // 머신 패널
+    ctx.beginPath(); ctx.roundRect(mx - pad, my - pad, mw + pad * 2, mh, 16); ctx.fill();
+    ctx.strokeStyle = s.revealed ? RR.col : "#4a3a6b"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.roundRect(mx - pad, my - pad, mw + pad * 2, mh, 16); ctx.stroke();
+    for (let i = 0; i < 3; i++){
+      const R = s.reels[i], rx = mx + i * (rw + gap);
+      const p = clamp((el - 800) / (R.stopAt - 800), 0, 1);
+      if (p >= 1 && !R.landed){ // 릴 정지 "thunk": 화면 흔들림 + 효과음
+        R.landed = true; R.flashT = 1;
+        s.shake = 7; G.shake = Math.min(10, G.shake + 4);
+        tone(190, 55, 0.09, "square", 0.16);
+        playSfx("powerup", { playbackRate: 1.2 + i * 0.15, volume: 0.28 });
+      }
+      ctx.save();
+      ctx.beginPath(); ctx.roundRect(rx, my, rw, rh, 10); ctx.clip();
+      ctx.fillStyle = "#171122"; ctx.fillRect(rx, my, rw, rh);
+      const off = R.turns * (1 - Math.pow(1 - p, 3)); // easeOutCubic 감속 (정확히 정지 위치에 랜딩)
+      const L = R.strip.length, frac = off % 1, base = (R.start + Math.floor(off)) % L, rowH = 60;
+      for (let k = -1; k <= 1; k++)
+        emoji(R.strip[((base + k) % L + L) % L], rx + rw / 2, my + rh / 2 + (k - frac) * rowH, 40);
+      const eg = ctx.createLinearGradient(0, my, 0, my + rh); // 상하 페이드
+      eg.addColorStop(0, "rgba(10,7,20,0.9)"); eg.addColorStop(0.5, "rgba(10,7,20,0)"); eg.addColorStop(1, "rgba(10,7,20,0.9)");
+      ctx.fillStyle = eg; ctx.fillRect(rx, my, rw, rh);
+      ctx.fillStyle = "rgba(232,182,76,0.08)"; ctx.fillRect(rx, my + rh / 2 - 30, rw, 60); // 센터 라인
+      ctx.fillStyle = "rgba(232,182,76,0.55)";
+      ctx.fillRect(rx, my + rh / 2 - 31, rw, 2); ctx.fillRect(rx, my + rh / 2 + 29, rw, 2);
+      if (R.landed){ // 랜딩 플래시
+        R.flashT = Math.max(0, R.flashT - dt * 4);
+        ctx.fillStyle = `rgba(255,255,255,${0.55 * R.flashT})`; ctx.fillRect(rx, my, rw, rh);
+      }
+      ctx.restore();
+      ctx.strokeStyle = "#4a3a6b"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.roundRect(rx, my, rw, rh, 10); ctx.stroke();
+    }
+    ctx.restore();
+  }
+  // ---- 페이즈 3: 최종 리빌 (희귀도 색 글로우 + rare 이상 컨페티) ----
+  if (el >= 2000 && !s.revealed){
+    s.revealed = true;
+    playSfx("powerup", { playbackRate: 0.8, volume: 0.5 }); // 최종 리빌: 저재생 속도로 무게감
+    tone(520, 1180, 0.3, "triangle", 0.14);
+    if (s.rarity !== "common"){
+      const n = s.rarity === "legendary" ? 90 : s.rarity === "epic" ? 60 : 45;
+      const cols = [RR.col, "#ffd76a", "#ffffff", "#7fd0ff", "#ff8ac0"];
+      for (let i = 0; i < n; i++)
+        s.confetti.push({ x: cx + rand(-mw / 2, mw / 2), y: my, vx: rand(-240, 240), vy: rand(-560, -160),
+                          rot: rand(0, TAU), vr: rand(-9, 9), w: rand(5, 9), h: rand(9, 15), t: rand(1, 1.7), col: pick(cols) });
+    }
+  }
+  if (s.revealed){
+    const rp = clamp((el - 2000) / 400, 0, 1), pulse = 0.6 + 0.4 * Math.sin(el * 0.012);
+    const gr = Math.max(vw, vh) * (0.25 + 0.3 * rp);
+    const gg = ctx.createRadialGradient(cx, cy, 30, cx, cy, gr);
+    gg.addColorStop(0, `rgba(${RR.rgb},${0.34 * pulse * rp})`); gg.addColorStop(1, `rgba(${RR.rgb},0)`);
+    ctx.fillStyle = gg; ctx.fillRect(0, 0, vw, vh);
+    const lp = clamp((el - 2020) / 260, 0, 1), ls = 0.6 + 0.4 * backOut(lp); // 희귀도 라벨
+    ctx.save(); ctx.translate(cx, my + mh + 52); ctx.scale(ls, ls); ctx.globalAlpha = lp;
+    ctx.font = "900 42px sans-serif"; ctx.textAlign = "center";
+    ctx.fillStyle = "rgba(0,0,0,0.65)"; ctx.fillText(`★ ${RR.label} ★`, 2, 2);
+    ctx.fillStyle = RR.col; ctx.fillText(`★ ${RR.label} ★`, 0, 0);
+    ctx.font = "800 14px sans-serif"; ctx.fillStyle = "rgba(236,230,247,0.85)";
+    ctx.fillText(s.evoId ? `${WEAPONS[s.evoId].name} → ${EVO[s.evoId].name}` : "골드와 체력을 획득!", 0, 30);
+    ctx.restore();
+  }
+  for (let i = s.confetti.length - 1; i >= 0; i--){ // 컨페티 (화면 좌표 파티클)
+    const c = s.confetti[i];
+    c.t -= dt; c.x += c.vx * dt; c.y += c.vy * dt; c.vy += 780 * dt; c.rot += c.vr * dt;
+    if (c.t <= 0 || c.y > vh + 24){ s.confetti.splice(i, 1); continue; }
+    ctx.save(); ctx.translate(c.x, c.y); ctx.rotate(c.rot); ctx.globalAlpha = clamp(c.t, 0, 1);
+    ctx.fillStyle = c.col; ctx.fillRect(-c.w / 2, -c.h / 2, c.w, c.h);
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+  s.shake = Math.max(0, s.shake - dt * 30);
+  ctx.font = "800 12px sans-serif"; ctx.textAlign = "center"; // 스킵 힌트
+  ctx.fillStyle = "rgba(169,156,196,0.75)";
+  ctx.fillText("클릭 또는 아무 키 — 건너뛰기", cx, vh - 24);
+  ctx.restore();
+  if (el >= 2500) finishChestSpin(); // 연출 종료 → 기존 결과 화면
+}
+
 /* ---------------- 씬 관리 ---------------- */
 function setScene(s){
   scene = s;
-  const inRun = s === "play" || s === "levelup" || s === "chest" || s === "pause";
+  const inRun = s === "play" || s === "levelup" || s === "chest" || s === "chestspin" || s === "pause";
   $("hud").classList.toggle("hidden", !inRun);
   for (const el of document.querySelectorAll(".screen")) el.classList.add("hidden");
   if (s === "play") { /* 화면 없음 */ }
@@ -1854,6 +2031,7 @@ function render(now){
     ctx.fillStyle = `rgba(255,40,40,${0.10 + 0.06 * Math.sin(now * 0.008)})`;
     ctx.fillRect(0, 0, vw, vh);
   }
+  if (spinFx) drawChestSpin(now); // BACKLOG #5: 슬롯머신 상자 연출 (최상단 캔버스 오버레이)
 }
 
 /* ---------------- 메인 루프 ---------------- */
