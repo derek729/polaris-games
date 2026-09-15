@@ -280,6 +280,14 @@ const RESTITUTION = 0.92;
 const STOP_SPEED = 0.06;
 const EDGE = 0.35;            // center beyond edge ± this → falls off
 
+// juice effects (로컬 연출 전용)
+const HIT_STOP_MS = 80;          // 히트스톱 지속 시간 (ms)
+const HIT_STOP_MIN = 0.45;       // 히트스톱 발동 임계 강도 (정규화 충돌 강도)
+const HIT_STOP_COOLDOWN = 240;   // 히트스톱 연속 발동 방지 (ms)
+const PARTICLE_LIFE = 500;       // 포획 파티클 수명 (ms)
+const PARTICLE_GRAVITY = 14;     // 포획 파티클 중력 (cells/s²)
+const WALL_SOUND_MIN_SPEED = 3;  // 가장자리 충돌음 최소 속도 (cells/s)
+
 const START_BLACK = [[4, 3], [4, 6], [4, 9], [4, 12], [4, 15]];
 const START_WHITE = [[14, 3], [14, 6], [14, 9], [14, 12], [14, 15]];
 
@@ -297,6 +305,11 @@ let lastOutsThisShot = [];
 let lastOutIds = [];          // stone ids knocked out during the current shot
 let lastShotBy = 0;           // colour of the current shot's shooter
 let pendingResult = null;     // authoritative result from the shooter (online)
+
+// juice effect state (로컬 전용 — 네트워크로 전송되지 않음)
+const particles = [];         // 포획 파티클 { x, y, vx, vy, born, rgb, size }
+let hitStopUntil = 0;         // 이 시각까지 물리 갱신 생략
+let hitStopCooldownUntil = 0; // 히트스톱 재발동 가능 시각
 
 // online match state
 let onlineActive = false;
@@ -348,6 +361,7 @@ class AlkkagiRenderer extends BoardRenderer {
     this.drawGrid();
     this.drawEdgeShade();
     this.drawStones();
+    this.drawParticles();
     this.drawAim();
   }
   drawEdgeShade() {
@@ -391,6 +405,23 @@ class AlkkagiRenderer extends BoardRenderer {
     }
     // purge finished fades — but keep stones recoverable during online play
     if (!onlineActive) stones = stones.filter(s => !s.fadeDone);
+  }
+  drawParticles() {
+    if (!particles.length) return;
+    const ctx = this.ctx;
+    const now = performance.now();
+    for (const p of particles) {
+      const t = (now - p.born) / PARTICLE_LIFE;           // 0 → 1 진행률
+      const [px, py] = this.toPx(p.x, p.y);
+      const r = Math.max(0.5, this.cellSize * p.size * (1 - t * 0.55));
+      ctx.save();
+      ctx.globalAlpha = 1 - t;
+      ctx.fillStyle = `rgb(${p.rgb[0]}, ${p.rgb[1]}, ${p.rgb[2]})`;
+      ctx.beginPath();
+      ctx.arc(px, py, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
   }
   drawAim() {
     if (!aim) return;
@@ -498,6 +529,60 @@ function allStopped(list) {
 }
 
 // ============================================
+// EFFECTS (로컬 연출 전용 — 물리·규칙·네트워크 동기화와 무관)
+// ============================================
+
+// 포획 파티클 — 사라진 돌 자리에서 8~12개가 사방으로 튀어나가 중력을 받아 떨어짐
+function spawnCaptureBurst(s) {
+  const n = 8 + Math.floor(Math.random() * 5);                // 8~12개
+  const rgb = s.color === 1 ? [72, 72, 78] : [240, 238, 230]; // 흑→짙은 회색, 백→밝은 회색
+  for (let i = 0; i < n; i++) {
+    const ang = Math.random() * Math.PI * 2;
+    const sp = 2 + Math.random() * 3.5;                       // cells/s
+    particles.push({
+      x: s.x, y: s.y,
+      vx: Math.cos(ang) * sp,
+      vy: Math.sin(ang) * sp - 1.5,                           // 살짝 위로 튕기며 출발
+      born: performance.now(),
+      rgb,
+      size: 0.09 + Math.random() * 0.09,                      // 반경 (cell 단위)
+    });
+  }
+  if (particles.length > 240) particles.splice(0, particles.length - 240); // 상한 방어
+}
+
+function stepParticles(dt) {
+  const now = performance.now();
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    if (now - p.born >= PARTICLE_LIFE) { particles.splice(i, 1); continue; }
+    p.vy += PARTICLE_GRAVITY * dt;
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+  }
+}
+
+// 벽(가장자리) 반사음 — Web Audio 오실레이터, 외부 파일 없음. 음량은 충돌 속도에 비례.
+let wallAudioCtx = null;
+function playWallBounce(power) {
+  if (!Suiji.sound.enabled) return; // 사운드 토글과 동일하게 음소거 존중
+  try {
+    if (!wallAudioCtx) wallAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (wallAudioCtx.state === 'suspended') wallAudioCtx.resume();
+    const t = wallAudioCtx.currentTime;
+    const osc = wallAudioCtx.createOscillator();
+    const gain = wallAudioCtx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(170 + power * 130, t);
+    osc.frequency.exponentialRampToValueAtTime(70, t + 0.09);
+    gain.gain.setValueAtTime(Math.min(0.22, 0.05 + power * 0.18), t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+    osc.connect(gain); gain.connect(wallAudioCtx.destination);
+    osc.start(t); osc.stop(t + 0.14);
+  } catch (e) { /* 오디오 미지원 환경은 조용히 무시 */ }
+}
+
+// ============================================
 // GAME FLOW
 // ============================================
 function setupStones() {
@@ -582,12 +667,36 @@ function init() {
   function frame(now) {
     const dt = Math.min(0.033, (now - last) / 1000);
     last = now;
-    if (phase === 'running') {
+    if (phase === 'running' && now >= hitStopUntil) { // 히트스톱 중에는 물리 갱신 생략
       const events = { collisions: [], outs: [], outStones: [] };
       // sub-step for stability
       const steps = 3;
       for (let i = 0; i < steps; i++) stepPhysics(stones, dt / steps, events);
       for (const v of events.collisions) Suiji.sound.clack(0.3 + v);
+      // 히트스톱 — 강한 충돌 순간 80ms 정지로 타격감 연출 (로컬 전용)
+      if (now >= hitStopCooldownUntil && events.collisions.some(v => v >= HIT_STOP_MIN)) {
+        hitStopUntil = now + HIT_STOP_MS;
+        hitStopCooldownUntil = now + HIT_STOP_COOLDOWN;
+      }
+      // 포획 파티클 — 보드에서 사라진 돌 자리에서 로컬 재생
+      for (const s of stones) {
+        if (s.out && s.fadeAt !== undefined && !s.burstDone) {
+          s.burstDone = true;
+          spawnCaptureBurst(s);
+        }
+      }
+      // 가장자리 충돌음 — 돌이 보드 테두리선을 넘는 순간 재생 (물리 변경 없음)
+      for (const s of stones) {
+        if (s.out) continue;
+        const outside = s.x < 0 || s.x > N - 1 || s.y < 0 || s.y > N - 1;
+        if (outside && !s.wallHit) {
+          s.wallHit = true;
+          const speed = Math.hypot(s.vx, s.vy);
+          if (speed >= WALL_SOUND_MIN_SPEED) playWallBounce(speed / MAX_SPEED);
+        } else if (!outside && s.wallHit) {
+          s.wallHit = false;
+        }
+      }
       for (const c of events.outs) {
         Suiji.sound.fall();
         lastOutsThisShot.push(c);
@@ -596,6 +705,8 @@ function init() {
       for (const st of events.outStones) lastOutIds.push(st.id);
       if (allStopped(stones)) setTimeout(onSettled, 250);
     }
+    // 파티클은 히트스톱과 무관하게 항상 갱신
+    stepParticles(dt);
     // animate fade marks
     requestAnimationFrame(frame);
   }
@@ -848,7 +959,7 @@ function applyRemoteShot(data) {
   for (const [id, x, y] of (data.snap || [])) {
     const st = stones.find(o => o.id === id);
     if (!st) continue;
-    st.out = false; st.fadeAt = undefined; st.fadeDone = false;
+    st.out = false; st.fadeAt = undefined; st.fadeDone = false; st.burstDone = false;
     st.x = x; st.y = y; st.vx = 0; st.vy = 0;
   }
   for (const st of stones) {
@@ -877,7 +988,7 @@ function applyRemoteResult(data) {
   for (const [id, x, y] of (data.board || [])) {
     const st = stones.find(o => o.id === id);
     if (!st) continue;
-    st.out = false; st.fadeAt = undefined; st.fadeDone = false;
+    st.out = false; st.fadeAt = undefined; st.fadeDone = false; st.burstDone = false;
     st.x = x; st.y = y; st.vx = 0; st.vy = 0;
   }
   pendingResult = { opp: data.opp, own: data.own };
