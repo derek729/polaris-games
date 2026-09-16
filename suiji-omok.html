@@ -95,6 +95,50 @@ canvas#board {
   touch-action: none;
 }
 .mode-note { font-size: 11px; color: var(--ink-light); font-style: italic; margin-top: 10px; text-align: center; font-family: 'Cormorant Garamond', serif; font-size: 14px; }
+/* 3단 힌트 박스 — 추천점 · 이유 · 무르기 */
+.hint-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 9px 14px;
+  background: var(--paper-dark);
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--ink-2);
+  animation: hintFade 0.35s ease;
+}
+.hint-box[hidden] { display: none; }
+.hint-tier-badge {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--paper);
+}
+.hint-text { flex: 1; min-width: 0; }
+.hint-next { flex-shrink: 0; font-size: 11px; color: var(--ink-light); font-style: italic; }
+.hint-box .btn { flex-shrink: 0; padding: 4px 12px; font-size: 12px; }
+.hint-box .btn[hidden] { display: none; }
+.btn .hint-count {
+  display: inline-block;
+  min-width: 15px;
+  margin-left: 3px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: rgba(31, 20, 16, 0.14);
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+}
+@keyframes hintFade {
+  from { opacity: 0; transform: translateY(-3px); }
+  to { opacity: 1; transform: none; }
+}
 </style>
 </head>
 <body>
@@ -212,6 +256,12 @@ canvas#board {
               <div class="thinking-sub">Reading the lines</div>
             </div>
           </div>
+        </div>
+        <div class="hint-box" id="hintBox" hidden>
+          <span class="hint-tier-badge" id="hintTierBadge">추천</span>
+          <span class="hint-text" id="hintText"></span>
+          <button class="btn" id="btnHintUndo" hidden><i class="fa-solid fa-rotate-left"></i> 무르기</button>
+          <span class="hint-next" id="hintNext"></span>
         </div>
         <div class="mode-note">First to five in a row — straight or diagonal — takes the game.</div>
       </div>
@@ -426,6 +476,9 @@ let gameOver = false;
 let winLine = null;
 let aiThinking = false;
 let hintMark = null;
+let hintTier = 0;        // 힌트 3단계: 0=끔, 1=추천점, 2=이유, 3=무르기 제안
+let hintMove = null;     // 현재 힌트 세션의 추천점과 이유
+const HINT_KEY = 'dumadang.omok.hints'; // 난이도별 힌트 잔여 횟수 (새 게임마다 리셋)
 let lastIntent = null;
 let generation = 0;
 
@@ -456,13 +509,21 @@ class OmokRenderer extends BoardRenderer {
         const px = this.padding + hintMark.x * this.cellSize;
         const py = this.padding + hintMark.y * this.cellSize;
         const pulse = (Math.sin(this.lastMovePulse * 0.15) + 1) / 2;
+        const r = this.stoneRadius * (1.05 + pulse * 0.12);
         const ctx = this.ctx;
         ctx.save();
+        // 은은한 글로우 + 점선 링으로 추천점을 표시
+        ctx.fillStyle = `rgba(165, 40, 40, ${0.08 + pulse * 0.10})`;
+        ctx.beginPath();
+        ctx.arc(px, py, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowColor = 'rgba(165, 40, 40, 0.55)';
+        ctx.shadowBlur = 8 + pulse * 6;
         ctx.strokeStyle = `rgba(165, 40, 40, ${0.65 + pulse * 0.35})`;
         ctx.lineWidth = 2.5;
         ctx.setLineDash([5, 4]);
         ctx.beginPath();
-        ctx.arc(px, py, this.stoneRadius * (1.05 + pulse * 0.12), 0, Math.PI * 2);
+        ctx.arc(px, py, r, 0, Math.PI * 2);
         ctx.stroke();
         ctx.restore();
       }
@@ -523,6 +584,11 @@ const els = {
   clockBlack: document.getElementById('clockBlack'),
   clockWhite: document.getElementById('clockWhite'),
   btnHint: document.getElementById('btnHint'),
+  btnHintUndo: document.getElementById('btnHintUndo'),
+  hintBox: document.getElementById('hintBox'),
+  hintTierBadge: document.getElementById('hintTierBadge'),
+  hintText: document.getElementById('hintText'),
+  hintNext: document.getElementById('hintNext'),
   btnUndo: document.getElementById('btnUndo'),
   btnNew: document.getElementById('btnNew'),
   btnSound: document.getElementById('btnSound'),
@@ -576,6 +642,7 @@ function swapOmokView() {
   els.btnNew.addEventListener('click', onNewButton);
   els.btnUndo.addEventListener('click', onUndo);
   els.btnHint.addEventListener('click', onHint);
+  els.btnHintUndo.addEventListener('click', onUndo); // 힌트 3단계의 무르기 제안
   els.btnView.addEventListener('click', swapOmokView);
   // 3D board picking — page-level capture (reliable across renderer swaps)
   document.addEventListener('click', (e) => {
@@ -613,6 +680,9 @@ function swapOmokView() {
       els.rankSelector.querySelectorAll('.rank-badge').forEach(x => x.classList.remove('active'));
       b.classList.add('active');
       level = parseInt(b.dataset.level);
+      resetHintCounter(); // 난이도가 바뀌면 힌트 횟수도 새로
+      clearHintSession(); // 진행 중이던 힌트 정리
+      updateUI();
       Suiji.toast(`AI level set to ${b.querySelector('.name').textContent}`);
     });
   });
@@ -657,6 +727,8 @@ function swapOmokView() {
     if (e.key === 'n' && e.ctrlKey) { newGame(); e.preventDefault(); }
   });
 
+  if (!history.length) resetHintCounter(); // 페이지 로드 시점은 새 대국 — 힌트 횟수 초기화
+  clearHintSession(); // 힌트 박스/마커 초기 상태 보장
   refreshRecord();
   updateUI();
 }
@@ -826,6 +898,8 @@ function resetBoard() {
   gameOver = false;
   winLine = null;
   hintMark = null;
+  clearHintSession();   // 힌트 세션 종료
+  resetHintCounter();   // 새 게임 — 힌트 횟수 복구
   view.lastMove = null;
   els.gameOverCard.classList.remove('show');
 }
@@ -862,6 +936,7 @@ function checkWin(x, y, color) {
 }
 
 function place(x, y, color) {
+  clearHintSession(); // 새 수가 놓이면 이전 추천은 무효 — 착점 규칙 그대로
   board[x][y] = color;
   history.push({ x, y, color });
   view.lastMove = { x, y, color };
@@ -1003,6 +1078,7 @@ function onUndo() {
   view.gameOver = false;
   winLine = null;
   hintMark = null;
+  clearHintSession(); // 무르면 힌트 세션도 함께 종료
   els.gameOverCard.classList.remove('show');
   const last = history[history.length - 1];
   view.lastMove = last ? { x: last.x, y: last.y, color: last.color } : null;
@@ -1012,23 +1088,133 @@ function onUndo() {
   updateUI();
 }
 
-function onHint() {
-  if (aiThinking || gameOver) return;
-  const mv = boardAI.bestMove(board, current, 3);
-  if (!mv) return;
-  hintMark = { x: mv.x, y: mv.y, until: performance.now() + 2600 };
-  Suiji.sound.stone(0.4);
-  setIntent(`Hint — this point scores ${fmtScore(mv.score)} for you.`, `Suggested ${coordName(mv.x, mv.y)}`, history.length + 1);
+// ============ 힌트 시스템 (3단계) ============
+// 단계 순환: 1=추천점 표시 → 2=이유 설명 → 3=무르기 제안 → 닫기
+// 난이도별 횟수 제한: 초급 무제한 / 중급 3회 / 고급 1회 (새 게임마다 리셋)
+
+function hintLimitFor(lv) {
+  return lv === 1 ? Infinity : (lv === 3 ? 1 : 3);
 }
 
-function fmtScore(s) {
-  if (s >= 10000000) return 'a winning five';
-  if (s >= 1000000) return 'an open four';
-  if (s >= 100000) return 'a forcing four';
-  if (s >= 50000) return 'an open three';
-  if (s >= 6000) return 'a three';
-  if (s >= 1500) return 'an open two';
-  return 'a quiet point';
+function hintLimitLabel() {
+  return level === 1 ? '무제한' : `${hintLimitFor(level)}회`;
+}
+
+function hintsLeft() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(HINT_KEY) || 'null');
+    if (raw && raw.lv === level) return raw.left; // null = 무제한
+  } catch (e) { /* 손상된 저장값 — 기본값 사용 */ }
+  return hintLimitFor(level);
+}
+
+function setHintsLeft(n) {
+  try { localStorage.setItem(HINT_KEY, JSON.stringify({ lv: level, left: n })); } catch (e) { /* 저장 불가 환경 */ }
+}
+
+function resetHintCounter() { setHintsLeft(hintLimitFor(level)); }
+
+function useHint() {
+  const left = hintsLeft();
+  if (typeof left === 'number') setHintsLeft(Math.max(0, left - 1));
+}
+
+function hintsExhausted() {
+  const left = hintsLeft();
+  return typeof left === 'number' && left <= 0;
+}
+
+function clearHintSession() {
+  hintTier = 0;
+  hintMove = null;
+  hintMark = null;
+  if (window.Suiji3D && renderer instanceof Suiji3D.BoardRenderer3D) renderer.hintMark = null;
+  if (els.hintBox) els.hintBox.hidden = true;
+}
+
+// 추천점 마커 — 2D는 페이지 렌더러가, 3D는 내장 hintRing이 그린다
+function showHintMarker(x, y) {
+  hintMark = { x, y, until: Infinity }; // 세션이 유지되는 동안 표시
+  if (window.Suiji3D && renderer instanceof Suiji3D.BoardRenderer3D) {
+    renderer.hintMark = { x, y, until: performance.now() + 3.6e6 };
+  }
+}
+
+// 추천 이유 한 줄 — AI 평가(공격/수비 점수)를 읽어 분류
+function classifyHint(mv, color) {
+  const opp = color === 1 ? 2 : 1;
+  const atk = boardAI.lineScore(board, mv.x, mv.y, color);
+  const def = boardAI.lineScore(board, mv.x, mv.y, opp);
+  if (atk >= 10000000) return '공격: 다섯 목 완성 — 두면 이깁니다';
+  if (def >= 10000000) return '수비: 상대 다섯 목 긴급 차단';
+  if (atk >= 1000000) return '공격: 4목 완성 가능';
+  if (def >= 1000000) return '수비: 상대 4목 차단';
+  if (atk >= 100000) return '공격: 4목 시나리오 유도';
+  if (def >= 100000) return '수비: 상대 4목 저지';
+  if (atk >= 50000) return '공격: 열린 3목 — 두 갈래 위협';
+  if (def >= 50000) return '수비: 상대 열린 3목 차단';
+  if (atk >= 6000) return '공격: 3목 확장';
+  if (def >= 6000) return '수비: 상대 3목 견제';
+  if (atk >= 1500) return '공격: 2목 확장';
+  const c = (SIZE - 1) / 2;
+  const dist = Math.max(Math.abs(mv.x - c), Math.abs(mv.y - c));
+  if (history.length < 6 && dist <= 3) return '중앙 장악 — 주도권 확보';
+  return '균형: 가장 가치 있는 착점';
+}
+
+function renderHintBox() {
+  if (hintTier <= 0 || !hintMove) { els.hintBox.hidden = true; return; }
+  els.hintBox.hidden = false;
+  const nextLabels = { 1: '클릭 — 이유 보기', 2: '클릭 — 무르기 제안', 3: '클릭 — 힌트 닫기' };
+  if (hintTier === 1) {
+    els.hintTierBadge.textContent = '추천점';
+    els.hintText.textContent = `${coordName(hintMove.x, hintMove.y)} — 여기에 두시면 좋습니다`;
+    els.btnHintUndo.hidden = true;
+  } else if (hintTier === 2) {
+    els.hintTierBadge.textContent = '이유';
+    els.hintText.textContent = hintMove.reason;
+    els.btnHintUndo.hidden = true;
+  } else {
+    // 3단계: 무르기 제안 — 게임 진행 중 + 두 수 이상일 때만
+    els.hintTierBadge.textContent = '무르기';
+    const undoOk = !gameOver && !aiThinking && history.length >= 2 && mode !== 'online';
+    els.hintText.textContent = undoOk
+      ? '마지막 수를 되돌릴 수 있습니다.'
+      : (mode === 'online' ? '온라인 대국에서는 무르기를 쓸 수 없습니다'
+        : history.length < 2 ? '무르기는 두 수 이상일 때 가능합니다' : '게임이 끝나 무르기를 쓸 수 없습니다');
+    els.btnHintUndo.hidden = !undoOk;
+  }
+  els.hintNext.textContent = nextLabels[hintTier] || '';
+}
+
+function onHint() {
+  if (aiThinking || gameOver) return;
+  if (mode === 'online' && !onlineActive) return;
+  if (hintTier >= 3) { clearHintSession(); updateUI(); return; } // 3단계 다음 클릭 — 힌트 닫기
+  if (hintTier === 0) {
+    // 새 힌트 세션 — 잔여 횟수 확인 후 소비
+    if (hintsExhausted()) {
+      Suiji.toast(`이 난이도의 힌트를 모두 사용했습니다 (${hintLimitLabel()})`);
+      return;
+    }
+    const mv = boardAI.bestMove(board, current, 3); // AI 판단을 그대로 읽어 최선점 추천
+    if (!mv) return;
+    hintMove = { x: mv.x, y: mv.y, reason: classifyHint(mv, current) };
+    showHintMarker(mv.x, mv.y);
+    useHint();
+    Suiji.sound.stone(0.4);
+    setIntent(`추천점 ${coordName(mv.x, mv.y)} — ${hintMove.reason}`, 'Hint', history.length + 1);
+  }
+  hintTier++;
+  renderHintBox();
+  updateUI();
+}
+
+function updateHintButtonLabel() {
+  const left = hintsLeft();
+  const count = (typeof left === 'number') ? String(left) : '∞';
+  els.btnHint.innerHTML = `<i class="fa-solid fa-lightbulb"></i> Hint <span class="hint-count">${count}</span>`;
+  els.btnHint.title = hintTier > 0 ? '힌트 단계 이동 — 추천점 → 이유 → 무르기' : 'AI 추천 수를 보여줍니다';
 }
 
 function updateThreats() {
@@ -1116,7 +1302,10 @@ function updateUI() {
   setRoles();
   els.moveCounter.textContent = history.length;
   els.btnUndo.disabled = aiThinking || history.length === 0 || mode === 'online';
-  els.btnHint.disabled = aiThinking || gameOver || (mode === 'online' && !onlineActive);
+  // 힌트: 단계 순환 중에는 횟수 0이어도 버튼 유지 (닫기까지 진행할 수 있어야 함)
+  els.btnHint.disabled = aiThinking || gameOver || (mode === 'online' && !onlineActive)
+    || (hintTier === 0 && hintsExhausted());
+  updateHintButtonLabel();
   renderMoveList();
   updateThreats();
 }
