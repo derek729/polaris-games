@@ -159,6 +159,13 @@
       all[game] = s;
       localStorage.setItem('suiji.stats.v1', JSON.stringify(all));
       Suiji.badges.evaluate(); // 2-3 업적 판정 훅 — 3개 게임의 모든 판종료가 이곳을 지난다
+      // 포털 경제 정산 (Phase 1) — 도토리 판돈 · 경험치 · 오늘의 미션 진행
+      if (window.Polaris && Polaris.settle) {
+        const r = Polaris.settle(game, outcome);
+        if (r.delta > 0) Suiji.toast('판돈 정산 🌰+' + r.delta + '  ·  EXP +' + r.exp + (r.levelUp ? '  ⭐ Lv.' + r.level + ' 달성!' : ''));
+        else if (r.delta < 0) Suiji.toast('판돈 정산 🌰' + r.delta + '  ·  EXP +' + r.exp);
+        else Suiji.toast('무승부 정산  ·  EXP +' + r.exp);
+      }
     },
     text(game) {
       const s = this.get(game);

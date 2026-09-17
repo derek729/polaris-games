@@ -3,7 +3,7 @@
    Cache-first offline support for the whole game suite.
    Bump CACHE_VERSION whenever suite files change.
    ============================================================ */
-const CACHE_VERSION = 'polaris-v19';
+const CACHE_VERSION = 'polaris-v20';
 const PRECACHE = [
   // 통합 포털 + 아케이드 게임
   'index.html',
@@ -19,7 +19,7 @@ const PRECACHE = [
   'suiji-alkkagi.html',
   'suiji-kifu.html',
   'suiji-theme.css?v=15',
-  'suiji-common.js?v=15',
+  'suiji-common.js?v=16',
   'suiji-engine.js?v=15',
   'suiji-net.js?v=15',
   'suiji-3d.js?v=15',

@@ -87,6 +87,8 @@
     <span class="badge">v1.4.0 · GAME PORTAL</span>
   </header>
 
+  <div id="portal-meta" style="display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));margin-bottom:8px"></div>
+
   <h2>아케이드</h2>
   <div class="grid">
     <a class="card" href="vampire-survivors.html">
@@ -178,8 +180,10 @@
 </div>
 <script src="polaris-common.js"></script>
 <script>
-  // 포털 상단바: 닉네임 · 도토리 · 일일 보너스
+  // 포털 상단바: 닉네임 · 도토리 · 일일 보너스 + 프로필 카드 · 오늘의 미션
   Polaris.header.mount('.wrap');
+  Polaris.widgets.profileCard('#portal-meta');
+  Polaris.widgets.missionsPanel('#portal-meta');
 </script>
 </body>
 </html>
