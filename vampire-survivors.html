@@ -82,6 +82,28 @@
   .chesticon{font-size:72px;filter:drop-shadow(0 0 18px rgba(232,182,76,.6));margin:6px 0;}
   .buildlist{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:12px 0 2px;}
   .buildlist .slot{width:34px;height:34px;font-size:19px;}
+  /* ---------- 메타 진행 (BACKLOG #11) ---------- */
+  .metaChips{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-top:8px;}
+  .chip{display:inline-block;padding:3px 10px;font-size:12px;font-weight:800;color:#7fd0ff;
+        background:rgba(63,140,255,.12);border:1px solid rgba(127,208,255,.4);border-radius:999px;}
+  .chip.gold{color:var(--gold);background:rgba(232,182,76,.12);border-color:rgba(232,182,76,.45);}
+  .chip.off{color:var(--dim);background:rgba(0,0,0,.25);border-color:var(--line);font-weight:700;}
+  #wpick{margin-top:10px;}
+  .wptitle{font-size:13px;font-weight:900;color:var(--gold);margin-bottom:6px;}
+  .wptitle span{color:var(--dim);font-weight:700;font-size:11px;}
+  .wplist{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;}
+  .wchip{padding:4px 10px;font-size:12px;font-weight:800;background:var(--panel2);border:2px solid var(--line);
+         border-radius:999px;cursor:pointer;transition:.12s;}
+  .wchip:hover{border-color:#7fd0ff;}
+  .wchip.sel{border-color:var(--gold);color:var(--gold);box-shadow:0 0 8px rgba(232,182,76,.35);}
+  .achgrid{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:14px;}
+  .achcard{width:150px;background:var(--panel2);border:2px solid var(--line);border-radius:12px;padding:12px 8px;opacity:.55;}
+  .achcard .ai{font-size:30px;}
+  .achcard .an{font-weight:900;margin:2px 0;}
+  .achcard .ad{font-size:11px;color:var(--dim);min-height:28px;line-height:1.45;}
+  .achcard .ab{font-size:11px;color:#7fd0ff;font-weight:800;margin-top:3px;}
+  .achcard.got{opacity:1;border-color:var(--gold);box-shadow:0 0 10px rgba(232,182,76,.25);}
+  .achcard.got .ab{color:var(--gold);}
 </style>
 </head>
 <body>
@@ -113,11 +135,22 @@
       일시정지 <kbd>P</kbd> · 소리 <kbd>M</kbd>
     </p>
     <button class="btn" id="btnStart">⚔️ 게임 시작</button>
+    <button class="btn ghost" id="btnMeta">🏆 업적</button>
   </div>
 
   <div id="scr-char" class="screen hidden">
     <h2>캐릭터 선택</h2>
+    <div id="metaChips" class="metaChips"></div>
     <div class="chargrid" id="chargrid"></div>
+    <div id="wpick" class="hidden"></div>
+  </div>
+
+  <div id="scr-meta" class="screen hidden">
+    <h2>🏆 업적</h2>
+    <p class="hint" id="achCount"></p>
+    <p class="hint">업적은 영구 저장되며 <b style="color:var(--gold)">다음 런부터</b> 보너스로 적용된다 (스탯 보너스 최대 +20%)</p>
+    <div class="achgrid" id="achgrid"></div>
+    <button class="btn" id="btnMetaClose">돌아가기</button>
   </div>
 
   <div id="scr-levelup" class="screen hidden">
@@ -151,6 +184,7 @@
     <div class="statgrid" id="endStats"></div>
     <div class="hint" id="endSub"></div>
     <div class="hint" id="endGoal" style="color:var(--gold)"></div>
+    <div class="hint" id="endMeta" style="color:#7fd0ff"></div>
     <button class="btn" id="btnRetry">다시 도전</button>
     <button class="btn ghost" id="btnHome">타이틀로</button>
   </div>
@@ -162,6 +196,7 @@
    🧛 뱀파이어 키우기 (뱀서라이크 — Vampire Survivors 스타일)
    - 단일 HTML 파일, 외부 에셋 없음 (캔버스 드로잉 + WebAudio)
    - 자동 공격 · 경험치 젬 · 레벨업 3택 · 무기 진화(만렙+패시브+상자)
+   - 메타 진행(BACKLOG #11): 업적 9종 · 언락 보너스 · localStorage("vs_meta") 영구 저장
    ============================================================ */
 window.__errors = [];
 window.addEventListener("error", e => __errors.push(e.message));
@@ -410,6 +445,110 @@ const FLOCKS = [
 const ELITE_TIMES = [90, 200, 320, 440, 555];
 const GOAL = 600; // 10분 생존
 
+/* ---------------- 메타 진행 (BACKLOG #11 — 업적 9종 · 언락 보너스 · localStorage 영구 저장) ----------------
+   - 업적 판정은 현재 런 상태(G) 기준, 해금 즉시 META로 영구 저장된다
+   - 보너스는 "다음 런부터" 적용 — newGame()의 스탯 초기화 시 배수/가산으로 한 번만 반영 (기존 로직 불변)
+   - 스탯 보너스는 스탯당 상한(+20%, HP +40)을 초과할 수 없다 (파워 크리프 방지) */
+const META_KEY = "vs_meta";
+const META_CAP = { damage:0.20, hp:40, gold:0.20, evo:0.20 }; // 스탯별 보너스 상한
+const META_ACH = {
+  kill100:  { icon:"💀", name:"학살자",      desc:"한 런에 적 100마리 처치",    bonus:{ damage:0.05 }, bonusLabel:"피해 +5%" },
+  kill500:  { icon:"☠️", name:"대학살자",    desc:"한 런에 적 500마리 처치",    bonus:null },
+  kill1000: { icon:"🗡️", name:"천명 참수",   desc:"한 런에 적 1,000마리 처치",  bonus:null },
+  survive5: { icon:"⏳", name:"생존자",      desc:"한 런에서 5분 생존",         bonus:{ hp:10 }, bonusLabel:"최대 체력 +10" },
+  survive10:{ icon:"🌟", name:"불멸",        desc:"한 런에서 10분 생존",        bonus:null },
+  chest3:   { icon:"🎁", name:"보물 사냥꾼", desc:"한 런에 보물 상자 3개 획득", bonus:{ gold:0.10 }, bonusLabel:"상자 골드 +10%" },
+  evolve:   { icon:"✨", name:"진화론자",    desc:"무기를 1회 진화",            bonus:{ evo:0.05 }, bonusLabel:"진화 확률 +5%" },
+  level10:  { icon:"📈", name:"베테랑",      desc:"한 런에서 레벨 10 달성",     bonus:null },
+  conquer:  { icon:"👑", name:"정복자",      desc:"10분을 버티고 게임 클리어",  bonus:{ weapon:1 }, bonusLabel:"시작 무기 선택" },
+};
+// 업적 목록 기준으로 보너스 재계산 + 상한 클램프 (저장값 변조·손상 자가 수복)
+function metaRecalc(m){
+  const M = m || META;
+  const b = { damage:0, hp:0, gold:0, evo:0 };
+  for (const id of M.achievements){
+    const bn = META_ACH[id] && META_ACH[id].bonus;
+    if (!bn) continue;
+    for (const k in bn) if (k in b) b[k] += bn[k];
+  }
+  for (const k in b) b[k] = clamp(b[k], 0, META_CAP[k]);
+  M.bonuses = b;
+  return M;
+}
+// localStorage("vs_meta") 로드 — 손상/변조 시 기본값으로 자가 수복
+function metaLoad(){
+  const def = { achievements:[], bonuses:{ damage:0, hp:0, gold:0, evo:0 } };
+  try {
+    const raw = localStorage.getItem(META_KEY);
+    if (!raw) return def;
+    const d = JSON.parse(raw);
+    return metaRecalc({
+      achievements:[...new Set((Array.isArray(d.achievements) ? d.achievements : []).filter(id => META_ACH[id]))],
+      bonuses:Object.assign({}, def.bonuses, d.bonuses),
+    });
+  } catch (e) { return def; }
+}
+function metaSave(){
+  try { localStorage.setItem(META_KEY, JSON.stringify({ achievements:META.achievements, bonuses:META.bonuses })); } catch (e) {}
+}
+// 활성 보너스 조회 (상한 클램프 보장) — newGame()에서 스탯 초기화에 사용
+function metaBonus(){
+  const b = META.bonuses;
+  return { damage:clamp(b.damage || 0, 0, META_CAP.damage), hp:clamp(b.hp || 0, 0, META_CAP.hp),
+           gold:clamp(b.gold || 0, 0, META_CAP.gold), evo:clamp(b.evo || 0, 0, META_CAP.evo) };
+}
+// 업적 판정 — 현재 런(G) 기준, 멱등. 임계값 통과 시 해금 → 저장 → 배너 통지
+function metaCheck(){
+  if (!G) return;
+  const fresh = [];
+  const add = id => { if (!META.achievements.includes(id)){ META.achievements.push(id); fresh.push(id); } };
+  if (G.kills >= 100) add("kill100");
+  if (G.kills >= 500) add("kill500");
+  if (G.kills >= 1000) add("kill1000");
+  if (G.t >= 300) add("survive5");
+  if (G.t >= GOAL){ add("survive10"); add("conquer"); }
+  if ((G.chests || 0) >= 3) add("chest3");
+  if (G.weapons.some(w => w.evolved)) add("evolve");
+  if (G.level >= 10) add("level10");
+  if (!fresh.length) return;
+  metaRecalc(); metaSave();
+  for (const id of fresh) if (!META_NEW.includes(id)) META_NEW.push(id);
+  const last = META_ACH[fresh[fresh.length - 1]];
+  banner("🏆 업적 달성 「" + last.name + "」",
+         last.bonusLabel ? "다음 런부터 " + last.bonusLabel + " 적용!" : "업적 목록에서 확인하세요");
+}
+// 캐릭터 선택 화면 상단 보너스 칩
+function metaChipHtml(){
+  const b = metaBonus(), out = [];
+  if (b.damage > 0) out.push(`<span class="chip">⚔️ 피해 +${Math.round(b.damage * 100)}%</span>`);
+  if (b.hp > 0) out.push(`<span class="chip">❤️ 최대 체력 +${b.hp}</span>`);
+  if (b.gold > 0) out.push(`<span class="chip">💰 상자 골드 +${Math.round(b.gold * 100)}%</span>`);
+  if (b.evo > 0) out.push(`<span class="chip">✨ 진화 확률 +${Math.round(b.evo * 100)}%</span>`);
+  if (META.achievements.includes("conquer")) out.push(`<span class="chip gold">👑 시작 무기 선택</span>`);
+  return out.join("");
+}
+// 업적 목록 패널 (타이틀 → 업적 버튼)
+function buildMeta(){
+  const grid = $("achgrid");
+  grid.innerHTML = "";
+  let got = 0;
+  for (const id of Object.keys(META_ACH)){
+    const A = META_ACH[id], has = META.achievements.includes(id);
+    if (has) got++;
+    const el = document.createElement("div");
+    el.className = "achcard" + (has ? " got" : "");
+    el.innerHTML = `<div class="ai">${has ? A.icon : "🔒"}</div>
+                    <div class="an">${has ? A.name : "???"}</div>
+                    <div class="ad">${A.desc}</div>
+                    <div class="ab">${A.bonusLabel ? "보너스: " + A.bonusLabel : "배지 전용"}</div>`;
+    grid.appendChild(el);
+  }
+  $("achCount").textContent = `달성 ${got} / ${Object.keys(META_ACH).length}`;
+}
+let META = metaLoad();      // 영구 메타 상태 { achievements:[], bonuses:{ damage,hp,gold,evo } }
+let META_NEW = [];          // 이번 런에서 새로 해금한 업적 (엔드 화면 표시용)
+let metaStartWeapon = null; // 정복자 언락: 시작 무기 선택 (세션 한정, null = 캐릭터 기본)
+
 /* ---------------- 입력 ---------------- */
 const keys = {};
 let joyId = null, joyOrigin = null, joyVec = { x:0, y:0 };
@@ -427,6 +566,7 @@ window.addEventListener("keydown", e => {
   if (scene === "chest" && (e.code === "Space" || e.code === "Enter")) chestAdvance();
   if (scene === "chestspin") skipChestSpin(); // 슬롯 연출 스킵 (아무 키)
   if (scene === "title" && (e.code === "Enter" || e.code === "Space")) setScene("char");
+  if (scene === "meta" && e.code === "Escape") setScene("title"); // BACKLOG #11: 업적 화면 닫기
 });
 window.addEventListener("keyup", e => { keys[e.code] = false; });
 canvas.addEventListener("pointerdown", e => {
@@ -466,18 +606,25 @@ function xpNeed(lv){ return Math.floor(5 + lv * 5 + Math.pow(lv, 1.6) * 2); }
 
 function newGame(charId){
   const c = CHARS[charId];
+  const mb = metaBonus(); // BACKLOG #11: 메타 보너스 (업적 언락분, 상한 클램프 적용)
   G = {
     charId, t:0, kills:0, gold:0, level:1, xp:0, xpNext:xpNeed(1), luQueue:0,
     hitstop:0, rerollLeft:2, dmgDealt:0,
     p:{ x:0, y:0, hp:c.hp, baseHp:c.hp, maxHp:c.hp, baseSpd:c.spd, spd:c.spd, baseRegen:c.regen,
         regen:c.regen, cdm:1, baseArea:c.area || 1, area:c.area || 1, pickR:50, face:1, moving:false, anim:0, hurtT:0, iv:0 },
-    passives:{}, weapons:[{ id:c.weapon, lv:1, t:0.4, evolved:false, books:null, bT:0, bA:0 }],
+    passives:{}, weapons:[{ id:(metaStartWeapon || c.weapon), lv:1, t:0.4, evolved:false, books:null, bT:0, bA:0 }], // 정복자 언락: 시작 무기 선택 (미선택 시 캐릭터 기본)
     enemies:[], bullets:[], pools:[], gems:[], pickups:[], texts:[], parts:[], effects:[],
     cam:{ x:0, y:0 }, shake:0, animT:0,
     spawnT:1.2, flockIdx:0, eliteIdx:0, bossIdx:0, boss:null,
     rushFlag:false, slotsDirty:true, chestData:null, chestPhase:"closed", chestApplied:false,
   };
   spinFx = null; // 슬롯 연출 오버레이 상태 초기화 (안전망)
+  // BACKLOG #11: 메타 보너스 적용 — 스탯 초기화 시 1회 반영 (런 중 변동 없음)
+  G.p.baseHp += mb.hp; G.p.hp += mb.hp;  // 생존자: 최대 체력 +10
+  G.p.dmgMult  = 1 + mb.damage;          // 학살자: 피해 +5% (wstats 배수)
+  G.p.goldMult = 1 + mb.gold;            // 보물 사냥꾼: 상자 골드 +10% (openChest)
+  G.p.evoBonus = mb.evo;                 // 진화론자: 진화 확률 +5% (openChest)
+  META_NEW = [];                         // 이번 런 신규 업적 목록 초기화
   recalcStats();
   G.p.hp = G.p.maxHp;
 }
@@ -792,10 +939,11 @@ function wstats(w){
   const P = G.p, D = WEAPONS[w.id], L = Math.min(w.lv, 8);
   if (w.evolved){
     const E = EVO[w.id];
-    return { dmg:E.dmg, cd:(E.cd || 1) * P.cdm, count:E.count || 1, area:P.area, rad:(E.rad || 60) * P.area, spd:360 };
+    return { dmg:E.dmg * (P.dmgMult || 1), cd:(E.cd || 1) * P.cdm, count:E.count || 1, area:P.area, rad:(E.rad || 60) * P.area, spd:360 }; // dmg에 메타 피해 배수 (BACKLOG #11)
   }
   return {
-    dmg:D.dmg[L-1], cd:D.cd * P.cdm,
+    dmg:D.dmg[L-1] * (P.dmgMult || 1), // 메타 피해 배수 (BACKLOG #11)
+    cd:D.cd * P.cdm,
     count:D.count ? D.count[L-1] : 1,
     area:P.area * (D.ar ? D.ar[L-1] : 1),
     rad:(D.rad ? D.rad[L-1] : 0) * P.area,
@@ -1084,6 +1232,7 @@ function update(dt){
   }
   G.t += dt;
   G.animT += dt;
+  metaCheck(); // BACKLOG #11: 업적 판정 (처치·생존·레벨·상자·진화 — 매 프레임 멱등 체크)
   if (G.t >= GOAL){ setScene("win"); SFX.win(); return; }
   director(dt);
   updatePlayer(dt);
@@ -1213,11 +1362,22 @@ function chooseCard(i){
   else setScene("play");
 }
 function openChest(){
+  G.chests = (G.chests || 0) + 1; // BACKLOG #11: 보물 상자 획득 수 (업적 판정)
   const ready = G.weapons.filter(w => !w.evolved && w.lv >= 8 && (G.passives[EVO[w.id].passive] || 0) > 0);
-  G.chestData = ready.length ? { evoId:ready[0].id } : { gold:100, heal:40 };
+  let data;
+  if (ready.length) data = { evoId:ready[0].id };
+  else {
+    // BACKLOG #11 메타 보너스: ① 진화 확률 +5% — 만렙은 됐지만 재료 패시브가 없는 무기를 확률로 강제 진화
+    //                          ② 상자 골드 +10% (goldMult) — 진화 실패 시 대체 재화에만 적용
+    const near = G.weapons.find(w => !w.evolved && w.lv >= 8);
+    if (near && Math.random() < (G.p.evoBonus || 0)) data = { evoId:near.id };
+    else data = { gold:Math.round(100 * (G.p.goldMult || 1)), heal:40 };
+  }
+  G.chestData = data;
   G.chestPhase = "closed"; G.chestApplied = false;
   SFX.chest(); playSfx("powerup", { playbackRate: 0.7 });
   startChestSpin(); // BACKLOG #5: 슬롯머신 연출 후 기존 결과 화면으로 전환
+  metaCheck(); // 상자 3개 업적 판정
 }
 function chestAdvance(){
   if (scene !== "chest") return;
@@ -1235,6 +1395,7 @@ function chestAdvance(){
         G.p.hp = Math.min(G.p.maxHp, G.p.hp + G.chestData.heal);
       }
     }
+    metaCheck(); // BACKLOG #11: 진화/상자 업적 판정
     buildChest();
   } else {
     if (G.luQueue > 0) setScene("levelup");
@@ -1316,6 +1477,7 @@ function finishChestSpin(){
       G.p.hp = Math.min(G.p.maxHp, G.p.hp + G.chestData.heal);
     }
   }
+  metaCheck(); // BACKLOG #11: 진화/상자 업적 판정
   G.chestPhase = "open";
   setScene("chest"); // 기존 결과(무기 진화/재화) 화면으로 전환
 }
@@ -1443,6 +1605,7 @@ function setScene(s){
   for (const el of document.querySelectorAll(".screen")) el.classList.add("hidden");
   if (s === "play") { /* 화면 없음 */ }
   else if (s === "char"){ buildChar(); $("scr-char").classList.remove("hidden"); }
+  else if (s === "meta"){ buildMeta(); $("scr-meta").classList.remove("hidden"); } // BACKLOG #11: 업적 목록
   else if (s === "levelup"){ G.hitstop = 0; buildLevelUp(); $("scr-levelup").classList.remove("hidden"); }
   else if (s === "chest"){ G.hitstop = 0; buildChest(); $("scr-chest").classList.remove("hidden"); }
   else if (s === "pause"){ buildPause(); $("scr-pause").classList.remove("hidden"); }
@@ -1452,6 +1615,19 @@ function setScene(s){
 function buildChar(){
   const grid = $("chargrid");
   grid.innerHTML = "";
+  // BACKLOG #11: 메타 보너스 칩 + 정복자 시작 무기 선택
+  $("metaChips").innerHTML = metaChipHtml() || `<span class="chip off">언락된 보너스 없음 — 업적 달성 시 해금</span>`;
+  const wp = $("wpick");
+  if (META.achievements.includes("conquer")){
+    wp.classList.remove("hidden");
+    let h = `<div class="wptitle">🏁 시작 무기 선택 <span>(정복자 언락 · 미선택 시 캐릭터 기본)</span></div><div class="wplist">`;
+    h += `<span class="wchip${metaStartWeapon ? "" : " sel"}" data-w="">기본</span>`;
+    for (const id of Object.keys(WEAPONS))
+      h += `<span class="wchip${metaStartWeapon === id ? " sel" : ""}" data-w="${id}">${WEAPONS[id].icon} ${WEAPONS[id].name}</span>`;
+    wp.innerHTML = h + `</div>`;
+    for (const b of wp.querySelectorAll(".wchip"))
+      b.addEventListener("click", () => { metaStartWeapon = b.dataset.w || null; SFX.pick(); buildChar(); });
+  } else { wp.classList.add("hidden"); wp.innerHTML = ""; }
   for (const id of Object.keys(CHARS)){
     const c = CHARS[id], w = WEAPONS[c.weapon];
     const el = document.createElement("div");
@@ -1520,6 +1696,9 @@ function buildEnd(s){
     goal = "🎉 완벽한 새벽! 다른 캐릭터의 진화 빌드에 도전해 보세요";
   }
   $("endGoal").textContent = goal;
+  // BACKLOG #11: 이번 런 신규 업적 안내
+  $("endMeta").innerHTML = META_NEW.length
+    ? "🏆 신규 업적 — " + META_NEW.map(id => META_ACH[id].icon + " " + META_ACH[id].name).join(" · ") : "";
 }
 function banner(main, sub, dur){
   const b = $("banner");
@@ -2181,6 +2360,8 @@ function frame(now){
 
 /* ---------------- 버튼 ---------------- */
 $("btnStart").addEventListener("click", () => setScene("char"));
+$("btnMeta").addEventListener("click", () => setScene("meta"));       // BACKLOG #11: 업적 목록
+$("btnMetaClose").addEventListener("click", () => setScene("title")); // BACKLOG #11: 업적 화면 닫기
 $("btnPause").addEventListener("click", () => { if (scene === "play") setScene("pause"); });
 $("btnMute").addEventListener("click", toggleMute);
 $("btnResume").addEventListener("click", () => setScene("play"));
