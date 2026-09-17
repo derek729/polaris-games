@@ -793,7 +793,7 @@ function applyNetSnapshotOmok(s) {
   view.lastMove = last ? { x: last.x, y: last.y, color: last.color } : null;
   current = history.length % 2 === 0 ? 1 : 2;
   updateUI();
-  showToast('대국이 복원되었습니다');
+  Suiji.toast('대국이 복원되었습니다');
 }
 
 function buildNetSnapshotOmok() {
@@ -862,7 +862,7 @@ function onNetTimeoutOmok(loserColor) {
 function onNetPeerLeft(disconnected, rejoinable) {
   if (rejoinable) {
     setIntent('상대의 연결이 끊겼습니다. 5분 내 재접속하면 대국이 이어집니다.', 'Waiting', history.length);
-    showToast('상대 재접속 대기 중 (5분)');
+    Suiji.toast('상대 재접속 대기 중 (5분)');
     return;
   }
   onlineActive = false;

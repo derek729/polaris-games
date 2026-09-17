@@ -518,6 +518,7 @@ function stepPhysics(list, dt, events) {
       s.fadeAt = performance.now();
       if (events) {
         events.outs.push(s.color);
+        events.outStones.push({ id: s.id, color: s.color });
         events.fellOff = true;
       }
     }
@@ -942,7 +943,7 @@ function applyNetSnapshotAlk(s) {
   phase = 'ready';
   els.gameOverCard.classList.remove('show');
   updateUI();
-  showToast('대결이 복원되었습니다');
+  Suiji.toast('대결이 복원되었습니다');
 }
 
 function onNetRemoteAlk(data) {
@@ -1023,7 +1024,7 @@ function onNetPeerLeftAlk(disconnected, rejoinable) {
   if (rejoinable) {
     els.hintNote.textContent = '상대 재접속 대기 중 (5분)…';
     setIntent('상대의 연결이 끊겼습니다. 5분 내 재접속하면 대결이 이어집니다.', 'Waiting', shotNo);
-    showToast('상대 재접속 대기 중 (5분)');
+    Suiji.toast('상대 재접속 대기 중 (5분)');
     updateUI();
     return;
   }
