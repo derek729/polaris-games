@@ -20,6 +20,7 @@
 /* ============================================================
    🌻 식물 vs 좀비 (Plants vs. Zombies 스타일 웹 클론)
    - 단일 HTML 파일, 외부 에셋 없음 (전부 캔버스 드로잉)
+   - 엔드리스 모드: 10웨이브 승리 후 무한 웨이브 도전 (2.4)
    ============================================================ */
 window.__errors = [];
 window.addEventListener("error", e => __errors.push(e.message));
@@ -88,6 +89,87 @@ const WAVES = [
 ];
 const FINAL_T = WAVES[WAVES.length - 1].t;
 
+/* ---------------- 엔드리스 모드 (2.4) ---------------- */
+// 10웨이브 승리 후 선택 시 무한히 이어지는 모드 — 웨이브마다 난이도가 증가한다.
+const ENDLESS = {
+  BASE_WAVE: 10,       // 기준 웨이브 (원본 마지막 웨이브)
+  BASE_COUNT: WAVES[WAVES.length - 1].z.length,  // 기준 좀비 수 (원본 최종 웨이브 = 12)
+  COUNT_GROWTH: 1.15,  // 웨이브당 좀비 수 증가율 (1.15^(n-10))
+  HP_GROWTH: 1.1,      // 웨이브당 좀비 체력 배율 (1.1^(n-10))
+  HUGE_EVERY: 5,       // 5웨이브마다 대규모 웨이브 (깃발 선두 · 좀비 2배)
+  BOSS_EVERY: 10,      // 10웨이브마다 보스 웨이브 (버킷+콘 중심 · 전 타입 포함)
+  FIRST_DELAY: 14,     // 엔드리스 진입 후 첫 웨이브까지 휴식(초)
+  CLEAR_PULL: 6,       // 웨이브 조기 클리어 시 다음 웨이브까지 대기(초)
+  MAX_COUNT: 400,      // 웨이브당 좀비 수 상한 — 초과 성장분은 체력 배율로 대체(프레임 방어)
+};
+// 엔드리스 웨이브 간 휴식(초): 웨이브가 오를수록 짧아진다 (26초 → 최소 10초)
+function endlessInterval(n) {
+  return Math.max(10, 26 - (n - ENDLESS.BASE_WAVE) * 0.8);
+}
+// 웨이브 내 좀비 스폰 간격(초): 원본 0.9초에서 점점 촘촘하게 (최소 0.22초)
+function endlessSpawnGap(n) {
+  return Math.max(0.22, 0.9 - (n - ENDLESS.BASE_WAVE) * 0.04);
+}
+// 웨이브 n의 이론상 좀비 수(대규모 2배 제외): 12 × 1.15^(n-10) — 항상 단조 증가
+function endlessRawCount(n) {
+  return Math.round(ENDLESS.BASE_COUNT * Math.pow(ENDLESS.COUNT_GROWTH, n - ENDLESS.BASE_WAVE));
+}
+// 웨이브 n의 좀비 체력 배율: 1.1^(n-10) — 원본 웨이브(≤10)는 1배
+// 좀비 수가 상한에 도달한 뒤에는 초과분을 (1 + overflow/100) 배율로 전환해 난이도 상승을 이어간다
+function endlessHpMul(n) {
+  if (n <= ENDLESS.BASE_WAVE) return 1;
+  const overflow = Math.max(0, endlessRawCount(n) - ENDLESS.MAX_COUNT);
+  return Math.pow(ENDLESS.HP_GROWTH, n - ENDLESS.BASE_WAVE) * (1 + overflow / 100);
+}
+// 웨이브 n의 좀비 구성 배열: 수 = endlessRawCount(n), 상한 400 (깃발 선두)
+function endlessComposition(n) {
+  const huge = n % ENDLESS.HUGE_EVERY === 0;   // 대규모 웨이브
+  const boss = n % ENDLESS.BOSS_EVERY === 0;   // 보스 웨이브
+  const d = n - ENDLESS.BASE_WAVE;
+  let count = endlessRawCount(n);
+  if (huge) count *= 2;                        // 대규모: 좀비 수 2배 (상한 내에서만 유효)
+  count = Math.min(count, ENDLESS.MAX_COUNT);
+  // 타입 가중치 — 진행할수록 튼튼한 좀비 비중 상승, 보스는 버킷+콘 중심
+  const weights = boss
+    ? { bucket: 4, cone: 4, thrower: 1, runner: 1, normal: 0.6 }
+    : { bucket: 0.5 + d * 0.18, cone: 1.2 + d * 0.10, thrower: 0.6 + d * 0.10,
+        runner: 0.8, normal: Math.max(0.4, 1.6 - d * 0.10) };
+  const types = Object.keys(weights);
+  const list = (huge || boss) ? ["flag"] : [];       // 대규모/보스: 깃발 좀비 선두
+  if (boss) list.push("bucket", "cone", "thrower", "runner", "normal");  // 보스: 전 타입 구성 보장
+  for (let rem = count - list.length; rem > 0; rem--) {
+    const total = types.reduce((s, t) => s + weights[t], 0);
+    let r = Math.random() * total, pick = types[types.length - 1];
+    for (const t of types) { r -= weights[t]; if (r <= 0) { pick = t; break; } }
+    list.push(pick);
+  }
+  return list;
+}
+// 엔드리스 최고 기록 조회 ("pvz.endlessBest" = { wave, kills, date })
+let endlessBestCache;  // 조회 캐시 (매 프레임 JSON 파싱 방지)
+function loadEndlessBest() {
+  if (endlessBestCache === undefined) {
+    try {
+      const b = JSON.parse(localStorage.getItem("pvz.endlessBest"));
+      endlessBestCache = (b && typeof b.wave === "number") ? b : null;
+    } catch (e) { endlessBestCache = null; }
+  }
+  return endlessBestCache;
+}
+// 엔드리스 최고 기록 저장 — 웨이브 우선, 동일 웨이브면 처치 수 비교. 신기록이면 true
+function saveEndlessBest() {
+  const cur = { wave: game.highestWave, kills: game.kills, date: new Date().toISOString().slice(0, 10) };
+  try {
+    const best = loadEndlessBest();
+    const better = !best || cur.wave > best.wave ||
+                   (cur.wave === best.wave && cur.kills > (best.kills || 0));
+    if (!better) return false;
+    localStorage.setItem("pvz.endlessBest", JSON.stringify(cur));
+    endlessBestCache = cur;
+    return true;
+  } catch (e) { return false; }  // 저장 불가 환경 무시
+}
+
 /* ---------------- 사운드 (WebAudio) ---------------- */
 let AC = null, muted = false;
 function ac() {
@@ -153,6 +235,7 @@ let shake = 0, lastEatSfx = 0, burstFlash = 0;  // burstFlash: 태양 광폭 화
 const BTN = {
   start: { x: 390, y: 430, w: 220, h: 54 },
   again: { x: 390, y: 430, w: 220, h: 54 },
+  endless: { x: 390, y: 494, w: 220, h: 44 },  // 엔드리스 계속 버튼 — 승리 화면 아래 (2.4)
   pause: { x: 940, y: 15, w: 46, h: 46 },
   mute:  { x: 940, y: 70, w: 46, h: 46 },
   shovel:{ x: 600, y: 15, w: 70, h: 100 },
@@ -169,6 +252,16 @@ function newGame() {
     waveIdx: 0, sunTimer: 4, mx: -100, my: -100,
     finalWarned: false,           // 최종 웨이브 15초 전 경고 1회 플래그 (2.1)
     burst: 0, burstReady: false,  // 태양 광폭: 태양 수집 카운트(12회 = 1충전) / 완충 여부 (2.3)
+    // 엔드리스 모드 상태 (2.4)
+    endless: false,        // 엔드리스 모드 활성 여부 (승리 화면에서 옵트인)
+    kills: 0,              // 누적 좀비 처치 수
+    wavesSurvived: 0,      // 완전 클리어한 웨이브 수
+    highestWave: 0,        // 도달한 최고 웨이브
+    endlessWave: 0,        // 다음 엔드리스 웨이브 번호
+    endlessNextAt: 0,      // 다음 엔드리스 웨이브 스폰 시각(게임 시간)
+    endlessWait: 1,        // 다음 웨이브까지 총 대기시간 (진행바 게이지용)
+    endlessActive: false,  // 현재 엔드리스 웨이브 진행 중 (클리어 판정용)
+    newRecord: false,      // 패배 시 신기록 저장 여부
   };
 }
 game = newGame();
@@ -310,12 +403,13 @@ class Pea {
   }
 }
 class Zombie {
-  constructor(type, row, delay) {
+  constructor(type, row, delay, wave) {
     const d = ZTYPES[type];
+    const hpMul = endlessHpMul(wave || 0);  // 엔드리스: 웨이브별 체력 배율 (2.4)
     this.type = type; this.row = row;
     this.x = W + 20 + rand(0, 30);
     this.y = GRID.y + row * GRID.ch + GRID.ch / 2 + 18;
-    this.hp = d.hp; this.maxhp = d.hp; this.spd = d.spd;
+    this.hp = d.hp * hpMul; this.maxhp = d.hp * hpMul; this.spd = d.spd;
     this.delayT = delay; this.slowT = 0; this.flashT = 0;
     this.thrT = rand(0.8, 1.6);  // 투척형 첫 투척 대기시간 (2.2)
     this.wob = rand(0, 6); this.eating = false; this.chomp = 0;
@@ -407,9 +501,9 @@ class Sun {
 }
 
 /* ---------------- 스폰 / 진행 ---------------- */
-function spawnZombie(type) {
+function spawnZombie(type, wave) {
   const row = (Math.random() * GRID.rows) | 0;
-  game.zombies.push(new Zombie(type, row, 0));
+  game.zombies.push(new Zombie(type, row, 0, wave));  // wave: 엔드리스 체력 배율용 웨이브 번호 (2.4)
 }
 function spawnSun(x, y, fromSky, targetY) {
   game.suns.push(new Sun(x, y, fromSky, targetY));
@@ -417,11 +511,13 @@ function spawnSun(x, y, fromSky, targetY) {
 function killZombie(z) {
   if (z.dead) return;
   z.dead = true; z.eating = false;
+  game.kills++;  // 엔드리스 점수: 누적 처치 수 (2.4)
   puff(z.x, z.y - 30, 10, ["#a8c08a", "#66788a", "#dcedc8"], 130, 0.7);
 }
 function loseGame() {
   if (game.state !== "playing") return;
   game.state = "lost"; SFX.lose();
+  if (game.endless) game.newRecord = saveEndlessBest();  // 엔드리스 최고 기록 저장 (2.4)
 }
 function winGame() {
   if (game.state !== "playing") return;
@@ -433,6 +529,51 @@ function startGame() {
   for (let r = 0; r < GRID.rows; r++) game.mowers.push({ row: r, x: 42, active: false, used: false, wheel: 0 });
   game.state = "playing";
   banner("식물을 심으세요! 태양을 클릭해 모으세요 ☀", "#fff59d", 22, 3, 165);
+}
+
+/* ---------------- 엔드리스 모드 진행 (2.4) ---------------- */
+// 엔드리스 진입: 10웨이브 승리 화면에서 "엔드리스 계속" 선택 시
+function startEndless() {
+  if (game.state !== "won") return;
+  game.endless = true;
+  game.state = "playing";
+  game.endlessWave = game.waveIdx + 1;   // 11웨이브부터
+  game.highestWave = game.waveIdx;
+  game.wavesSurvived = game.waveIdx;     // 1~10웨이브는 이미 생존
+  game.endlessNextAt = game.time + ENDLESS.FIRST_DELAY;
+  game.endlessWait = ENDLESS.FIRST_DELAY;
+  banner("♾️ 엔드리스 모드! 웨이브가 끝없이 이어진다", "#ce93d8", 34, 3, 290);
+  playSfx("powerup", { volume: 0.4 });
+}
+// 엔드리스 웨이브 스폰: 구성 생성 → 스폰 예약 → 배너/사운드
+function spawnEndlessWave() {
+  const n = game.endlessWave;
+  const comp = endlessComposition(n);
+  const gap = endlessSpawnGap(n);
+  const jitter = Math.max(0.3, 1.3 - (n - ENDLESS.BASE_WAVE) * 0.08);  // 웨이브가 오를수록 동시 상륙에 가까워짐
+  comp.forEach((type, i) => game.pending.push({ at: game.time + i * gap + rand(0, jitter), type, wave: n }));
+  game.waveIdx = n;                              // HUD "웨이브 N" — 상한 없음
+  game.highestWave = Math.max(game.highestWave, n);
+  game.endlessWave = n + 1;
+  game.endlessNextAt = game.time + endlessInterval(n);
+  game.endlessWait = endlessInterval(n);
+  game.endlessActive = true;
+  const boss = n % ENDLESS.BOSS_EVERY === 0, huge = n % ENDLESS.HUGE_EVERY === 0;
+  if (boss) { banner(`🚩 보스 웨이브 ${n}! 🚩`, "#ff5252", 44, 3, 290); SFX.warn(); playSfx("warn", { volume: 0.4 }); }
+  else if (huge) { banner(`🚩 대규모 웨이브 ${n}! 🚩`, "#ff8a80", 38, 2.5, 290); SFX.warn(); playSfx("warn", { volume: 0.35 }); }
+  else banner(`웨이브 ${n}`, "#ffffff", 30, 1.6, 270);
+  SFX.wave();
+}
+// 엔드리스 웨이브 진행: 클리어 판정 + 다음 웨이브 예약 스폰
+function runEndlessWaves() {
+  // 현재 웨이브 완전 클리어 → 생존 웨이브 수 갱신 + 다음 웨이브 조기 호출
+  if (game.endlessActive && game.pending.length === 0 && game.zombies.length === 0) {
+    game.endlessActive = false;
+    game.wavesSurvived++;
+    toast(`웨이브 ${game.wavesSurvived} 클리어!`);
+    game.endlessNextAt = Math.min(game.endlessNextAt, game.time + ENDLESS.CLEAR_PULL);
+  }
+  if (game.time >= game.endlessNextAt) spawnEndlessWave();
 }
 
 /* ---------------- 클러치 스킬: 태양 광폭 (2.3) ---------------- */
@@ -474,21 +615,25 @@ function update(dt) {
   }
 
   // 웨이브 진행
-  while (game.waveIdx < WAVES.length && game.time >= WAVES[game.waveIdx].t) {
-    const w = WAVES[game.waveIdx]; game.waveIdx++;
-    w.z.forEach((type, i) => game.pending.push({ at: game.time + i * 0.9 + rand(0, 1.3), type }));
-    if (w.final) banner("🚩 최종 웨이브! 🚩", "#ff5252", 44, 3, 290);
-    else if (game.waveIdx > 1) banner(`웨이브 ${game.waveIdx}`, "#ffffff", 30, 1.6, 270);
-    SFX.wave();
-  }
-  // 최종 웨이브 15초 전 사전 경고 (정확히 1회) — 2.1B
-  if (!game.finalWarned && game.time >= FINAL_T - 15) {
-    game.finalWarned = true;
-    banner("🚩 대량 좀비 다가온다! 방어 준비", "#ff5252", 30, 2.5, 290);
-    SFX.warn(); playSfx("warn", { volume: 0.4 });
+  if (game.endless) {
+    runEndlessWaves();  // 엔드리스: 11웨이브부터 무한 생성 (2.4)
+  } else {
+    while (game.waveIdx < WAVES.length && game.time >= WAVES[game.waveIdx].t) {
+      const w = WAVES[game.waveIdx]; game.waveIdx++;
+      w.z.forEach((type, i) => game.pending.push({ at: game.time + i * 0.9 + rand(0, 1.3), type }));
+      if (w.final) banner("🚩 최종 웨이브! 🚩", "#ff5252", 44, 3, 290);
+      else if (game.waveIdx > 1) banner(`웨이브 ${game.waveIdx}`, "#ffffff", 30, 1.6, 270);
+      SFX.wave();
+    }
+    // 최종 웨이브 15초 전 사전 경고 (정확히 1회) — 2.1B
+    if (!game.finalWarned && game.time >= FINAL_T - 15) {
+      game.finalWarned = true;
+      banner("🚩 대량 좀비 다가온다! 방어 준비", "#ff5252", 30, 2.5, 290);
+      SFX.warn(); playSfx("warn", { volume: 0.4 });
+    }
   }
   for (const p of game.pending) {
-    if (game.time >= p.at) { spawnZombie(p.type); p.done = true; }
+    if (game.time >= p.at) { spawnZombie(p.type, p.wave); p.done = true; }  // p.wave: 엔드리스 웨이브 번호 (2.4)
   }
   game.pending = game.pending.filter(p => !p.done);
 
@@ -515,8 +660,8 @@ function update(dt) {
   game.peas = game.peas.filter(p => !p.dead);
   game.suns = game.suns.filter(s => !s.dead);
 
-  // 승리 체크
-  if (game.waveIdx >= WAVES.length && game.pending.length === 0 && game.zombies.every(z => z.dead)) {
+  // 승리 체크 (엔드리스 모드에서는 판정하지 않음 — 무한 진행, 2.4)
+  if (!game.endless && game.waveIdx >= WAVES.length && game.pending.length === 0 && game.zombies.every(z => z.dead)) {
     if (game.zombies.length === 0) winGame();
   }
 }
@@ -1016,7 +1161,9 @@ function drawHUD() {
   text(muted ? "🔇" : "🔊", BTN.mute.x + 23, BTN.mute.y + 24, 20, "#fff");
 
   // 웨이브 진행 바
-  const prog = clamp(game.time / FINAL_T, 0, 1);
+  const prog = game.endless
+    ? clamp(1 - (game.endlessNextAt - game.time) / Math.max(0.001, game.endlessWait), 0, 1)  // 다음 웨이브 대기 게이지 (2.4)
+    : clamp(game.time / FINAL_T, 0, 1);
   const bx = 690, by = 25, bw = 236, bh = 16;
   rrect(bx, by, bw, bh, 8, "rgba(0,0,0,0.45)", "#c9a86a", 2);
   const pg = ctx.createLinearGradient(bx, 0, bx + bw, 0);
@@ -1028,13 +1175,22 @@ function drawHUD() {
   ctx.globalAlpha = 1;
 
   // 다음 웨이브 미리보기 행 (진행바 아래 y 48~66, 마지막 웨이브 이후 비표시) — 2.1A
-  const isBig = game.waveIdx < WAVES.length && WAVES[game.waveIdx].z.length >= 6;
-  const counterStr = isBig
-    ? `${Math.min(game.waveIdx, WAVES.length)} / ${WAVES.length}`   // 대량 웨이브: "대규모!" 라벨과 공존 위해 축약
-    : `웨이브 ${Math.min(game.waveIdx, WAVES.length)} / ${WAVES.length}`;
+  const isBig = !game.endless && game.waveIdx < WAVES.length && WAVES[game.waveIdx].z.length >= 6;
+  const counterStr = game.endless
+    ? `웨이브 ${game.waveIdx}`                                       // 엔드리스: 상한 없는 카운터 (2.4)
+    : (isBig
+      ? `${Math.min(game.waveIdx, WAVES.length)} / ${WAVES.length}`   // 대량 웨이브: "대규모!" 라벨과 공존 위해 축약
+      : `웨이브 ${Math.min(game.waveIdx, WAVES.length)} / ${WAVES.length}`);
   ctx.font = font(isBig ? 11 : 12, true);
   const counterW = ctx.measureText(counterStr).width;
-  if (game.waveIdx < WAVES.length) {
+  if (game.endless) {
+    // 엔드리스 표시 행: ♾️ 배지 + 다음 웨이브 카운트다운 (2.4)
+    const py = 48, ph = 18;
+    rrect(bx, py, bw, ph, 6, "rgba(156,39,176,0.25)", "rgba(206,147,216,0.55)", 1.5);
+    text("♾️ 엔드리스", bx + 10, py + ph / 2, 11, "#e1bee7", true, "left");
+    const secs = Math.max(0, Math.ceil(game.endlessNextAt - game.time));
+    text(`다음 웨이브 ${secs}초`, bx + bw - counterW - 10, py + ph / 2, 11, "#f0e6c8", true, "right");
+  } else if (game.waveIdx < WAVES.length) {
     const w = WAVES[game.waveIdx];
     const py = 48, ph = 18;
     const big = w.z.length >= 6;
@@ -1069,6 +1225,13 @@ function drawHUD() {
   drawSunIcon(bb.x + 26, bb.y + bb.h / 2, 13, game.time);
   if (bReady) text("⚡ 발동!", bb.x + 46 + (bb.w - 50) / 2, bb.y + bb.h / 2, 19, "#ffd23e", true);
   else text(`${game.burst} / 12`, bb.x + 46 + (bb.w - 50) / 2, bb.y + bb.h / 2 + 1, 17, "#f0e6c8", true);
+
+  // 엔드리스 점수: 하단 흙길에 처치 수 · 최고 기록 표시 (2.4)
+  if (game.endless) {
+    const best = loadEndlessBest();
+    text(`🧠 처치 ${game.kills}`, 14, 640, 14, "#e8dfc8", true, "left");
+    if (best) text(`👑 최고 기록 웨이브 ${best.wave}`, 130, 640, 14, "#ffd23e", true, "left");
+  }
 }
 
 /* ---------------- 그리기: 오버레이 ---------------- */
@@ -1098,6 +1261,7 @@ function drawMenu() {
     "🧟  10개의 좀비 웨이브를 모두 막아내면 승리!",
     "🥄  삽: 식물 제거 · 우클릭/Esc: 선택 취소 · Space: 일시정지",
     "🚜  잔디깎이는 각 줄의 마지막 방어선입니다 (한 번만 작동!)",
+    "♾️  10웨이브 승리 후 엔드리스 모드로 무한 웨이브 도전 (최고 기록 저장)",
   ];
   lines.forEach((l, i) => text(l, 500, 262 + i * 30, 16, "#f0ead8", false));
   drawButton(BTN.start, "▶  게임 시작", "#4caf3a");
@@ -1105,15 +1269,29 @@ function drawMenu() {
 function drawEndOverlay(won) {
   ctx.fillStyle = "rgba(0,0,0,0.62)"; ctx.fillRect(0, 0, W, H);
   rrect(230, 170, 540, 280, 20, "rgba(20,26,16,0.95)", won ? "#ffd23e" : "#b3402e", 4);
+  const best = loadEndlessBest();
   if (won) {
     text("🏆 승리!", 500, 235, 46, "#ffd23e", true);
     text("당신의 정원을 지켜냈습니다!", 500, 290, 20, "#c8e6a0", false);
     text(`생존 시간 ${Math.floor(game.time)}초 · 남은 태양 ${game.sun}`, 500, 325, 16, "#e8dfc8", false);
+    // 엔드리스 도전 프롬프트 — 기존 승리 화면에 추가 (2.4)
+    text("♾️ 무한 웨이브에 도전하시겠습니까?", 500, 362, 18, "#e1bee7", true);
+    if (best) text(`엔드리스 최고 기록: 웨이브 ${best.wave} · 처치 ${best.kills} (${best.date})`, 500, 392, 14, "#f0e6c8", false);
     drawButton(BTN.again, "🔄  다시 하기", "#4caf3a");
+    drawButton(BTN.endless, "♾️  엔드리스 계속", "#7b1fa2");
   } else {
     text("🧟 좀비가 당신의 뇌를", 500, 225, 34, "#ff6b5e", true);
     text("먹어치웠습니다...", 500, 270, 34, "#ff6b5e", true);
-    text(`버틴 시간 ${Math.floor(game.time)}초 · 웨이브 ${Math.max(1, game.waveIdx)}/${WAVES.length}`, 500, 320, 16, "#e8dfc8", false);
+    if (game.endless) {
+      text(`버틴 시간 ${Math.floor(game.time)}초 · 웨이브 ${game.highestWave}`, 500, 320, 16, "#e8dfc8", false);
+      // 엔드리스 점수 요약 + 최고 기록 (2.4)
+      text(`🧠 처치 ${game.kills} · 생존 웨이브 ${game.wavesSurvived} · 최고 웨이브 ${game.highestWave}`, 500, 356, 15, "#e8dfc8", false);
+      if (game.newRecord) text("🎉 엔드리스 신기록!", 500, 384, 17, "#ffd23e", true);
+      else if (best) text(`엔드리스 최고 기록: 웨이브 ${best.wave}`, 500, 384, 15, "#ffd23e", true);
+    } else {
+      text(`버틴 시간 ${Math.floor(game.time)}초 · 웨이브 ${Math.max(1, game.waveIdx)}/${WAVES.length}`, 500, 320, 16, "#e8dfc8", false);
+      if (best) text(`엔드리스 최고 기록: 웨이브 ${best.wave}`, 500, 356, 15, "#ffd23e", true);
+    }
     drawButton(BTN.again, "🔄  다시 도전", "#c62828");
   }
 }
@@ -1238,6 +1416,7 @@ canvas.addEventListener("pointerdown", e => {
   }
   if (game.state === "won" || game.state === "lost") {
     if (inRect(x, y, BTN.again)) startGame();
+    else if (game.state === "won" && inRect(x, y, BTN.endless)) startEndless();  // 엔드리스 계속 (2.4)
     return;
   }
   if (inRect(x, y, BTN.pause)) {
@@ -1335,6 +1514,10 @@ window.__start = startGame;
 // 테스트/디버깅 훅
 window.Plant = Plant; window.Zombie = Zombie; window.Sun = Sun; window.Pea = Pea;
 window.__update = update;
+window.__draw = draw;
+window.__state = () => game;  // 현재 게임 객체 참조 (startGame 재생성 대응 디버깅 훅)
+window.__endless = { ENDLESS, endlessComposition, endlessInterval, endlessSpawnGap, endlessHpMul,
+                     loadEndlessBest, saveEndlessBest, startEndless };  // 엔드리스 테스트 훅 (2.4)
 </script>
 </body>
 </html>
