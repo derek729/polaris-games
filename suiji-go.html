@@ -190,6 +190,24 @@ canvas#heatmap {
   font-family: 'JetBrains Mono', monospace;
 }
 .move-end { display: inline-flex; align-items: center; justify-content: flex-end; gap: 5px; }
+
+/* ---------- 초보 모드 (BACKLOG #12) — 9×9 기본 + AI 기급 고정 ---------- */
+.info-row .btn.mini { padding: 4px 10px; font-size: 11.5px; }
+.beginner-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 13px;
+  background: rgba(184, 134, 11, 0.10);
+  border: 1px solid rgba(184, 134, 11, 0.45);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gold);
+  white-space: nowrap;
+}
+.beginner-badge[hidden] { display: none; }
+.beginner-badge i { font-size: 11px; }
 </style>
 </head>
 <body>
@@ -252,6 +270,13 @@ canvas#heatmap {
     <aside class="left-col">
       <div class="panel">
         <h3 class="panel-title">Game Setup</h3>
+        <!-- 초보 모드 (BACKLOG #12) — 9×9 판 기본 + AI 기급 고정 프리셋 -->
+        <div class="info-row">
+          <span class="label">Difficulty Preset</span>
+          <button class="btn mini" id="btnBeginner" type="button" title="초보 모드 — 9×9 판 기본, AI 기급 고정, 한 판 가볍게 (5분)">
+            <i class="fa-solid fa-graduation-cap"></i> 초보 모드
+          </button>
+        </div>
         <div class="info-row">
           <span class="label">Board</span>
           <select class="info-select" id="selBoard" title="Board size — starts a new game">
@@ -329,6 +354,10 @@ canvas#heatmap {
               <span class="captures" id="capturesWhite">0</span>
               <span class="clock-chip" id="clockWhite" hidden>--:--</span>
             </div>
+            <!-- 초보 모드 배지 (BACKLOG #12) — 프리셋 활성화 시에만 표시 -->
+            <span class="beginner-badge" id="beginnerBadge" hidden title="초보 모드 — 9×9 판 기본 · AI 기급 고정">
+              <i class="fa-solid fa-graduation-cap"></i>초보 모드 — 5분 한 판
+            </span>
           </div>
           <div class="board-controls">
             <button class="btn" id="btnHint" title="Ask the AI for a move suggestion"><i class="fa-solid fa-lightbulb"></i> Hint</button>
@@ -656,6 +685,8 @@ const els = {
   intentGrade: document.getElementById('intentGrade'),
   rankSelector: document.getElementById('rankSelector'),
   sizeSelector: document.getElementById('sizeSelector'),
+  btnBeginner: document.getElementById('btnBeginner'),
+  beginnerBadge: document.getElementById('beginnerBadge'),
   selBoard: document.getElementById('selBoard'),
   selRules: document.getElementById('selRules'),
   selHandicap: document.getElementById('selHandicap'),
@@ -697,6 +728,58 @@ const els = {
   goKifu: document.getElementById('goKifu'),
   goNew: document.getElementById('goNew'),
 };
+
+// ============================================
+// 초보 모드 (BACKLOG #12) — 9×9 판 기본 + AI 기급 상한 + 배지
+// ============================================
+const BEGINNER_KEY = 'suiji.beginnerMode'; // localStorage 저장 키
+const BEGINNER_AI_LEVEL = 1;               // 초보 모드 AI 상한 — 기급(Beginner Dan)
+const DEFAULT_AI_LEVEL = 2;                // 일반 모드 기본 AI — 중급(Mid Dan)
+let beginnerMode = localStorage.getItem(BEGINNER_KEY) === '1'; // 취향은 새로고침 후에도 유지
+let aiLevelBeforeBeginner = null; // 초보 모드 해제 시 이전 AI 등급 복원용
+
+function capAiLevel(level) {
+  // 초보 모드에서는 기급보다 강한 등급을 상한으로 잘라낸다
+  return beginnerMode ? Math.min(level, BEGINNER_AI_LEVEL) : level;
+}
+
+function syncRankBadges() {
+  // 실제 ai.level 기준으로 등급 배지 active 동기화
+  const lvl = ai ? capAiLevel(ai.level) : (beginnerMode ? BEGINNER_AI_LEVEL : DEFAULT_AI_LEVEL);
+  els.rankSelector.querySelectorAll('.rank-badge').forEach(b => {
+    b.classList.toggle('active', parseInt(b.dataset.level) === lvl);
+  });
+}
+
+function syncBeginnerUI() {
+  // 토글 버튼 상태 + 대국 화면 배지 표시
+  els.btnBeginner.classList.toggle('primary', beginnerMode);
+  els.beginnerBadge.hidden = !beginnerMode;
+}
+
+function onBeginnerToggle() {
+  if (onlineActive) { showToast('온라인 대국 중에는 초보 모드를 바꿀 수 없습니다'); return; }
+  beginnerMode = !beginnerMode;
+  try { localStorage.setItem(BEGINNER_KEY, beginnerMode ? '1' : '0'); } catch (e) { /* 저장 불가 — 무시 */ }
+  if (beginnerMode) {
+    // ON — 9×9 판을 기본으로, AI를 기급으로 고정
+    aiLevelBeforeBeginner = ai ? ai.level : DEFAULT_AI_LEVEL;
+    els.selBoard.value = '9';
+    if (ai) ai.setLevel(BEGINNER_AI_LEVEL);
+    syncBeginnerUI();
+    syncRankBadges();
+    if (config.size !== 9) startNewGame(); // 판 크기 기본이 바뀌었으니 새 대국
+    else syncSizeBadges();                 // 이미 9×9 — 진행 중인 대국 유지
+    showToast('초보 모드 — 9×9 판 · AI 기급으로 한 판 가볍게!');
+  } else {
+    // OFF — AI 등급 선택 잠금 해제, 직전 등급 복원 (판 크기는 현재 선택 유지)
+    if (ai) ai.setLevel(aiLevelBeforeBeginner || DEFAULT_AI_LEVEL);
+    aiLevelBeforeBeginner = null;
+    syncBeginnerUI();
+    syncRankBadges();
+    showToast('초보 모드 해제 — AI 등급을 다시 고를 수 있습니다');
+  }
+}
 
 // ============================================
 // AUTOSAVE / RESUME
@@ -796,6 +879,7 @@ function setOnlineInputs(disabled) {
   els.selBoard.disabled = disabled;
   els.selRules.disabled = disabled;
   els.selHandicap.disabled = disabled;
+  els.btnBeginner.disabled = disabled; // 초보 모드 전환도 온라인 대국 중 잠금
 }
 
 function onNetStart(color, isHost, hasSnapshot) {
@@ -1134,7 +1218,9 @@ function mountGame() {
   if (boardRenderer) boardRenderer.destroy();
   if (heatmapRenderer) heatmapRenderer.destroy();
 
-  ai = new GoAI(game, ai ? ai.level : 2);
+  // 초보 모드 — 새 AI의 기본 등급과 유지 등급 모두 기급 상한 적용
+  ai = new GoAI(game, ai ? capAiLevel(ai.level) : (beginnerMode ? BEGINNER_AI_LEVEL : DEFAULT_AI_LEVEL));
+  syncRankBadges();
   deadMarks = new Set();
   boardRenderer = makeBoardRenderer();
   boardRenderer.setDead(deadMarks);
@@ -1179,8 +1265,11 @@ function init() {
     mountGame();
     Suiji.toast('Restored your saved game — carry on!');
   } else {
+    // 초보 모드 기본 프리셋 — 19×19 대신 9×9 판으로 시작
+    if (beginnerMode) els.selBoard.value = '9';
     startNewGame(true);
   }
+  syncBeginnerUI(); // 초보 모드 토글·배지 상태 반영
 
   els.board.addEventListener('mousemove', onMouseMove);
   els.board.addEventListener('mouseleave', () => {
@@ -1208,6 +1297,7 @@ function init() {
   els.selBoard.addEventListener('change', () => startNewGame());
   els.selRules.addEventListener('change', () => startNewGame());
   els.selHandicap.addEventListener('change', () => startNewGame());
+  els.btnBeginner.addEventListener('click', onBeginnerToggle);
 
   els.sizeSelector.querySelectorAll('.size-badge').forEach(b => {
     b.addEventListener('click', () => {
@@ -1219,11 +1309,18 @@ function init() {
 
   els.rankSelector.querySelectorAll('.rank-badge').forEach(b => {
     b.addEventListener('click', () => {
+      let lvl = parseInt(b.dataset.level);
+      let target = b;
+      // 초보 모드 — 기급 위 등급은 상한(기급)으로 되돌린다
+      if (beginnerMode && lvl > BEGINNER_AI_LEVEL) {
+        lvl = BEGINNER_AI_LEVEL;
+        target = els.rankSelector.querySelector(`.rank-badge[data-level="${lvl}"]`);
+        showToast('초보 모드에서는 AI가 기급까지만 선택됩니다');
+      }
       els.rankSelector.querySelectorAll('.rank-badge').forEach(x => x.classList.remove('active'));
-      b.classList.add('active');
-      const lvl = parseInt(b.dataset.level);
+      target.classList.add('active');
       ai.setLevel(lvl);
-      showToast(`AI level set to ${b.querySelector('.name').textContent}`);
+      if (target === b) showToast(`AI level set to ${b.querySelector('.name').textContent}`);
     });
   });
 
