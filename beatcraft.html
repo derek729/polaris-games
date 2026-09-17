@@ -222,7 +222,7 @@ body.fx-off .bg-shape,body.fx-off .logo-shine::after,body.fx-off .hero-arrow,bod
       <div class="mod-header" onclick="toggleModPanel()">
         <div style="display:flex;align-items:center;gap:8px">
           <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" stroke-linecap="round"><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/><circle cx="12" cy="12" r="4"/></svg>
-          <span style="font-family:'Fredoka',sans-serif;font-weight:600;font-size:15px">게임 설정</span>
+          <span style="font-family:'Fredoka',sans-serif;font-weight:600;font-size:15px">게임 설정 · 개조(MODS)</span>
         </div>
         <span id="mod-arrow" style="font-size:12px;opacity:.5;transition:transform .2s">▼</span>
       </div>
@@ -266,6 +266,13 @@ body.fx-off .bg-shape,body.fx-off .logo-shine::after,body.fx-off .hero-arrow,bod
           <span class="mod-label">연습</span>
           <div class="mod-toggle" id="tog-practice" onclick="togglePractice()"></div>
           <span style="font-size:12px;opacity:.6;margin-left:4px">0.5× 속도 · HP없음 · 타이밍 표시</span>
+        </div>
+        <div class="mod-row">
+          <span class="mod-label">개조</span>
+          <button class="mod-chip" data-mod="hidden" onclick="setMod('hidden')">Hidden</button>
+          <button class="mod-chip" data-mod="sudden" onclick="setMod('sudden')">Sudden</button>
+          <button class="mod-chip sel" data-mod="normal" onclick="setMod('normal')">Normal</button>
+          <span style="font-size:12px;opacity:.6;margin-left:4px">히든: 노트가 중간에 사라짐(암기) · 서든: 하단에서 갑자기 나타남 (판정 불변)</span>
         </div>
       </div>
     </div>
@@ -456,7 +463,9 @@ const G = {
   mirror:false,
   nofail:false,
   practice:false,
-  offset:0
+  offset:0,
+  // 개조 (BACKLOG #7): 히든/서든 — 렌더 전용 (판정·점수·음향 스케줄 불변)
+  mods:{hidden:false,sudden:false}
 };
 
 const LEVELS = [
@@ -638,6 +647,29 @@ const VIGNETTE=(function(){
   rg.addColorStop(0,'rgba(0,0,0,0)'); rg.addColorStop(1,'rgba(0,0,0,.42)');
   g.fillStyle=rg; g.fillRect(0,0,W,H);
   return cv;
+})();
+
+/* 개조(Hidden/Sudden)용 노트 전용 레이어 & 그라디언트 마스크 (BACKLOG #7)
+   - Hidden: 노트가 화면 상단 60% 위에서 투명하게 페이드아웃 → 타이밍 암기 필요
+   - Sudden: 노트가 화면 하단 70% 아래에서만 표시 → 반응 시간 단축
+   렌더 전용이므로 판정·점수·오디오에는 영향 없음 */
+const NOTE_LAYER=document.createElement('canvas'); NOTE_LAYER.width=W; NOTE_LAYER.height=H;
+const NOTE_LAYER_CTX=NOTE_LAYER.getContext('2d');
+const MOD_MASKS=(function(){
+  // topY: 완전 투명, fullY: 완전 불투명 — 그 사이는 선형 그라디언트 페이드
+  function build(topY,fullY){
+    const cv=document.createElement('canvas'); cv.width=W; cv.height=H;
+    const g=cv.getContext('2d');
+    const lg=g.createLinearGradient(0,topY,0,fullY);
+    lg.addColorStop(0,'rgba(0,0,0,0)'); lg.addColorStop(1,'rgba(0,0,0,1)');
+    g.fillStyle=lg; g.fillRect(0,0,W,fullY);
+    g.fillStyle='rgba(0,0,0,1)'; g.fillRect(0,fullY,W,H-fullY);
+    return cv;
+  }
+  return {
+    hidden:build(H*.45,H*.60), // 45%까지 완전 투명 → 60% 지점부터 완전히 보임
+    sudden:build(H*.60,H*.70)  // 60%까지 완전 투명 → 70% 지점부터 표시
+  };
 })();
 
 /* AI 생성 픽셀아트 스프라이트 (상대경로 → file:// 에서도 동작, 로드 실패 시 기존 벡터 렌더로 폴백) */
@@ -938,6 +970,15 @@ class Game {
         c.globalAlpha=g*.5; c.fillStyle=grad; c.fillRect(i*LANE_W,HIT_Y-220,LANE_W,300); c.globalAlpha=1;
       }
     }
+    // 개조(Hidden/Sudden): 노트·홀드 바디를 전용 레이어에 그린 뒤 그라디언트 마스크로 합성 (BACKLOG #7 — 렌더 전용)
+    let nctx=null;
+    if(G.mods.hidden||G.mods.sudden){
+      nctx=NOTE_LAYER_CTX;
+      nctx.setTransform(1,0,0,1,0,0);
+      nctx.clearRect(0,0,W,H);
+      c.imageSmoothingEnabled=false; // 일반 모드와 동일한 픽셀 렌더링 상태 유지
+    }
+    const dc=nctx||c;
     // hold bodies (활성)
     for(const n of this.notes){
       if(!n.isHold||n.missed||!n.hit) continue;
@@ -947,12 +988,12 @@ class Game {
       const progress=1-(n.time-this.elapsed)/ft, noteY=progress*HIT_Y;
       const endProg=1-(endTime-this.elapsed)/ft, endY=Math.min(HIT_Y,endProg*HIT_Y);
       const x=n.lane*LANE_W+LANE_W*.25, nw=LANE_W*.5, clr=LANE_COLORS[n.lane];
-      const hg=c.createLinearGradient(0,endY,0,noteY); hg.addColorStop(0,clr+'33'); hg.addColorStop(1,clr+'CC');
-      c.fillStyle=hg; c.beginPath(); c.roundRect(x,endY,nw,noteY-endY,8); c.fill();
-      c.fillStyle='rgba(255,255,255,.28)';
+      const hg=dc.createLinearGradient(0,endY,0,noteY); hg.addColorStop(0,clr+'33'); hg.addColorStop(1,clr+'CC');
+      dc.fillStyle=hg; dc.beginPath(); dc.roundRect(x,endY,nw,noteY-endY,8); dc.fill();
+      dc.fillStyle='rgba(255,255,255,.28)';
       const cy0=Math.max(0,endY), cy1=Math.max(0,noteY);
-      if(cy1>cy0) c.fillRect(x+nw*.34,cy0,nw*.32,cy1-cy0);
-      c.strokeStyle=clr; c.lineWidth=3; c.globalAlpha=.75; c.beginPath(); c.roundRect(x,endY,nw,noteY-endY,8); c.stroke(); c.globalAlpha=1;
+      if(cy1>cy0) dc.fillRect(x+nw*.34,cy0,nw*.32,cy1-cy0);
+      dc.strokeStyle=clr; dc.lineWidth=3; dc.globalAlpha=.75; dc.beginPath(); dc.roundRect(x,endY,nw,noteY-endY,8); dc.stroke(); dc.globalAlpha=1;
     }
     // hold bodies (대기 중)
     for(const n of this.notes){
@@ -965,8 +1006,8 @@ class Game {
       const endProgress=1-(endDt/ft), endY=endProgress*HIT_Y;
       if(noteY<-80&&endY<-80) continue;
       const x=n.lane*LANE_W+LANE_W*.25, nw=LANE_W*.5, clr=LANE_COLORS[n.lane];
-      c.fillStyle=clr+'44'; c.beginPath(); c.roundRect(x,Math.max(-20,endY),nw,noteY-Math.max(-20,endY),8); c.fill();
-      c.strokeStyle=clr; c.lineWidth=2; c.globalAlpha=.6; c.beginPath(); c.roundRect(x,Math.max(-20,endY),nw,noteY-Math.max(-20,endY),8); c.stroke(); c.globalAlpha=1;
+      dc.fillStyle=clr+'44'; dc.beginPath(); dc.roundRect(x,Math.max(-20,endY),nw,noteY-Math.max(-20,endY),8); dc.fill();
+      dc.strokeStyle=clr; dc.lineWidth=2; dc.globalAlpha=.6; dc.beginPath(); dc.roundRect(x,Math.max(-20,endY),nw,noteY-Math.max(-20,endY),8); dc.stroke(); dc.globalAlpha=1;
     }
     // receptors
     for(let i=0;i<4;i++){
@@ -989,7 +1030,15 @@ class Game {
       if(n.missed&&dt<-BAD_WIN-150) continue;
       const progress=1-(dt/ft), noteY=progress*HIT_Y;
       if(noteY<-50) continue;
-      this._drawNote(n.lane,n.lane*LANE_W+LANE_W/2,noteY,n.missed?.3:1,n.missed?.92:1);
+      this._drawNote(n.lane,n.lane*LANE_W+LANE_W/2,noteY,n.missed?.3:1,n.missed?.92:1,dc);
+    }
+    if(nctx){
+      // 그라디언트 마스크 적용: destination-in으로 노트 레이어 알파와 마스크를 곱합 (둘 다 켜면 교집합)
+      nctx.globalCompositeOperation='destination-in';
+      if(G.mods.hidden) nctx.drawImage(MOD_MASKS.hidden,0,0);
+      if(G.mods.sudden) nctx.drawImage(MOD_MASKS.sudden,0,0);
+      nctx.globalCompositeOperation='source-over';
+      c.drawImage(NOTE_LAYER,0,0);
     }
     // shockwave rings
     for(const r of this.rings){
@@ -1121,19 +1170,19 @@ class Game {
     }
   }
 
-  _drawArrow(lane,cx,cy,alpha,scale){
+  _drawArrow(lane,cx,cy,alpha,scale,ctx){
     const spr=ARROW_SPRITES[lane*2+(scale>1.04?1:0)];
-    const S=spr.width, c=C;
+    const S=spr.width, c=ctx||C;
     c.save(); c.globalAlpha*=Math.max(0,Math.min(1,alpha));
     c.drawImage(spr,cx-S*scale/2,cy-S*scale/2,S*scale,S*scale);
     c.restore();
   }
 
-  _drawNote(lane,cx,cy,alpha,scale){
+  _drawNote(lane,cx,cy,alpha,scale,ctx){
     // 레인 교대로 스프라이트 노트 사용 (짝수=파랑, 홀수=핑크), 미로드 시 기존 화살표로 폴백
     const img=lane%2===0?SPRITES.noteBlue:SPRITES.notePink;
-    if(!_spriteReady(img)){ this._drawArrow(lane,cx,cy,alpha,scale); return; }
-    const S=ARROW_SPRITES[0].width, c=C; // 기존 노트와 동일한 크기 유지
+    if(!_spriteReady(img)){ this._drawArrow(lane,cx,cy,alpha,scale,ctx); return; }
+    const S=ARROW_SPRITES[0].width, c=ctx||C; // 기존 노트와 동일한 크기 유지
     c.save(); c.globalAlpha*=Math.max(0,Math.min(1,alpha));
     c.imageSmoothingEnabled=false; // 32px 픽셀아트 선명 확대
     c.drawImage(img,cx-S*scale/2,cy-S*scale/2,S*scale,S*scale);
@@ -1774,6 +1823,22 @@ function togglePractice(){
   saveSettings();
 }
 
+// 개조 선택 (BACKLOG #7): Hidden/Sudden/Normal 3단 선택 — 상호배타적, 렌더 전용
+function setMod(mod){
+  if(mod==='hidden'){ G.mods.hidden=true; G.mods.sudden=false; toast('🙈 히든 개조 — 노트가 중간에 사라집니다'); }
+  else if(mod==='sudden'){ G.mods.hidden=false; G.mods.sudden=true; toast('⚡ 서든 개조 — 노트가 하단에 나타납니다'); }
+  else { G.mods.hidden=false; G.mods.sudden=false; }
+  _syncModChips();
+  saveSettings();
+}
+
+function _syncModChips(){
+  const mod=G.mods.hidden?'hidden':G.mods.sudden?'sudden':'normal';
+  document.querySelectorAll('.mod-chip[data-mod]').forEach(ch=>{
+    ch.classList.toggle('sel',ch.dataset.mod===mod);
+  });
+}
+
 function nudgeOffset(d){ setOffset(G.offset+d); }
 function setOffset(v){
   G.offset=Math.max(-150,Math.min(150,Math.round(v)));
@@ -1804,7 +1869,7 @@ function toggleMotion(){
 
 function saveSettings(){
   try{
-    localStorage.setItem('bc_settings',JSON.stringify({audioOn:G.audioOn,motionOn:G.motionOn,speed:G.speed,scroll:G.scroll,mirror:G.mirror,nofail:G.nofail,practice:G.practice,offset:G.offset}));
+    localStorage.setItem('bc_settings',JSON.stringify({audioOn:G.audioOn,motionOn:G.motionOn,speed:G.speed,scroll:G.scroll,mirror:G.mirror,nofail:G.nofail,practice:G.practice,offset:G.offset,mods:G.mods}));
   }catch(e){}
 }
 
@@ -1814,6 +1879,7 @@ function _syncSettingsUI(){
   const tm=document.getElementById('tog-mirror'); if(tm) tm.classList.toggle('on',G.mirror);
   const tn=document.getElementById('tog-nofail'); if(tn) tn.classList.toggle('on',G.nofail);
   const tp=document.getElementById('tog-practice'); if(tp) tp.classList.toggle('on',G.practice);
+  _syncModChips();
   const ba=document.getElementById('btn-audio'); if(ba) ba.style.opacity=G.audioOn?'1':'.4';
   const bm=document.getElementById('btn-motion'); if(bm) bm.style.opacity=G.motionOn?'1':'.4';
   setOffset(G.offset);
@@ -1923,6 +1989,11 @@ document.addEventListener('visibilitychange',()=>{
       if(typeof s.nofail==='boolean') G.nofail=s.nofail;
       if(typeof s.practice==='boolean') G.practice=s.practice;
       if(typeof s.offset==='number') G.offset=s.offset;
+      if(s.mods&&typeof s.mods==='object'){
+        G.mods.hidden=!!s.mods.hidden;
+        G.mods.sudden=!!s.mods.sudden;
+        if(G.mods.hidden&&G.mods.sudden) G.mods.sudden=false; // 비정상 저장값 보정 (개조는 단일 선택)
+      }
     }
   }catch(e){}
   if(G.practice&&!G.nofail) G.nofail=true;
