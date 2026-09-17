@@ -468,16 +468,27 @@ const G = {
   mods:{hidden:false,sudden:false}
 };
 
+/* BACKLOG #10: 레벨별 난이도 곡선 재설계 — 티어 구조 설정
+   입문(Lv1-3): 4분음표 전용 · 홀드 금지 · 판정 윈도우 +15%
+   중급(Lv4-6): 8분음표 그리드 · 홀드 허용(최대 2박) · 판정 윈도우 표준(1.0)
+   고급(Lv7-9): 8분음표 그리드 · 연타(스트림) · 짧은 홀드(1박) · 판정 윈도우 -10% */
+const TIER_CFG={
+  '입문':{stepDiv:1, winMult:1.15, allowHold:false, maxHoldBeats:0},
+  '중급':{stepDiv:2, winMult:1.00, allowHold:true,  maxHoldBeats:2},
+  '고급':{stepDiv:2, winMult:0.90, allowHold:true,  maxHoldBeats:1}
+};
+// density=해당 그리드 스텝(입문: 4분음표, 중급·고급: 8분음표)에서 노트가 놓일 확률
+// stream=연타(4~8연타 런) 구간이 시작될 확률 (고급 전용), holdChance=홀드 노트 확률 (입문은 티어 설정이 강제로 0 처리)
 const LEVELS = [
-  {id:1, name:'First Pulse',  bpm:78,  dur:30, diff:'EASY',   density:.40, holdChance:.06, color:'coral'},
-  {id:2, name:'Sunny Step',   bpm:90,  dur:33, diff:'EASY',   density:.46, holdChance:.08, color:'yellow'},
-  {id:3, name:'Green Groove', bpm:100, dur:35, diff:'EASY',   density:.52, holdChance:.10, color:'green'},
-  {id:4, name:'Sky Walk',     bpm:110, dur:37, diff:'NORMAL', density:.58, holdChance:.12, color:'sky'},
-  {id:5, name:'Coral Riff',   bpm:118, dur:40, diff:'NORMAL', density:.63, holdChance:.14, color:'coral'},
-  {id:6, name:'Yellow Beat',  bpm:126, dur:42, diff:'NORMAL', density:.68, holdChance:.16, color:'yellow'},
-  {id:7, name:'Forest Run',   bpm:136, dur:44, diff:'HARD',   density:.74, holdChance:.18, color:'green'},
-  {id:8, name:'Ocean Drive',  bpm:146, dur:47, diff:'HARD',   density:.80, holdChance:.20, color:'sky'},
-  {id:9, name:'Master Craft', bpm:156, dur:52, diff:'EXPERT', density:.86, holdChance:.22, color:'coral'}
+  {id:1, name:'First Pulse',  bpm:90,  dur:30, diff:'EASY',   tier:'입문', density:.55, holdChance:0,   stream:0,    color:'coral'},
+  {id:2, name:'Sunny Step',   bpm:110, dur:33, diff:'EASY',   tier:'입문', density:.62, holdChance:0,   stream:0,    color:'yellow'},
+  {id:3, name:'Green Groove', bpm:130, dur:35, diff:'EASY',   tier:'입문', density:.70, holdChance:0,   stream:0,    color:'green'},
+  {id:4, name:'Sky Walk',     bpm:120, dur:37, diff:'NORMAL', tier:'중급', density:.42, holdChance:.10, stream:0,    color:'sky'},
+  {id:5, name:'Coral Riff',   bpm:135, dur:40, diff:'NORMAL', tier:'중급', density:.48, holdChance:.13, stream:0,    color:'coral'},
+  {id:6, name:'Yellow Beat',  bpm:150, dur:42, diff:'NORMAL', tier:'중급', density:.54, holdChance:.16, stream:0,    color:'yellow'},
+  {id:7, name:'Forest Run',   bpm:140, dur:44, diff:'HARD',   tier:'고급', density:.55, holdChance:.10, stream:.05,  color:'green'},
+  {id:8, name:'Ocean Drive',  bpm:155, dur:47, diff:'HARD',   tier:'고급', density:.62, holdChance:.12, stream:.065, color:'sky'},
+  {id:9, name:'Master Craft', bpm:170, dur:52, diff:'EXPERT', tier:'고급', density:.70, holdChance:.14, stream:.08,  color:'coral'}
 ];
 
 const ACHIEVEMENTS = [
@@ -576,6 +587,7 @@ const LANE_COLORS=['#FF6B6B','#FFD23F','#4ADE80','#38BDF8'];
 const LANE_KEYS=['d','f','j','k'];
 const LANE_CODES={KeyD:0,KeyF:1,KeyJ:2,KeyK:3}; // 물리 키 코드: 한글 IME가 켜져 있어도 인식됨
 const NOTE_FALL_TIME=1600;
+// 기본 판정 윈도우(ms) — 실제 판정에는 티어 배율(this.win: 입문 ×1.15 · 중급 ×1.0 · 고급 ×0.9)이 적용됨 (BACKLOG #10)
 const PERFECT_WIN=45, GREAT_WIN=90, GOOD_WIN=135, BAD_WIN=180;
 // 랭크 컷 단일 진실 원천: HUD(_updateHUD)와 결과(showResults)가 공유 (BACKLOG #1 정합성 수정)
 // BACKLOG #2: 상위 랭크 1% 간격 세분화(SS>S+>S->S) — 재도전 유도. 업적 ss_rank(≥99)·s_rank(≥95) 컷 불변.
@@ -687,6 +699,10 @@ let game=null;
 class Game {
   constructor(lvl){
     this.lvl=lvl;
+    // BACKLOG #10: 티어별 판정 윈도우 배율 — 입문 +15% · 중급 표준(1.0) · 고급 -10%
+    // (오디오 스케줄·스크롤·점수에는 영향 없음. 티어 없는 레벨=무한 모드는 표준 1.0 유지)
+    const _wm=(TIER_CFG[lvl.tier]||TIER_CFG['중급']).winMult;
+    this.win={PERFECT:PERFECT_WIN*_wm,GREAT:GREAT_WIN*_wm,GOOD:GOOD_WIN*_wm,BAD:BAD_WIN*_wm};
     this.notes=[]; this.particles=[]; this.popups=[];
     this.rings=[]; this.comboPulse=0;
     this.stars=Array.from({length:26},()=>({x:Math.random()*W,y:Math.random()*H,s:Math.random()<.3?2:1.4,a:.15+Math.random()*.3,tw:.5+Math.random()*2,ph:Math.random()*6}));
@@ -716,29 +732,48 @@ class Game {
     return NOTE_FALL_TIME/(G.scroll||1);
   }
 
+  // BACKLOG #10: 티어별 채보 생성 — 입문=4분음표 그리드·홀드 없음, 중급=8분음표 그리드·홀드 도입,
+  // 고급=8분음표 그리드·연타(스트림) 런·짧은 홀드. 노트 시간은 2200ms 카운트다운 오프셋 유지(오디오 스케줄 불변).
   _generate(){
     const speedMult = G.practice ? 0.5 : G.speed;
     const bpm = this.lvl.bpm * speedMult;
     const beatMs=60000/bpm;
-    const subMs=beatMs/2;
-    const total=Math.floor(this.lvl.dur*1000/subMs);
+    const cfg=TIER_CFG[this.lvl.tier]||TIER_CFG['중급']; // 티어 없는 레벨(무한 모드)은 중급 구조 기본값
+    const stepMs=beatMs/cfg.stepDiv; // 입문: 4분음표 스텝 / 중급·고급: 8분음표 스텝
+    const total=Math.floor(this.lvl.dur*1000/stepMs);
+    const holdChance=cfg.allowHold?(this.lvl.holdChance||0):0; // 입문은 홀드 금지
+    const streamChance=this.lvl.stream||0; // 연타 구간 시작 확률 (고급 전용)
     let lastLane=-1;
-    for(let i=0;i<total;i++){
-      const time=i*subMs+2200;
+    let i=0;
+    while(i<total){
+      const time=i*stepMs+2200;
       if(time>this.endTime-300) break; // 종료 직후에 무의미하게 사라질 노트는 아예 생성하지 않음
+      // 고급: 연타(스트림) — 4~8개 연속 8분음표 런을 계단식 배치로 확정 생성 (밀도 굴림과 별개)
+      if(streamChance>0&&i+4<total&&Math.random()<streamChance&&time+stepMs*8<=this.endTime-300){
+        const len=4+Math.floor(Math.random()*5); // 4~8연타
+        let lane=lastLane>=0?(lastLane+1+Math.floor(Math.random()*3))%4:Math.floor(Math.random()*4);
+        for(let s=0;s<len&&i<total;s++,i++){
+          this.notes.push({time:i*stepMs+2200,lane:this._getLane(lane),hit:false,missed:false,isHold:false,holdDur:0,holdHeld:false,holdComplete:false,holdStart:0});
+          lane=(lane+1+(Math.random()<.5?0:1))%4; // 한 스텝마다 옆 레인으로 계단 이동 (동일 레인 연타 폭탄 방지)
+        }
+        lastLane=lane;
+        continue;
+      }
       if(Math.random()<this.lvl.density){
         let lane;
         do{ lane=Math.floor(Math.random()*4); }while(lane===lastLane&&Math.random()<.5);
         lastLane=lane;
-        const mappedLane=this._getLane(lane);
-        const isHold=Math.random()<this.lvl.holdChance;
-        const holdDur=isHold?(beatMs*(1+Math.floor(Math.random()*2))):0;
-        this.notes.push({time,lane:mappedLane,hit:false,missed:false,isHold,holdDur,holdHeld:false,holdComplete:false,holdStart:0});
-        if(this.lvl.diff!=='EASY'&&Math.random()<.10){
-          let l2; do{ l2=Math.floor(Math.random()*4); }while(l2===mappedLane);
-          this.notes.push({time,lane:l2,hit:false,missed:false,isHold:false,holdDur:0,holdHeld:false,holdComplete:false,holdStart:0});
+        const isHold=holdChance>0&&Math.random()<holdChance;
+        const holdDur=isHold?(beatMs*(1+Math.floor(Math.random()*cfg.maxHoldBeats))):0; // 중급 1~2박 · 고급 1박(짧은 홀드)
+        this.notes.push({time,lane:this._getLane(lane),hit:false,missed:false,isHold,holdDur,holdHeld:false,holdComplete:false,holdStart:0});
+        // 동시 치고(2레인 동시 노트): 입문 없음 · 중급 8% · 고급 12%
+        const chordChance=this.lvl.tier==='고급'?.12:this.lvl.tier==='중급'?.08:0;
+        if(chordChance>0&&Math.random()<chordChance){
+          let l2; do{ l2=Math.floor(Math.random()*4); }while(l2===lane);
+          this.notes.push({time,lane:this._getLane(l2),hit:false,missed:false,isHold:false,holdDur:0,holdHeld:false,holdComplete:false,holdStart:0});
         }
       }
+      i++;
     }
   }
 
@@ -789,7 +824,7 @@ class Game {
     }
     for(const n of this.notes){
       if(n.hit||n.missed) continue;
-      if(this.elapsed-n.time>BAD_WIN){ n.missed=true; this._registerMiss(n.lane); }
+      if(this.elapsed-n.time>this.win.BAD){ n.missed=true; this._registerMiss(n.lane); }
     }
     for(let i=0;i<4;i++){
       const hn=this.holdState[i];
@@ -842,12 +877,12 @@ class Game {
       const d=Math.abs(n.time+G.offset-this.elapsed);
       if(d<dist){ dist=d; nearest=n; }
     }
-    if(nearest&&dist<BAD_WIN){
+    if(nearest&&dist<this.win.BAD){
       nearest.hit=true;
       let judge='BAD';
-      if(dist<PERFECT_WIN) judge='PERFECT';
-      else if(dist<GREAT_WIN) judge='GREAT';
-      else if(dist<GOOD_WIN) judge='GOOD';
+      if(dist<this.win.PERFECT) judge='PERFECT';
+      else if(dist<this.win.GREAT) judge='GREAT';
+      else if(dist<this.win.GOOD) judge='GOOD';
       this.lastTimingMs=(this.elapsed-nearest.time-G.offset); // positive=late, negative=early
       this._registerHit(lane,judge,nearest);
       if(nearest.isHold) this.holdState[lane]=nearest;
@@ -895,7 +930,7 @@ class Game {
     if(this.lastTimingMs===null||this.lastHitElapsed===null) return;
     const age=this.elapsed-this.lastHitElapsed;
     if(age<0||age>500) return;
-    const ERR_RANGE=GOOD_WIN; // ±135ms 게이지 끝, |오차| 초과 시 끝에 고정
+    const ERR_RANGE=this.win.GOOD; // 게이지 끝=GOOD 컷 (티어별 배율 적용: 입문 넓게 · 고급 좁게)
     const cx=W/2, cy=HIT_Y+62, gw=160, gh=6;
     c.save();
     c.globalAlpha=(1-age/500)*.95;
@@ -906,7 +941,7 @@ class Game {
     c.fillStyle='#FF6B6B'; c.fillRect(cx+gw/2-2,cy-gh/2-2,2,gh+4); // 우측 끝=늦음
     const err=Math.max(-ERR_RANGE,Math.min(ERR_RANGE,this.lastTimingMs));
     const a=Math.abs(this.lastTimingMs);
-    const mclr=a<PERFECT_WIN?'#FFD700':a<GREAT_WIN?'#38BDF8':a<GOOD_WIN?'#4ADE80':'#FF6B6B';
+    const mclr=a<this.win.PERFECT?'#FFD700':a<this.win.GREAT?'#38BDF8':a<this.win.GOOD?'#4ADE80':'#FF6B6B';
     const mx=cx+err/ERR_RANGE*(gw/2);
     c.fillStyle=mclr; c.shadowColor=mclr; c.shadowBlur=6;
     c.beginPath(); c.roundRect(mx-2.5,cy-gh/2-3,5,12,2.5); c.fill(); // 마커: 높이 12px 막대
@@ -1000,7 +1035,7 @@ class Game {
       if(!n.isHold||n.hit||n.missed) continue;
       const ft=this._fallTime();
       const dt=n.time-this.elapsed;
-      if(dt>ft||dt<-BAD_WIN-100) continue;
+      if(dt>ft||dt<-this.win.BAD-100) continue;
       const progress=1-(dt/ft), noteY=progress*HIT_Y;
       const endTime=n.time+n.holdDur, endDt=endTime-this.elapsed;
       const endProgress=1-(endDt/ft), endY=endProgress*HIT_Y;
@@ -1027,7 +1062,7 @@ class Game {
       const ft=this._fallTime();
       const dt=n.time-this.elapsed;
       if(dt>ft) continue;
-      if(n.missed&&dt<-BAD_WIN-150) continue;
+      if(n.missed&&dt<-this.win.BAD-150) continue;
       const progress=1-(dt/ft), noteY=progress*HIT_Y;
       if(noteY<-50) continue;
       this._drawNote(n.lane,n.lane*LANE_W+LANE_W/2,noteY,n.missed?.3:1,n.missed?.92:1,dc);
@@ -1306,7 +1341,7 @@ class InfiniteGame extends Game {
     for(const n of this.notes){
       if(n.hit||n.missed) continue;
       const diff=this.elapsed-n.time;
-      if(diff>BAD_WIN+150){
+      if(diff>this.win.BAD+150){
         n.missed=true;
         this._registerMiss(n.lane);
       }
@@ -1410,11 +1445,11 @@ function _renderLevels(){
       ${gradeHtml}
       ${fcHtml}
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
-        <div style="font-size:10px;font-weight:800;letter-spacing:.08em;color:${dc};text-transform:uppercase">${lvl.diff}</div>
+        <div style="font-size:10px;font-weight:800;letter-spacing:.08em;color:${dc}">Lv.${lvl.id} · ${lvl.tier}</div>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="${clr}" opacity=".95"><path d="M12 3l7 9h-4v9h-6v-9H5z"/></svg>
       </div>
       <div style="font-family:'Fredoka',sans-serif;font-weight:700;font-size:16px;line-height:1.2;color:#fff;margin-bottom:3px">${lvl.name}</div>
-      <div style="font-size:11px;opacity:.6;color:#fff">BPM ${lvl.bpm} · ${lvl.dur}s</div>
+      <div style="font-size:11px;opacity:.6;color:#fff">BPM ${lvl.bpm} · ${lvl.dur}s · ${lvl.diff}</div>
       <div class="diff-dots" style="color:${dc}">${dots}</div>
       ${hs>0?`<div style="font-size:10px;opacity:.6;margin-top:6px;color:#fff">최고 ${hs.toLocaleString()}점</div>`:''}
       ${locked?'<div class="lock-veil"><div style="font-size:22px;filter:drop-shadow(0 2px 6px rgba(0,0,0,.6))">🔒</div></div>':''}
@@ -1689,7 +1724,8 @@ function showResults(g){
   const title=g.gameOver?'게임 오버':'클리어!';
   const titleEl=document.getElementById('res-title');
   if(titleEl){ titleEl.textContent=title; titleEl.className='font-display '+(g.gameOver?'neon-coral':'neon-green'); }
-  const lvlName=g.lvl?g.lvl.name:'?';
+  // BACKLOG #10: 결과 화면에도 티어(입문/중급/고급) 표기
+  const lvlName=g.lvl?(g.lvl.tier?`Lv.${g.lvl.id} ${g.lvl.tier} · ${g.lvl.name}`:g.lvl.name):'?';
   const subEl=document.getElementById('res-sub');
   if(subEl){
     const effBpm=g.lvl?Math.round(g.lvl.bpm*(G.practice?0.5:G.speed)):0;
