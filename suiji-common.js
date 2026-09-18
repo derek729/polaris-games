@@ -159,7 +159,7 @@
       all[game] = s;
       localStorage.setItem('suiji.stats.v1', JSON.stringify(all));
       Suiji.badges.evaluate(); // 2-3 업적 판정 훅 — 3개 게임의 모든 판종료가 이곳을 지난다
-      // 포털 경제 정산 (Phase 1) — 도토리 판돈 · 경험치 · 오늘의 미션 진행
+      // 포털 경제 정산 (Phase 1) — 도토리 판돈 · 경험치 · 오늘의 미션 진행 · 주간 성적표 집계
       if (window.Polaris && Polaris.settle) {
         const r = Polaris.settle(game, outcome);
         if (r.delta > 0) Suiji.toast('판돈 정산 🌰+' + r.delta + '  ·  EXP +' + r.exp + (r.levelUp ? '  ⭐ Lv.' + r.level + ' 달성!' : ''));
@@ -173,6 +173,45 @@
       return `${s.w}W · ${s.l}L${s.d ? ` · ${s.d}D` : ''}`;
     }
   };
+
+  /* ---------------- 포털 보드 테마 훅 (Phase 1 상점) — 적용은 여기 한 곳 ---------------- */
+  // polaris-common.js THEME_DEFS(단일 출처)의 CSS 변수 + filter 틴트로 canvas#board 목재 톤을
+  // 변환한다 (엔진 무수정 — makeWoodTexture 프리셋 파라미터화는 Phase 2 백로그, 그때까지 filter 유지).
+  // v1 적용 대상은 바둑·오목 2종 한정 (기획서 §1-1 — 알까기·기보는 렌더 구조 검증이 별도로 필요해
+  // 스코프 제외. 비대상 페이지에서는 틴트/변수를 적용·유지하지 않고 기존 외형을 그대로 둔다).
+  const THEME_PAGES = ['suiji-go.html', 'suiji-omok.html'];
+  let themeStyle = null, themeVarKeys = [];
+  Suiji.theme = {
+    apply() {
+      if (!(window.Polaris && Polaris.shop)) return; // 폴백: 런타임 부재 시 기존 외형 유지
+      const root = document.documentElement;
+      // v1 스코프 판정 (기획서 §1-1) — file://에서도 pathname이 파일명으로 끝나므로 endsWith로 충분
+      const inScope = THEME_PAGES.some(p => location.pathname.endsWith(p));
+      if (!inScope) {
+        // 비대상 페이지 — 이전 적용분(변수·속성·틴트)을 제거해 기존 외형 유지
+        for (const k of themeVarKeys) root.style.removeProperty(k);
+        themeVarKeys = [];
+        root.removeAttribute('data-suiji-theme');
+        if (themeStyle) themeStyle.textContent = '';
+        return;
+      }
+      const t = Polaris.shop.catalog().find(x => x.active); // 활성 프리셋 (basic이면 아무것도 안 함)
+      for (const k of themeVarKeys) root.style.removeProperty(k); // 이전 프리셋 변수 정리
+      themeVarKeys = Object.keys(t ? t.vars : {});
+      for (const [k, v] of Object.entries(t ? t.vars : {})) root.style.setProperty(k, v); // CSS 변수 적용
+      root.setAttribute('data-suiji-theme', t ? t.id : 'basic');
+      // <style> 1개 주입: canvas#board에 프리셋 filter 틴트 → 엔진 수정 없이 목재 톤 변환
+      // (neon = hue-rotate + saturate + 글로우 drop-shadow / hanji = sepia + brightness)
+      if (!themeStyle) {
+        themeStyle = document.createElement('style');
+        themeStyle.id = 'suiji-theme-tint';
+        document.head.appendChild(themeStyle);
+      }
+      themeStyle.textContent = 'canvas#board{filter:' + (t ? (t.filter || 'none') : 'none') + '}';
+    }
+  };
+  Suiji.theme.apply(); // 로드 직후 1회 (게임 페이지는 polaris-common.js 다음에 로드됨)
+  document.addEventListener('polaris:shop', () => Suiji.theme.apply()); // 동일 탭 실시간 반영용
 
   /* ---------------- kifu library ---------------- */
   function readLib() {

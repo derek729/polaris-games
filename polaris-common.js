@@ -7,6 +7,8 @@
    - level   : 경험치·레벨 (게임 1판마다 획득)
    - missions: 오늘의 미션 3종 (날짜 시드 로테이션, 보상 수령)
    - settle  : 판 정산 — 승/무/패 판돈 정산 + 경험치 + 미션 진행
+   - shop    : 보드 테마 상점 — 코스메틱 영구 소유 (polaris.shop.v1)
+   - weekly  : 주간 성적표 — settle 한 곳에서 집계, 월요일 자동 롤오버 (polaris.weekly.v1)
    - header  : 포털 상단바 렌더 (로비·게임 공용)
    ============================================================ */
 (function () {
@@ -198,7 +200,131 @@
     }
   };
 
-  /* ---------------- 판 정산 (승/무/패 → 판돈·경험치·미션) ---------------- */
+  /* ---------------- 상점 (보드 테마 — 코스메틱 영구 소유) ---------------- */
+  const SHOP_KEY = 'polaris.shop.v1';
+  // 프리셋: 로비 스와치 프리뷰와 suiji 테마 훅이 같이 읽는 단일 출처
+  // (neon filter의 글로우 drop-shadow는 §1-5 주입 스타일 예시를 단일 출처에 통합)
+  const THEME_DEFS = [
+    { id: 'classic',  name: '클래식', price: 300, vars: { '--board': '#e6c17a', '--board-dark': '#cfa254' }, filter: 'none' },
+    { id: 'cheolmok', name: '철목',   price: 450, vars: { '--board': '#b07a42', '--board-dark': '#8f5c2c' }, filter: 'saturate(1.15) brightness(.94)' },
+    { id: 'hanji',    name: '한지',   price: 600, vars: { '--board': '#efe3c2', '--board-dark': '#d8c79b' }, filter: 'sepia(.18) brightness(1.06)' },
+    { id: 'neon',     name: '네온',   price: 800, vars: { '--board': '#2ea88a', '--board-dark': '#1c7a63' },
+      filter: 'hue-rotate(140deg) saturate(1.4) brightness(.9) drop-shadow(0 0 14px rgba(46,168,138,.45))' }
+  ];
+
+  P.shop = {
+    _store() {
+      // 파손/부재 폴백 — 유효한 값만 남긴다 (기존 readJSON 패턴)
+      const s = readJSON(SHOP_KEY, null) || {};
+      const valid = THEME_DEFS.some(d => d.id === s.active) || s.active === 'basic';
+      s.owned = (Array.isArray(s.owned) ? s.owned : [])
+        .filter(id => THEME_DEFS.some(d => d.id === id))
+        .filter((id, i, a) => a.indexOf(id) === i); // 미정의 id·중복 제거
+      s.active = valid ? s.active : 'basic'; // 미설정·무효값 → 'basic' (폴백 기본값)
+      return s;
+    },
+    catalog() {
+      // THEME_DEFS + 소유/활성 여부 — 스와치 프리뷰와 suiji 테마 훅이 같이 읽는다
+      const s = this._store();
+      return THEME_DEFS.map(d => ({
+        id: d.id, name: d.name, price: d.price, vars: d.vars, filter: d.filter,
+        owned: s.owned.indexOf(d.id) >= 0,
+        active: s.active === d.id
+      }));
+    },
+    activeId() {
+      return this._store().active;
+    },
+    buy(id) {
+      const def = THEME_DEFS.find(d => d.id === id);
+      if (!def) return { ok: false, reason: 'invalid' };
+      const s = this._store();
+      if (s.owned.indexOf(id) >= 0) return { ok: false, reason: 'owned' }; // 재구매 방지
+      if (P.coins.balance() < def.price) {
+        // 잔액 부족 — spend 전 선검사로 필요/보유/부족을 안내용으로 반환
+        return { ok: false, reason: 'poor', need: def.price, lack: def.price - P.coins.balance() };
+      }
+      if (!P.coins.spend(def.price)) { // 잔액 변동 동시성 폴백 — 기존 spend false 반환 패턴
+        return { ok: false, reason: 'poor', need: def.price, lack: def.price - P.coins.balance() };
+      }
+      s.owned.push(id);
+      s.active = id; // 구매 즉시 자동 장착
+      writeJSON(SHOP_KEY, s);
+      emit('shop', s); // 잔액 동기화는 spend 내부 emit('coins')가 담당
+      return { ok: true, theme: def };
+    },
+    equip(id) {
+      const s = this._store();
+      if (s.owned.indexOf(id) < 0) return false; // 소유 테마만 장착
+      s.active = id;
+      writeJSON(SHOP_KEY, s);
+      emit('shop', s);
+      return true;
+    },
+    unequip() {
+      const s = this._store();
+      s.active = 'basic'; // 기본 보드 복귀 — 소유권은 유지 (환불 아님)
+      writeJSON(SHOP_KEY, s);
+      emit('shop', s);
+      return true;
+    }
+  };
+
+  /* ---------------- 주간 성적표 (월요일 기준 — settle 한 곳에서만 집계) ---------------- */
+  const WEEKLY_KEY = 'polaris.weekly.v1';
+  // 월요일 기준 주 시작 (YYYY-MM-DD, 로컬 기준) — ISO 주 번호 계산 없이 날짜 비교만
+  function weekStartISO(now) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - ((d.getDay() + 6) % 7));   // 월=0 … 일=6 만큼 되돌림
+    const p = n => String(n).padStart(2, '0');
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); // 로컬 날짜 (toISOString의 UTC 시프트 회피)
+  }
+
+  P.weekly = {
+    _weekStartISO: weekStartISO, // 내부 헬퍼 (관례: 밑줄 = 내부) — 롤오버 판정 재사용
+    _store() {
+      const ws = weekStartISO(new Date());
+      let s = readJSON(WEEKLY_KEY, null);
+      if (!s || typeof s !== 'object') s = {};
+      // 필드 정규화 (파손/부재 폴백 — 기존 readJSON 패턴)
+      s.weekStart = (typeof s.weekStart === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s.weekStart)) ? s.weekStart : ws;
+      s.plays = s.plays | 0;
+      s.coinsEarned = s.coinsEarned | 0;
+      s.coinsSpent = s.coinsSpent | 0;
+      s.exp = s.exp | 0;
+      if (!s.games || typeof s.games !== 'object') s.games = {};
+      if (s.weekStart !== ws) {
+        if (s.weekStart < ws) {
+          // 자동 롤오버 — 현재 값을 지난주 요약 스냅샷으로 보관 (1주만 보관: 비교 지표용)
+          s.last = { weekStart: s.weekStart, plays: s.plays, coinsEarned: s.coinsEarned, exp: s.exp };
+        }
+        // 저장된 주가 미래면(시계 되돌림) 스냅샷 없이 리셋 — 음수 주 방지 (last는 기존값 유지)
+        s.weekStart = ws;
+        s.plays = 0; s.games = {}; s.coinsEarned = 0; s.coinsSpent = 0; s.exp = 0;
+      }
+      return s;
+    },
+    summary() {
+      const s = this._store();
+      writeJSON(WEEKLY_KEY, s); // 로비 재방문 시 재판정 — 롤오버 결과 즉시 반영
+      return JSON.parse(JSON.stringify(s)); // 복사본 반환 — 외부 변형 차단
+    },
+    record(game, outcome, delta, exp) {
+      // ※ P.settle에서만 호출 — 외부 직접 호출 금지 (수집 원본은 settle 한 곳: 단일 수집 원칙)
+      const s = this._store();
+      s.plays += 1;
+      const g = s.games[game] = s.games[game] || { w: 0, l: 0, d: 0 };
+      g.w = g.w | 0; g.l = g.l | 0; g.d = g.d | 0;
+      if (outcome === 'w') g.w++; else if (outcome === 'l') g.l++; else g.d++;
+      if (delta > 0) s.coinsEarned += delta;       // settle delta의 부호 기준 합산 (무승부 0)
+      else if (delta < 0) s.coinsSpent += -delta;
+      s.exp += exp | 0;
+      writeJSON(WEEKLY_KEY, s);
+      return JSON.parse(JSON.stringify(s));
+    }
+  };
+
+  /* ---------------- 판 정산 (승/무/패 → 판돈·경험치·미션·주간 성적표) ---------------- */
   const STAKE = 50; // 기본 판돈 — 잔액 부족 시 보유 전액(올인)
   P.settle = function (game, outcome) {
     const stake = Math.min(STAKE, P.coins.balance());
@@ -210,6 +336,8 @@
     P.level.addExp(expGain, 'settle');
     const after = P.level.info();
     P.missions._report(game, outcome);
+    // 주간 성적표 집계 (§2-1) — settle을 호출하는 게임은 향후 자동 포함, 로비 패널 즉시 갱신용 emit
+    emit('weekly', P.weekly.record(game, outcome, delta, expGain));
     return { delta: delta, exp: expGain, level: after.level, levelUp: after.level > before };
   };
 
@@ -290,7 +418,7 @@
     }
   };
 
-  /* ---------------- 로비 위젯 (프로필 카드 · 미션 패널) ---------------- */
+  /* ---------------- 로비 위젯 (프로필 카드 · 미션 패널 · 상점 · 주간 성적표) ---------------- */
   const BOX_STYLE = 'background:#171b31;border:1px solid #2a3154;border-radius:16px;padding:18px 20px;';
   const GOLD = '#f5c542';
 
@@ -368,6 +496,150 @@
       }
       render();
       document.addEventListener('polaris:missions', render);
+      document.addEventListener('polaris:coins', render);
+      host.appendChild(el);
+      return el;
+    },
+
+    /* 보드 테마 상점: 미니 보드 스와치 프리뷰 + 버튼 3상태(구매/적용/적용 중) — §1-4 */
+    shopPanel(selector) {
+      const host = document.querySelector(selector);
+      if (!host) return null;
+      // 기본 보드(전원 소유 · 판매 안 함) — suiji-theme.css 기본 톤(#dcb268/#c1934a)과 동일
+      const BASIC = { id: 'basic', name: '기본', price: 0, owned: true, vars: { '--board': '#dcb268', '--board-dark': '#c1934a' } };
+      const el = document.createElement('div');
+      el.style.cssText = BOX_STYLE;
+      el.innerHTML =
+        '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:12px">' +
+        '<div style="font-size:13px;letter-spacing:.15em;color:#9aa3c7">🛒 보드 테마 상점</div>' +
+        '<span id="sp-balance" style="font-size:13px;color:#4fd1c5;cursor:default">🌰 ' + P.coins.balance() + '</span></div>' +
+        '<div id="sp-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px"></div>' +
+        '<div style="margin-top:10px;font-size:11px;color:#9aa3c7">구매한 테마는 영구 소유 — 환불은 지원되지 않아요</div>';
+
+      // 미니 보드 스와치: 프리셋 vars를 입힌 CSS 그라디언트 프리뷰 (외부 리소스 없음 — file:// 안전)
+      function swatch(vars) {
+        const a = vars['--board'], b = vars['--board-dark'];
+        return '<div style="height:44px;border-radius:8px;border:1px solid rgba(0,0,0,.35);' +
+          'background:linear-gradient(135deg,' + a + ' 0%,' + a + ' 52%,' + b + ' 52%,' + b + ' 100%)"></div>';
+      }
+      function button(t) { // 상태 버튼: 적용 중 ✓ / 적용 / 구매(잔액 부족 시 비활성)
+        const css = 'width:100%;border:0;border-radius:8px;padding:6px 8px;font-size:12px;font-weight:700;font-family:inherit;';
+        if (t.active) return '<button disabled style="' + css + 'background:#242b4d;color:' + GOLD + '">적용 중 ✓</button>';
+        if (t.owned) return '<button data-theme="' + t.id + '" style="' + css + 'background:#242b4d;color:#4fd1c5;cursor:pointer">적용</button>';
+        const lack = t.price - P.coins.balance();
+        if (lack > 0) return '<button disabled title="도토리가 부족해요" style="' + css + 'background:#242b4d;color:#9aa3c7;opacity:.55">🌰' + lack + ' 부족</button>';
+        return '<button data-theme="' + t.id + '" style="' + css + 'background:' + GOLD + ';color:#0d1021;cursor:pointer">🌰' + t.price + ' 구매</button>';
+      }
+      function render() {
+        el.querySelector('#sp-balance').textContent = '🌰 ' + P.coins.balance();
+        const grid = el.querySelector('#sp-grid');
+        grid.innerHTML = '';
+        const cards = [BASIC].concat(P.shop.catalog()); // 기본 보드를 맨 앞 — '적용 해제' 경로 (A7)
+        for (const t of cards) {
+          const card = document.createElement('div');
+          card.style.cssText = 'background:#1e2440;border:1px solid #2a3154;border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:8px;';
+          card.innerHTML = swatch(t.vars) +
+            '<div style="display:flex;align-items:center;justify-content:space-between;gap:6px">' +
+            '<b style="font-size:13px">' + t.name + '</b>' +
+            (t.id !== 'basic' && t.owned
+              ? '<span style="font-size:10.5px;color:' + GOLD + ';border:1px solid ' + GOLD + ';border-radius:999px;padding:0 7px">보유 ✓</span>'
+              : '') +
+            '</div>' +
+            '<div style="font-size:11.5px;color:#9aa3c7">' + (t.price ? '🌰 ' + t.price : '기본 보드') + '</div>' +
+            button(t);
+          grid.appendChild(card);
+        }
+        grid.querySelectorAll('button[data-theme]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const id = btn.getAttribute('data-theme');
+            if (id === 'basic') { // '적용 해제' — 기본 보드 복귀, 소유권은 유지 (환불 아님)
+              P.shop.unequip();
+              P.toast('기본 보드로 복귀했어요 (보유 테마는 그대로 유지)');
+            } else {
+              const t = P.shop.catalog().find(x => x.id === id);
+              if (t.owned) { // 보유 테마 적용 — 구매 경로가 노출되지 않는 이중 방어(§1-3)
+                P.shop.equip(id);
+                P.toast(t.name + ' 테마를 적용했어요');
+              } else if (window.confirm('🪵 ' + t.name + ' 테마를 🌰' + t.price + '에 구매할까요? 구매 후 환불은 되지 않아요.')) {
+                // 구매 확인 1회 — 기존 네이티브 다이얼로그 패턴(닉네임 변경 prompt와 동일)
+                const res = P.shop.buy(id);
+                if (res.ok) P.toast('테마 구매! 보드에 바로 적용됐어요');
+                else if (res.reason === 'poor') P.toast('도토리가 부족해요 — 필요 ' + res.need + ' · 보유 ' + P.coins.balance() + ' (부족 ' + res.lack + ')');
+              }
+            }
+            render(); // polaris:shop/polaris:coins 재구독으로도 갱신되지만 클릭 흐름은 즉시 반영
+          });
+        });
+      }
+      render();
+      document.addEventListener('polaris:shop', render);
+      document.addEventListener('polaris:coins', render); // 잔액·버튼 상태 실시간 동기화
+      host.appendChild(el);
+      return el;
+    },
+
+    /* 주간 성적표: 요약 4칸 + 지난주 비교 + 게임별 상세 리스트 — §2-4 */
+    weeklyPanel(selector) {
+      const host = document.querySelector(selector);
+      if (!host) return null;
+      const GAME_LABELS = { go: '바둑', omok: '오목', alkkagi: '알까기', kifu: '기보' };
+      const el = document.createElement('div');
+      el.style.cssText = BOX_STYLE;
+      el.innerHTML = '<div style="font-size:13px;letter-spacing:.15em;color:#9aa3c7;margin-bottom:12px">📊 내 주간 성적표</div>' +
+        '<div id="wp-body"></div>';
+
+      function cell(label, value) {
+        return '<div style="background:#1e2440;border:1px solid #2a3154;border-radius:10px;padding:8px 10px">' +
+          '<div style="font-size:10.5px;color:#9aa3c7;letter-spacing:.08em">' + label + '</div>' +
+          '<div style="margin-top:3px;font-size:14px;font-weight:700">' + value + '</div></div>';
+      }
+      function wldText(g) { // Suiji.stats.text()와 같은 W/L/D 표기 포맷 — 전적 없는 게임은 '—'
+        if (!g || (g.w | 0) + (g.l | 0) + (g.d | 0) === 0) return '—';
+        return (g.w | 0) + 'W · ' + (g.l | 0) + 'L' + ((g.d | 0) ? ' · ' + (g.d | 0) + 'D' : '');
+      }
+      function compareLine(s) { // 지난주 비교 1줄 — last 스냅샷 기준 (없으면 첫 주 안내)
+        if (!s.last) return '이번 주가 첫 주예요';
+        const diff = s.plays - (s.last.plays | 0);
+        if (diff > 0) return '지난주보다 ' + diff + '판 더 했어요 ↑';
+        if (diff < 0) return '지난주보다 ' + (-diff) + '판 덜 했어요 ↓';
+        return '지난주와 같은 ' + s.plays + '판이에요';
+      }
+      function render() {
+        const s = P.weekly.summary();
+        let wins = 0, losses = 0, draws = 0;
+        for (const k of Object.keys(s.games)) {
+          const g = s.games[k] || {};
+          wins += g.w | 0; losses += g.l | 0; draws += g.d | 0;
+        }
+        const body = el.querySelector('#wp-body');
+        body.innerHTML =
+          '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px">' +
+          cell('이번 주', s.plays + '판') +
+          cell('전적', wins + '승 ' + losses + '패' + (draws ? ' (' + draws + '무)' : '')) +
+          cell('도토리', '🌰 <span style="color:' + GOLD + '">+' + (s.coinsEarned | 0) + '</span> / −' + (s.coinsSpent | 0)) +
+          cell('경험치', '+' + (s.exp | 0) + ' EXP') +
+          '</div>' +
+          '<div style="margin-top:8px;font-size:12px;color:#9aa3c7">' + compareLine(s) + '</div>' +
+          '<div id="wp-list" style="margin-top:10px;display:flex;flex-direction:column;gap:6px;font-size:13px"></div>';
+        // 게임별 상세 — 알려진 4종은 항상 표시(전적 없으면 '—'), 신규 게임은 settle 경유 시 자동 추가
+        const list = body.querySelector('#wp-list');
+        const ids = Object.keys(GAME_LABELS).concat(Object.keys(s.games).filter(k => !GAME_LABELS[k]));
+        for (const id of ids) {
+          const row = document.createElement('div');
+          row.style.cssText = 'display:flex;justify-content:space-between;gap:10px';
+          // 게임 id는 저장 기반 값이므로 innerHTML 대신 textContent 조립으로 경화
+          const nameEl = document.createElement('span');
+          nameEl.style.color = '#9aa3c7';
+          nameEl.textContent = GAME_LABELS[id] || id;
+          const valEl = document.createElement('span');
+          valEl.textContent = wldText(s.games[id]);
+          row.appendChild(nameEl);
+          row.appendChild(valEl);
+          list.appendChild(row);
+        }
+      }
+      render();
+      document.addEventListener('polaris:weekly', render); // 신규 이벤트 — 판 종료 직후 로비 복귀 시 즉시 갱신
       document.addEventListener('polaris:coins', render);
       host.appendChild(el);
       return el;
