@@ -3,6 +3,13 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "start": "node server.cjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "ws": "^8.0.0"
   }
 }

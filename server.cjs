@@ -4,6 +4,9 @@
    - 정적 파일 호스팅 + 온라인 대전 릴레이 (WebSocket)
    - v2: 서버 측 수 검증(바둑 엔진 탑재), 시간제한(초읽기),
          끊김 복구용 스냅샷 보관, 자리 보존(5분)
+   - v2.1 (Phase 2 사이클 A): 계정·전적·주간 리더보드 HTTP API (/api/*)
+         기획서: docs/design/portal-phase2-account-server.md
+         WS 대전 프로토콜·정적 서빙은 무수정 — http 핸들러 선두의 /api/* 분기만 추가
    ============================================================ */
 const http = require('http');
 const fs = require('fs');
@@ -11,6 +14,11 @@ const path = require('path');
 const crypto = require('crypto');
 const { WebSocketServer } = require('ws');
 
+/* Node 기동용 최소 브라우저 전역 스텁 — suiji-engine v1.7.0(1485fc8)이 모듈 최상위에서
+   new Image()를 요구(브라우저 전용 돌 스킨 로드)하므로, 이 가드가 없으면 node server.cjs
+   기동 자체가 ReferenceError로 실패한다(HEAD 기준 선존재 문제 — 서버는 렌더러를 쓰지 않음).
+   suiji-engine.js는 사이클 A 수정 금지 파일이므로 본 파일에서 추가 가드만 둔다. */
+if (typeof Image === 'undefined') globalThis.Image = class { set src(v) { /* 서버 렌더링 미사용 — no-op */ } };
 require('./suiji-engine.js');
 const { GoGame } = globalThis.SuijiEngine;
 
@@ -32,8 +40,514 @@ const MIME = {
   '.md': 'text/plain; charset=utf-8'
 };
 
+/* ============================================================
+   Phase 2 — 계정·전적·주간 리더보드 API (사이클 A)
+   기획서: docs/design/portal-phase2-account-server.md
+   - 라우팅은 handleApi 1개로 정적 서빙·WS와 완전 분리
+   - 무DB: DATA_DIR 하위 JSON (원자적 쓰기: writeFileSync tmp → renameSync)
+   ============================================================ */
+const DATA_DIR = process.env.DATA_DIR || './data';
+const AUTH_SALT = process.env.AUTH_SALT || '';
+if (!AUTH_SALT) {
+  console.error('[치명적] AUTH_SALT 환경변수가 비어 있습니다 — 비밀번호 scrypt 페퍼는 필수입니다.');
+  console.error('         발급: openssl rand -hex 32  → Railway Variables에 등록 후 기동하세요. 서버를 종료합니다.');
+  process.exit(1);
+}
+const API_VERSION = '2.1.0';
+const API_STARTED_AT = Date.now();
+const CORS_ORIGINS = (process.env.CORS_ORIGIN || 'https://derek729.github.io')
+  .split(',').map(s => s.trim()).filter(Boolean);
+const TOKEN_TTL_DAYS = Math.max(1, parseInt(process.env.TOKEN_TTL_DAYS || '30', 10) || 30);
+const TOKEN_TTL_MS = TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000;
+const WEEKLY_TZ_OFFSET_MIN = (parseInt(process.env.WEEKLY_TZ_OFFSET_MIN, 10) || 540);   // KST = UTC+9
+const RATE_ACCOUNT_PER_MIN = Math.max(1, parseInt(process.env.RATE_LIMIT_ACCOUNT_PER_MIN || '60', 10) || 60);
+const RATE_IP_PER_MIN = Math.max(1, parseInt(process.env.RATE_LIMIT_IP_PER_MIN || '120', 10) || 120);
+const GAME_WHITELIST = ['go', 'omok', 'alkkagi', 'kifu', 'beatcraft', 'vampire', 'pvz', 'gostop'];
+const MAX_BODY_BYTES = 16 * 1024;   // 413 PAYLOAD_TOO_LARGE 기준 (§4-9)
+
+/* ---------------- 저장 레이어 (§7) ---------------- */
+const ACCOUNTS_FILE = path.join(DATA_DIR, 'accounts.json');
+const TOKENS_FILE = path.join(DATA_DIR, 'tokens.json');
+const WEEKLY_DIR = path.join(DATA_DIR, 'weekly');
+const BACKUP_DIR = path.join(DATA_DIR, 'backups');
+const BACKUP_WEEKLY_DIR = path.join(BACKUP_DIR, 'weekly');
+const BACKUP_KEEP = 4;   // 각 종류 최근 4세대만 보관
+
+let accounts = [];   // [{ id, name, nameLower, passHash, createdAt, expTotal, matchesTotal }]
+let tokens = [];     // [{ hash, accountId, createdAt, expiresAt }] — sha256(토큰) 해시만 저장
+
+function atomicWriteJson(file, obj) {
+  const tmp = file + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify(obj));
+  fs.renameSync(tmp, file);
+}
+
+function readJsonOrDefault(file, def) {
+  try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) { return def; }
+}
+
+function saveAccounts() { atomicWriteJson(ACCOUNTS_FILE, accounts); }
+function saveTokens() { atomicWriteJson(TOKENS_FILE, tokens); }
+
+function backupStamp() { return new Date().toISOString().replace(/[:.]/g, '-'); }
+
+function rotateBackups(dir, prefix) {
+  let files;
+  try { files = fs.readdirSync(dir).filter(f => f.startsWith(prefix + '.') && f.endsWith('.json')).sort(); }
+  catch (e) { return; }
+  while (files.length > BACKUP_KEEP) {
+    try { fs.unlinkSync(path.join(dir, files.shift())); } catch (e) { break; }
+  }
+}
+
+function backupFile(src, dir, prefix) {
+  if (!fs.existsSync(src)) return;
+  fs.mkdirSync(dir, { recursive: true });
+  fs.copyFileSync(src, path.join(dir, prefix + '.' + backupStamp() + '.json'));
+  rotateBackups(dir, prefix);
+}
+
+function cleanExpiredTokens() {
+  const now = Date.now();
+  const before = tokens.length;
+  tokens = tokens.filter(t => t.expiresAt > now);
+  return tokens.length !== before;
+}
+
+/* KST(UTC+9) 월요일 00:00 기준 주 시작 'YYYY-MM-DD' — 서버 기준 단일 판정 (§5-2) */
+function kstWeekStart(now) {
+  const ms = (now instanceof Date ? now.getTime() : (typeof now === 'number' ? now : Date.now()))
+    + WEEKLY_TZ_OFFSET_MIN * 60000;
+  const kst = new Date(ms);
+  kst.setUTCDate(kst.getUTCDate() - ((kst.getUTCDay() + 6) % 7));   // 월=0 … 일=6 만큼 되돌림
+  const p = n => String(n).padStart(2, '0');
+  return kst.getUTCFullYear() + '-' + p(kst.getUTCMonth() + 1) + '-' + p(kst.getUTCDate());
+}
+
+/* 주간 롤오버 — 주 전환 후 첫 접근 시 지난 주 사본 1장 + 만료 토큰 일괄 청소 (§5-3) */
+let lastKnownWeek = kstWeekStart();
+function checkWeeklyRollover() {
+  const ws = kstWeekStart();
+  if (ws === lastKnownWeek) return;
+  const prev = lastKnownWeek;
+  lastKnownWeek = ws;
+  backupFile(path.join(WEEKLY_DIR, prev + '.json'), BACKUP_WEEKLY_DIR, prev);
+  if (cleanExpiredTokens()) saveTokens();
+}
+
+/* 기동 초기화 — 디렉터리 준비 · 로드 · 자동 사본(§7-2) · 만료 토큰 청소 */
+(function initStorage() {
+  for (const d of [DATA_DIR, WEEKLY_DIR, BACKUP_DIR, BACKUP_WEEKLY_DIR]) fs.mkdirSync(d, { recursive: true });
+  accounts = readJsonOrDefault(ACCOUNTS_FILE, []);
+  if (!Array.isArray(accounts)) accounts = [];
+  tokens = readJsonOrDefault(TOKENS_FILE, []);
+  if (!Array.isArray(tokens)) tokens = [];
+  backupFile(ACCOUNTS_FILE, BACKUP_DIR, 'accounts');
+  backupFile(TOKENS_FILE, BACKUP_DIR, 'tokens');
+  // 재기동으로 롤오버를 놓친 지난 주 파일 — 백업 없으면 스냅샷 1장
+  const cur = kstWeekStart();
+  let past;
+  try { past = fs.readdirSync(WEEKLY_DIR); } catch (e) { past = []; }
+  for (const f of past) {
+    if (!f.endsWith('.json')) continue;
+    const ws = f.slice(0, -5);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(ws) || ws >= cur) continue;
+    let backed;
+    try { backed = fs.readdirSync(BACKUP_WEEKLY_DIR).some(n => n.startsWith(ws + '.')); } catch (e) { backed = false; }
+    if (!backed) backupFile(path.join(WEEKLY_DIR, f), BACKUP_WEEKLY_DIR, ws);
+  }
+  if (cleanExpiredTokens()) saveTokens();
+})();
+
+/* ---------------- 인증 (§3) ---------------- */
+function sha256Hex(s) { return crypto.createHash('sha256').update(s, 'utf8').digest('hex'); }
+
+/* scrypt$16384$8$1$<saltHex>$<hashHex> — 파일 내 평문 비번 부재를 QA로 검증 가능한 단일 문자열 (§3-2) */
+function hashPassword(password) {
+  const salt = crypto.randomBytes(16);
+  const hash = crypto.scryptSync(password + AUTH_SALT, salt, 64);   // N=16384, r=8, p=1 (기본값)
+  return 'scrypt$16384$8$1$' + salt.toString('hex') + '$' + hash.toString('hex');
+}
+
+function verifyPassword(password, stored) {
+  const parts = String(stored || '').split('$');
+  if (parts.length !== 6 || parts[0] !== 'scrypt') return false;
+  try {
+    const hash = crypto.scryptSync(password + AUTH_SALT, Buffer.from(parts[4], 'hex'),
+      parts[5].length / 2, { N: parseInt(parts[1], 10), r: parseInt(parts[2], 10), p: parseInt(parts[3], 10) });
+    return crypto.timingSafeEqual(hash, Buffer.from(parts[5], 'hex'));
+  } catch (e) { return false; }
+}
+
+/* Phase 1 P.level.info()와 동일 규칙 — expForNext = 100 + 50*(L-1) 누적 차감 (§4-8) */
+function levelFromExpTotal(expTotal) {
+  let level = 1, exp = expTotal | 0;
+  while (exp >= 100 + (level - 1) * 50) { exp -= 100 + (level - 1) * 50; level++; }
+  return level;
+}
+
+/* 토큰 발급 — 원문은 응답 1회뿐, 저장은 sha256 해시. 계정당 최대 3세션(초과분 최근참 폐기) (§3-3) */
+function issueToken(accountId) {
+  const now = Date.now();
+  const raw = crypto.randomBytes(32).toString('hex');
+  tokens.push({ hash: sha256Hex(raw), accountId, createdAt: now, expiresAt: now + TOKEN_TTL_MS });
+  const mine = tokens.filter(t => t.accountId === accountId).sort((a, b) => a.createdAt - b.createdAt);
+  while (mine.length > 3) {
+    const oldest = mine.shift();
+    tokens = tokens.filter(t => t.hash !== oldest.hash);
+  }
+  saveTokens();
+  return raw;
+}
+
+/* Bearer 헤더 단일 방식 — 부재/불일치 AUTH_REQUIRED, 만료 TOKEN_EXPIRED (§4 공통 규칙) */
+function authenticate(req) {
+  const m = /^Bearer\s+(\S+)$/.exec(req.headers.authorization || '');
+  if (!m || !/^[0-9a-f]{64}$/.test(m[1])) return { error: 'AUTH_REQUIRED' };
+  const hash = sha256Hex(m[1]);
+  const t = tokens.find(t => t.hash === hash);
+  if (!t) return { error: 'AUTH_REQUIRED' };
+  if (t.expiresAt <= Date.now()) {
+    tokens = tokens.filter(x => x.hash !== hash);
+    saveTokens();
+    return { error: 'TOKEN_EXPIRED' };
+  }
+  const account = accounts.find(a => a.id === t.accountId);
+  if (!account) return { error: 'AUTH_REQUIRED' };
+  return { account, tokenHash: hash };
+}
+
+/* ---------------- 레이트 리미트 — in-memory 분 카운터 (§5-5) ---------------- */
+const rateCounters = new Map();
+function allowRate(key, maxPerMin) {
+  const now = Date.now();
+  let c = rateCounters.get(key);
+  if (!c || now - c.winStart >= 60000) { c = { winStart: now, count: 0 }; rateCounters.set(key, c); }
+  c.count += 1;
+  if (rateCounters.size > 4096) {
+    for (const [k, v] of rateCounters) if (now - v.winStart >= 60000) rateCounters.delete(k);
+  }
+  return c.count <= maxPerMin;
+}
+
+/* ---------------- 주간 버킷 저장 (§5-2) ---------------- */
+const weeklyCache = new Map();   // weekStart -> bucket
+function weeklyPath(ws) { return path.join(WEEKLY_DIR, ws + '.json'); }
+
+function loadWeek(ws) {
+  if (weeklyCache.has(ws)) return weeklyCache.get(ws);
+  const raw = readJsonOrDefault(weeklyPath(ws), null);
+  const week = (raw && raw.weekStart === ws && raw.players && typeof raw.players === 'object' && !Array.isArray(raw.players))
+    ? raw : { weekStart: ws, players: {} };
+  weeklyCache.set(ws, week);
+  return week;
+}
+
+function saveWeek(ws) {
+  const week = weeklyCache.get(ws);
+  if (week) atomicWriteJson(weeklyPath(ws), week);
+}
+
+/* ---------------- HTTP 공용 헬퍼 ---------------- */
+function sendJson(res, status, obj, headers) {
+  if (res.headersSent) return;   // 이중 응답 방어
+  res.writeHead(status, Object.assign({ 'Content-Type': 'application/json; charset=utf-8' }, headers || {}));
+  res.end(JSON.stringify(obj));
+}
+
+function sendErr(res, status, code, extra, headers) {
+  sendJson(res, status, Object.assign({ ok: false, code: code }, extra || {}), headers);
+}
+
+function fail500(res, e) {
+  console.error('[api] internal error:', e);
+  try { if (!res.headersSent) sendErr(res, 500, 'INTERNAL'); } catch (e2) { /* 응답 불가 상태 */ }
+}
+
+/* POST 본문 읽기 + JSON 파싱 + 비동기 구간 예외 포착 — 파싱 실패 시 이미 400으로 응답하고 null 전달 */
+function withBody(req, res, h, handler) {
+  readBody(req, (err, raw) => {
+    try {
+      if (err) return sendErr(res, 413, 'PAYLOAD_TOO_LARGE', {}, h);
+      return handler(parseJsonBody(raw, res, h));
+    } catch (e) { fail500(res, e); }
+  });
+}
+
+/* CORS (§8-2) — 등록 Origin만 통과(헤더 부여), 미등록/Origin:null(file://) 403, 무헤더(같은 origin/curl) 통과 */
+function resolveCors(req) {
+  const origin = req.headers.origin;
+  if (origin === undefined) return { ok: true, headers: {} };
+  const headers = {
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Max-Age': '86400',
+    'Vary': 'Origin'
+  };
+  if (origin === 'null') return { ok: false };
+  const host = req.headers.host || '';
+  const sameOrigin = host !== '' && (origin === 'https://' + host || origin === 'http://' + host);
+  if (!sameOrigin && !CORS_ORIGINS.includes(origin)) return { ok: false };
+  headers['Access-Control-Allow-Origin'] = origin;
+  return { ok: true, headers };
+}
+
+function readBody(req, cb) {
+  const chunks = [];
+  let size = 0, settled = false;
+  req.on('data', c => {
+    if (settled) return;
+    size += c.length;
+    if (size > MAX_BODY_BYTES) { settled = true; return cb({ tooLarge: true }); }
+    chunks.push(c);
+  });
+  req.on('end', () => { if (!settled) { settled = true; cb(null, Buffer.concat(chunks).toString('utf8')); } });
+  req.on('error', () => { if (!settled) { settled = true; cb({ stream: true }); } });
+}
+
+/* JSON 본문 파싱 — 실패 시 400 BAD_JSON으로 응답하고 undefined 반환 (핸들러는 undefined면 즉시 종료) */
+function parseJsonBody(raw, res, headers) {
+  if (raw.length === 0) { sendErr(res, 400, 'BAD_JSON', {}, headers); return undefined; }
+  try { return JSON.parse(raw); }
+  catch (e) { sendErr(res, 400, 'BAD_JSON', {}, headers); return undefined; }
+}
+
+function publicAccount(a) {
+  return { id: a.id, name: a.name, level: levelFromExpTotal(a.expTotal), expTotal: a.expTotal | 0, matchesTotal: a.matchesTotal | 0 };
+}
+
+/* ---------------- API 라우팅 — switch 1개의 순수 함수 (§4) ---------------- */
+function handleApi(req, res) {
+  try {
+    const cors = resolveCors(req);
+    if (!cors.ok) return sendErr(res, 403, 'FORBIDDEN_ORIGIN');
+    const h = cors.headers;
+    if (req.method === 'OPTIONS') { res.writeHead(204, h); res.end(); return; }
+    let pathname = '/', query = new URLSearchParams();
+    try { const u = new URL(req.url, 'http://localhost'); pathname = u.pathname; query = u.searchParams; } catch (e) {}
+    switch (req.method + ' ' + pathname) {
+      case 'GET /api/health':
+        return apiHealth(res, h);
+      case 'POST /api/auth/register':
+        return withBody(req, res, h, body => apiRegister(req, res, h, body));
+      case 'POST /api/auth/login':
+        return withBody(req, res, h, body => apiLogin(req, res, h, body));
+      case 'POST /api/auth/logout':
+        // 본문 없이 호출 가능해야 한다(§4-5) — 파싱 없이 인증만 수행
+        return readBody(req, (err) => {
+          try {
+            if (err) return sendErr(res, 413, 'PAYLOAD_TOO_LARGE', {}, h);
+            const auth = authenticate(req);
+            if (auth.error) return sendErr(res, 401, auth.error, {}, h);
+            tokens = tokens.filter(t => t.hash !== auth.tokenHash);
+            saveTokens();
+            return sendJson(res, 200, { ok: true }, h);
+          } catch (e) { fail500(res, e); }
+        });
+      case 'GET /api/me': {
+        const auth = authenticate(req);
+        if (auth.error) return sendErr(res, 401, auth.error, {}, h);
+        return apiMe(res, h, auth.account);
+      }
+      case 'POST /api/matches':
+        return withBody(req, res, h, body => {
+          const auth = authenticate(req);
+          if (auth.error) return sendErr(res, 401, auth.error, {}, h);
+          return apiMatches(req, res, h, body, auth.account);
+        });
+      case 'GET /api/leaderboard/weekly':
+        return apiLeaderboard(req, res, h, query);
+      default:
+        return sendErr(res, 404, 'NOT_FOUND', {}, h);
+    }
+  } catch (e) {
+    fail500(res, e);
+  }
+}
+
+function apiHealth(res, h) {
+  sendJson(res, 200, {
+    ok: true, service: 'dumadang', version: API_VERSION,
+    uptimeSec: Math.floor((Date.now() - API_STARTED_AT) / 1000), accounts: accounts.length
+  }, h);
+}
+
+/* 2~12자(코드포인트 기준)·제어문자 금지·비번 6~128자 (§3-1) */
+function validateAccountFields(body) {
+  if (typeof body.name !== 'string') return { field: 'name', reason: '닉네임을 입력하세요' };
+  const name = body.name.trim();
+  const len = Array.from(name).length;
+  if (len < 2 || len > 12) return { field: 'name', reason: '닉네임은 2~12자여야 합니다' };
+  if (/[\u0000-\u001f\u007f]/.test(name)) return { field: 'name', reason: '제어문자는 사용할 수 없습니다' };
+  if (typeof body.password !== 'string' || body.password.length < 6 || body.password.length > 128) {
+    return { field: 'password', reason: '비밀번호는 6~128자여야 합니다' };
+  }
+  return null;
+}
+
+function apiRegister(req, res, h, body) {
+  if (body === undefined) return;   // parseJsonBody가 이미 400 BAD_JSON으로 응답
+  if (body === null || typeof body !== 'object' || Array.isArray(body)) return sendErr(res, 400, 'BAD_JSON', {}, h);
+  const ip = req.socket.remoteAddress || 'unknown';
+  if (!allowRate('ip:' + ip, RATE_IP_PER_MIN)) return sendErr(res, 429, 'RATE_LIMITED', {}, h);
+  const bad = validateAccountFields(body);
+  if (bad) return sendErr(res, 400, 'FIELD_INVALID', { field: bad.field, reason: bad.reason }, h);
+  const name = body.name.trim();
+  const nameLower = name.toLowerCase();
+  if (accounts.some(a => a.nameLower === nameLower)) {
+    return sendErr(res, 409, 'NAME_TAKEN', { field: 'name', reason: '이미 사용 중인 닉네임입니다' }, h);
+  }
+  let id;
+  do { id = 'u_' + crypto.randomBytes(4).toString('hex'); } while (accounts.some(a => a.id === id));
+  const account = {
+    id, name, nameLower,
+    passHash: hashPassword(body.password),
+    createdAt: Date.now(), expTotal: 0, matchesTotal: 0
+  };
+  accounts.push(account);
+  saveAccounts();
+  const token = issueToken(account.id);
+  sendJson(res, 201, { ok: true, token, expiresInDays: TOKEN_TTL_DAYS, account: publicAccount(account) }, h);
+}
+
+/* 로그인 실패는 닉네임 부재·비번 불일치 모두 같은 코드 AUTH_FAILED — 계정 존재 여부 탐지 방지 (§4-4) */
+function apiLogin(req, res, h, body) {
+  if (body === undefined) return;   // parseJsonBody가 이미 400 BAD_JSON으로 응답
+  if (body === null || typeof body !== 'object' || Array.isArray(body)) return sendErr(res, 400, 'BAD_JSON', {}, h);
+  const ip = req.socket.remoteAddress || 'unknown';
+  if (!allowRate('ip:' + ip, RATE_IP_PER_MIN)) return sendErr(res, 429, 'RATE_LIMITED', {}, h);
+  const account = (typeof body.name === 'string')
+    ? accounts.find(a => a.nameLower === body.name.trim().toLowerCase()) : null;
+  const passOk = !!account && typeof body.password === 'string' && verifyPassword(body.password, account.passHash);
+  if (!account || !passOk) return sendErr(res, 401, 'AUTH_FAILED', {}, h);
+  const token = issueToken(account.id);
+  sendJson(res, 200, { ok: true, token, expiresInDays: TOKEN_TTL_DAYS, account: publicAccount(account) }, h);
+}
+
+function apiMe(res, h, account) {
+  checkWeeklyRollover();
+  const ws = kstWeekStart();
+  const p = loadWeek(ws).players[account.id];
+  const weekly = p
+    ? { weekStart: ws, plays: p.plays | 0, w: p.w | 0, l: p.l | 0, d: p.d | 0, coinsEarned: p.coinsEarned | 0, coinsSpent: p.coinsSpent | 0, exp: p.exp | 0 }
+    : { weekStart: ws, plays: 0, w: 0, l: 0, d: 0, coinsEarned: 0, coinsSpent: 0, exp: 0 };
+  sendJson(res, 200, { ok: true, account: publicAccount(account), weekly }, h);
+}
+
+/* 전적 업로드 — 토큰 인증·필드 화이트리스트·수치 상한·1요청 1판 (§5) */
+function apiMatches(req, res, h, body, account) {
+  const ip = req.socket.remoteAddress || 'unknown';
+  if (!allowRate('ip:' + ip, RATE_IP_PER_MIN) || !allowRate('acct:' + account.id, RATE_ACCOUNT_PER_MIN)) {
+    return sendErr(res, 429, 'RATE_LIMITED', {}, h);
+  }
+  checkWeeklyRollover();
+  if (body === undefined) return;   // parseJsonBody가 이미 400 BAD_JSON으로 응답
+  if (body === null || typeof body !== 'object') return sendErr(res, 400, 'FIELD_INVALID', { field: 'body', reason: 'JSON 객체가 필요합니다' }, h);
+  if (Array.isArray(body)) return sendErr(res, 400, 'FIELD_INVALID', { field: 'body', reason: '배치 업로드는 허용되지 않습니다 (1요청 1판)' }, h);
+  for (const k of Object.keys(body)) {
+    if (k !== 'game' && k !== 'outcome' && k !== 'delta' && k !== 'exp') {
+      return sendErr(res, 400, 'FIELD_INVALID', { field: k, reason: '허용되지 않는 필드입니다' }, h);
+    }
+  }
+  if (typeof body.game !== 'string' || !GAME_WHITELIST.includes(body.game)) {
+    return sendErr(res, 400, 'FIELD_INVALID', { field: 'game', reason: '지원하지 않는 게임입니다' }, h);
+  }
+  if (body.outcome !== 'w' && body.outcome !== 'l' && body.outcome !== 'd') {
+    return sendErr(res, 400, 'FIELD_INVALID', { field: 'outcome', reason: 'w | l | d 중 하나여야 합니다' }, h);
+  }
+  if (!Number.isInteger(body.delta) || Math.abs(body.delta) > 1000) {
+    return sendErr(res, 400, 'FIELD_INVALID', { field: 'delta', reason: '정수이고 절댓값 1000 이하여야 합니다' }, h);
+  }
+  if (!Number.isInteger(body.exp) || body.exp < 0 || body.exp > 100) {
+    return sendErr(res, 400, 'FIELD_INVALID', { field: 'exp', reason: '0 이상 100 이하 정수여야 합니다' }, h);
+  }
+  // 서버 수신 시각(KST)으로 주간 버킷 배정 — 클라이언트 타임스탬프는 받지 않는다 (§5-2)
+  const ws = kstWeekStart();
+  const week = loadWeek(ws);
+  let p = week.players[account.id];
+  if (!p) p = week.players[account.id] = { name: account.name, plays: 0, w: 0, l: 0, d: 0, coinsEarned: 0, coinsSpent: 0, exp: 0, games: {} };
+  p.name = account.name;
+  p.plays += 1;
+  if (!p.games || typeof p.games !== 'object') p.games = {};
+  const g = p.games[body.game] = p.games[body.game] || { plays: 0, w: 0, l: 0, d: 0, coinsEarned: 0, coinsSpent: 0, exp: 0 };
+  g.plays += 1;
+  p[body.outcome] += 1;
+  g[body.outcome] += 1;
+  if (body.delta > 0) { p.coinsEarned += body.delta; g.coinsEarned += body.delta; }
+  else if (body.delta < 0) { p.coinsSpent -= body.delta; g.coinsSpent -= body.delta; }
+  p.exp += body.exp;
+  g.exp += body.exp;
+  saveWeek(ws);
+  account.expTotal += body.exp;
+  account.matchesTotal += 1;
+  saveAccounts();
+  sendJson(res, 201, {
+    ok: true,
+    weekly: { weekStart: ws, plays: p.plays, w: p.w, l: p.l, d: p.d, coinsEarned: p.coinsEarned, coinsSpent: p.coinsSpent, exp: p.exp },
+    matchesTotal: account.matchesTotal
+  }, h);
+}
+
+/* 주간 리더보드 — exp 내림차순 → wins → coinsEarned → 가입 순 tiebreak, game 필터는 per-game 버킷 (§4-8) */
+function apiLeaderboard(req, res, h, query) {
+  checkWeeklyRollover();
+  let auth = null;
+  if (req.headers.authorization !== undefined) {
+    auth = authenticate(req);
+    if (auth.error) return sendErr(res, 401, auth.error, {}, h);
+  }
+  const weekParam = query.get('week');
+  let ws;
+  if (weekParam === null || weekParam === '') {
+    ws = kstWeekStart();
+  } else {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(weekParam)) return sendErr(res, 400, 'FIELD_INVALID', { field: 'week', reason: 'YYYY-MM-DD 형식이어야 합니다' }, h);
+    ws = weekParam;
+  }
+  const game = query.get('game');
+  if (game !== null && game !== '' && !GAME_WHITELIST.includes(game)) {
+    return sendErr(res, 400, 'FIELD_INVALID', { field: 'game', reason: '지원하지 않는 게임입니다' }, h);
+  }
+  let limit = 20;
+  if (query.get('limit') !== null) {
+    limit = Number(query.get('limit'));
+    if (!Number.isInteger(limit) || limit < 1 || limit > 100) return sendErr(res, 400, 'FIELD_INVALID', { field: 'limit', reason: '1~100이어야 합니다' }, h);
+  }
+  if (!fs.existsSync(weeklyPath(ws))) return sendErr(res, 404, 'WEEK_NOT_FOUND', {}, h);
+  const week = loadWeek(ws);
+  const list = [];
+  for (const [accountId, entry] of Object.entries(week.players)) {
+    let s;
+    if (!game) {
+      s = { plays: entry.plays | 0, wins: entry.w | 0, exp: entry.exp | 0, coinsEarned: entry.coinsEarned | 0 };
+    } else {
+      const gb = entry.games && entry.games[game];
+      if (!gb) continue;   // 해당 게임 기록 없음 — 전체 합산에만 포함
+      s = { plays: gb.plays | 0, wins: gb.w | 0, exp: gb.exp | 0, coinsEarned: gb.coinsEarned | 0 };
+    }
+    const acc = accounts.find(a => a.id === accountId);
+    list.push(Object.assign({ accountId, name: (entry.name || (acc && acc.name) || '?'), level: levelFromExpTotal(acc ? acc.expTotal : 0), createdAt: acc ? acc.createdAt : 0 }, s));
+  }
+  list.sort((a, b) => b.exp - a.exp || b.wins - a.wins || b.coinsEarned - a.coinsEarned || a.createdAt - b.createdAt);
+  const entries = list.slice(0, limit).map((e, i) => ({
+    rank: i + 1, name: e.name, level: e.level, plays: e.plays, wins: e.wins, exp: e.exp, coinsEarned: e.coinsEarned
+  }));
+  const payload = { ok: true, weekStart: ws, metric: 'exp', entries };
+  if (auth) {
+    const idx = list.findIndex(e => e.accountId === auth.account.id);
+    if (idx >= 0) {
+      const e = list[idx];
+      payload.me = { rank: idx + 1, name: e.name, plays: e.plays, wins: e.wins, exp: e.exp, coinsEarned: e.coinsEarned };
+    }
+  }
+  sendJson(res, 200, payload, h);
+}
+
 const server = http.createServer((req, res) => {
-  let urlPath = decodeURIComponent((req.url || '/').split('?')[0]);
+  // Phase 2 API 분기 — 정적 서빙·WS보다 먼저 (/api/* 는 정적 파일 경로와 절대 충돌하지 않는다)
+  const rawPath = (req.url || '/').split('?')[0];
+  if (rawPath === '/api' || rawPath.startsWith('/api/')) { handleApi(req, res); return; }
+  let urlPath = decodeURIComponent(rawPath);
   if (urlPath === '/') urlPath = '/index.html';
   const filePath = path.join(ROOT, path.normalize(urlPath).replace(/^(\.\.[/\\])+/, ''));
   if (!filePath.startsWith(ROOT)) { res.writeHead(403); res.end(); return; }

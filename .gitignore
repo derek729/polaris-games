@@ -8,3 +8,7 @@ dist/
 *.onnx.json
 .DS_Store
 fullstack-agent/
+
+# 서버 런타임 데이터 (Phase 2)
+data/
+.env
