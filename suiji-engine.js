@@ -643,7 +643,26 @@
   /* ============================================
      WOOD TEXTURE
      ============================================ */
-  function makeWoodTexture(w, h, scale = 2) {
+  // 테마 팔레트 — suiji-common.js 테마 훅이 SuijiEngine.setWoodPalette()로 설정한다 (BACKLOG #27).
+  // null이면 내장 기본 팔레트(기존 출시색)를 쓴다 — 완전 하위호환 (기획서 §0-2)
+  let woodPalette = null;
+
+  // wood: { stops: ['#..','#..','#..'], grain: [r,g,b], knot: [r,g,b], vignette: [r,g,b] }
+  // palette 미지정(명시 인자 null + 전역 null)이면 기존 하드코딩 값 그대로 — 팔레트 도입 이전과
+  // 같은 Math.random 수열에 대해 픽셀 단위로 동일한 색 문자열이 나온다 (기획서 §0-2)
+  function makeWoodTexture(w, h, scale = 2, palette = null) {
+    const p = palette || woodPalette; // 명시 인자 > 전역 테마 > 내장 기본 순
+    const stops    = p ? p.stops    : ['#e2b075', '#d6a466', '#c08a4a']; // 그라디언트 3정지
+    const grain    = p ? p.grain    : [100, 55, 18];  // 결선(세로 무늬) 기준 RGB
+    const knot     = p ? p.knot     : [80, 45, 15];   // 결눈(올림무늬) 기준 RGB
+    const vignette = p ? p.vignette : [50, 28, 10];   // 테두리 음영 RGB
+    // 결선 난수 폭 — 기존 절대 폭(+50/+30/+18)을 기준색 비율로 스케일해 밝은 테마(한지)에서도 결이 자연스럽게 (기획서 §2).
+    // 팔레트 미지정 시 기존 절대 폭 그대로 — 하위호환 유지
+    const grainJitter = p ? [grain[0] * 0.5, grain[1] * (30 / 55), grain[2]] : [50, 30, 18];
+    // 결눈 3정지 색 — 기존 3색(80,45,15 / 110,70,28 / 120,75,30)을 기준색 대비 비율 계수로 환산 (기획서 §2)
+    const knotMid = p ? [knot[0] * 1.375, knot[1] * (70 / 45), knot[2] * (28 / 15)] : [110, 70, 28];
+    const knotEnd = p ? [knot[0] * 1.5,   knot[1] * (75 / 45), knot[2] * 2]        : [120, 75, 30];
+
     const off = document.createElement('canvas');
     off.width = w * scale;
     off.height = h * scale;
@@ -651,17 +670,17 @@
     ctx.scale(scale, scale);
 
     const baseGrad = ctx.createLinearGradient(0, 0, w, h);
-    baseGrad.addColorStop(0, '#e2b075');
-    baseGrad.addColorStop(0.5, '#d6a466');
-    baseGrad.addColorStop(1, '#c08a4a');
+    baseGrad.addColorStop(0, stops[0]);
+    baseGrad.addColorStop(0.5, stops[1]);
+    baseGrad.addColorStop(1, stops[2]);
     ctx.fillStyle = baseGrad;
     ctx.fillRect(0, 0, w, h);
 
     for (let i = 0; i < 90; i++) {
       const opacity = 0.04 + Math.random() * 0.14;
-      const r = 100 + Math.random() * 50;
-      const g = 55 + Math.random() * 30;
-      const b = 18 + Math.random() * 18;
+      const r = grain[0] + Math.random() * grainJitter[0];
+      const g = grain[1] + Math.random() * grainJitter[1];
+      const b = grain[2] + Math.random() * grainJitter[2];
       ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${opacity})`;
       ctx.lineWidth = 0.4 + Math.random() * 1.6;
       const startX = Math.random() * w;
@@ -682,14 +701,14 @@
       const cy = Math.random() * h;
       const r = 8 + Math.random() * 18;
       const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-      g.addColorStop(0, 'rgba(80, 45, 15, 0.32)');
-      g.addColorStop(0.4, 'rgba(110, 70, 28, 0.18)');
-      g.addColorStop(1, 'rgba(120, 75, 30, 0)');
+      g.addColorStop(0, `rgba(${knot[0]}, ${knot[1]}, ${knot[2]}, 0.32)`);
+      g.addColorStop(0.4, `rgba(${knotMid[0]}, ${knotMid[1]}, ${knotMid[2]}, 0.18)`);
+      g.addColorStop(1, `rgba(${knotEnd[0]}, ${knotEnd[1]}, ${knotEnd[2]}, 0)`);
       ctx.fillStyle = g;
       ctx.beginPath();
       ctx.arc(cx, cy, r, 0, Math.PI * 2);
       ctx.fill();
-      ctx.strokeStyle = 'rgba(80, 45, 15, 0.1)';
+      ctx.strokeStyle = `rgba(${knot[0]}, ${knot[1]}, ${knot[2]}, 0.1)`;
       for (let rr = 2; rr < r; rr += 2) {
         ctx.lineWidth = 0.3;
         ctx.beginPath();
@@ -712,7 +731,7 @@
 
     const vig = ctx.createRadialGradient(w / 2, h / 2, w * 0.3, w / 2, h / 2, w * 0.75);
     vig.addColorStop(0, 'rgba(0,0,0,0)');
-    vig.addColorStop(1, 'rgba(50, 28, 10, 0.32)');
+    vig.addColorStop(1, `rgba(${vignette[0]}, ${vignette[1]}, ${vignette[2]}, 0.32)`);
     ctx.fillStyle = vig;
     ctx.fillRect(0, 0, w, h);
 
@@ -1174,5 +1193,9 @@
     }
   };
 
-  (typeof window !== 'undefined' ? window : globalThis).SuijiEngine = { GoGame, GoAI, BoardRenderer, SGF, packBoard, unpackBoard, makeWoodTexture };
+  // setter만 노출해 외부에서 내부 팔레트 상태를 직접 변조하지 않게 한다 (기획서 §2 힌트)
+  (typeof window !== 'undefined' ? window : globalThis).SuijiEngine = {
+    GoGame, GoAI, BoardRenderer, SGF, packBoard, unpackBoard, makeWoodTexture,
+    setWoodPalette(p) { woodPalette = p || null; } // null이면 내장 기본 팔레트(기존 출시색)로 복귀
+  };
 })();

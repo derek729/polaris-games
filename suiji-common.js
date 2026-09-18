@@ -175,39 +175,41 @@
   };
 
   /* ---------------- 포털 보드 테마 훅 (Phase 1 상점) — 적용은 여기 한 곳 ---------------- */
-  // polaris-common.js THEME_DEFS(단일 출처)의 CSS 변수 + filter 틴트로 canvas#board 목재 톤을
-  // 변환한다 (엔진 무수정 — makeWoodTexture 프리셋 파라미터화는 Phase 2 백로그, 그때까지 filter 유지).
-  // v1 적용 대상은 바둑·오목 2종 한정 (기획서 §1-1 — 알까기·기보는 렌더 구조 검증이 별도로 필요해
-  // 스코프 제외. 비대상 페이지에서는 틴트/변수를 적용·유지하지 않고 기존 외형을 그대로 둔다).
-  const THEME_PAGES = ['suiji-go.html', 'suiji-omok.html'];
+  // v2: 색 변환은 엔진 목재 팔레트(SuijiEngine.setWoodPalette)로 — filter 틴트 폐기 (품질 손실 해소, BACKLOG #27).
+  // Phase 1의 canvas#board 색변환 filter(hue-rotate/sepia/saturate/brightness)는 돌·라인까지 함께 물던 결함이
+  // 있어 폐기했고, neon 글로우 drop-shadow 같은 비색 효과만 잔류시킨다 (기획서 §0-6).
+  // 적용 대상은 바둑·오목에 알까기·기보를 확대한 4종 (기술검증 §1-2 — 전부 엔진 BoardRenderer 텍스처 경로 공유 확인).
+  // 비대상 페이지(로비 등)에서는 변수·틴트·팔레트를 전부 해제해 기존 외형을 그대로 둔다.
+  const THEME_PAGES = ['suiji-go.html', 'suiji-omok.html', 'suiji-alkkagi.html', 'suiji-kifu.html']; // 4종 확대 (기술검증 §1-2)
   let themeStyle = null, themeVarKeys = [];
   Suiji.theme = {
     apply() {
       if (!(window.Polaris && Polaris.shop)) return; // 폴백: 런타임 부재 시 기존 외형 유지
       const root = document.documentElement;
-      // v1 스코프 판정 (기획서 §1-1) — file://에서도 pathname이 파일명으로 끝나므로 endsWith로 충분
+      // 스코프 판정 — file://에서도 pathname이 파일명으로 끝나므로 endsWith로 충분
       const inScope = THEME_PAGES.some(p => location.pathname.endsWith(p));
       if (!inScope) {
-        // 비대상 페이지 — 이전 적용분(변수·속성·틴트)을 제거해 기존 외형 유지
+        // 비대상 페이지 — 이전 적용분(변수·속성·틴트·팔레트)을 제거해 기존 외형 유지
         for (const k of themeVarKeys) root.style.removeProperty(k);
         themeVarKeys = [];
         root.removeAttribute('data-suiji-theme');
         if (themeStyle) themeStyle.textContent = '';
+        if (window.SuijiEngine && SuijiEngine.setWoodPalette) SuijiEngine.setWoodPalette(null); // 팔레트 해제
         return;
       }
-      const t = Polaris.shop.catalog().find(x => x.active); // 활성 프리셋 (basic이면 아무것도 안 함)
+      const t = Polaris.shop.catalog().find(x => x.active); // 활성 프리셋 (basic이면 null)
       for (const k of themeVarKeys) root.style.removeProperty(k); // 이전 프리셋 변수 정리
       themeVarKeys = Object.keys(t ? t.vars : {});
-      for (const [k, v] of Object.entries(t ? t.vars : {})) root.style.setProperty(k, v); // CSS 변수 적용
+      for (const [k, v] of Object.entries(t ? t.vars : {})) root.style.setProperty(k, v); // CSS 변수 적용 (스와치 프리뷰 전용)
       root.setAttribute('data-suiji-theme', t ? t.id : 'basic');
-      // <style> 1개 주입: canvas#board에 프리셋 filter 틴트 → 엔진 수정 없이 목재 톤 변환
-      // (neon = hue-rotate + saturate + 글로우 drop-shadow / hanji = sepia + brightness)
+      // 색은 팔레트로 — filter는 비색 효과(glow)만 (로비는 엔진 미로드라 가드 필수, 기획서 §1-3)
+      if (window.SuijiEngine && SuijiEngine.setWoodPalette) SuijiEngine.setWoodPalette(t ? (t.wood || null) : null);
       if (!themeStyle) {
         themeStyle = document.createElement('style');
         themeStyle.id = 'suiji-theme-tint';
         document.head.appendChild(themeStyle);
       }
-      themeStyle.textContent = 'canvas#board{filter:' + (t ? (t.filter || 'none') : 'none') + '}';
+      themeStyle.textContent = 'canvas#board{filter:' + (t && t.filter ? t.filter : 'none') + '}';
     }
   };
   Suiji.theme.apply(); // 로드 직후 1회 (게임 페이지는 polaris-common.js 다음에 로드됨)

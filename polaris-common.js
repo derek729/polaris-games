@@ -202,14 +202,30 @@
 
   /* ---------------- 상점 (보드 테마 — 코스메틱 영구 소유) ---------------- */
   const SHOP_KEY = 'polaris.shop.v1';
-  // 프리셋: 로비 스와치 프리뷰와 suiji 테마 훅이 같이 읽는 단일 출처
-  // (neon filter의 글로우 drop-shadow는 §1-5 주입 스타일 예시를 단일 출처에 통합)
+  // 프리셋: 로비 스와치 프리뷰(vars)와 엔진 목재 팔레트(wood)가 같이 읽는 단일 출처
+  // wood가 없으면(null) 엔진 내장 기본 팔레트 = 기존 출시색 — 'basic' 복귀와 동일 외형.
+  // filter는 색 변환 금지(§0-6) — neon 글로우 같은 비색 효과만 잔류 (BACKLOG #27 팔레트화)
   const THEME_DEFS = [
-    { id: 'classic',  name: '클래식', price: 300, vars: { '--board': '#e6c17a', '--board-dark': '#cfa254' }, filter: 'none' },
-    { id: 'cheolmok', name: '철목',   price: 450, vars: { '--board': '#b07a42', '--board-dark': '#8f5c2c' }, filter: 'saturate(1.15) brightness(.94)' },
-    { id: 'hanji',    name: '한지',   price: 600, vars: { '--board': '#efe3c2', '--board-dark': '#d8c79b' }, filter: 'sepia(.18) brightness(1.06)' },
-    { id: 'neon',     name: '네온',   price: 800, vars: { '--board': '#2ea88a', '--board-dark': '#1c7a63' },
-      filter: 'hue-rotate(140deg) saturate(1.4) brightness(.9) drop-shadow(0 0 14px rgba(46,168,138,.45))' }
+    { id: 'classic',  name: '클래식', price: 300,
+      vars: { '--board': '#e6c17a', '--board-dark': '#cfa254' },          // 스와치 프리뷰 전용 (기존 유지)
+      wood: { stops: ['#f0c98a', '#e4bc7c', '#cfa45e'],                   // 목재 그라디언트 3정지
+              grain: [122, 78, 34], knot: [96, 58, 22], vignette: [56, 32, 12] },
+      filter: 'none' },
+    { id: 'cheolmok', name: '철목',   price: 450,
+      vars: { '--board': '#b07a42', '--board-dark': '#8f5c2c' },
+      wood: { stops: ['#c89058', '#a8743e', '#82552a'],
+              grain: [80, 44, 18], knot: [62, 34, 14], vignette: [38, 20, 8] },
+      filter: 'none' },                                                   // ← 색변환 saturate/brightness 폐기
+    { id: 'hanji',    name: '한지',   price: 600,
+      vars: { '--board': '#efe3c2', '--board-dark': '#d8c79b' },
+      wood: { stops: ['#f6ecd4', '#efe3c2', '#dcc79b'],
+              grain: [168, 138, 84], knot: [140, 112, 66], vignette: [120, 96, 56] },
+      filter: 'none' },                                                   // ← sepia/brightness 폐기
+    { id: 'neon',     name: '네온',   price: 800,
+      vars: { '--board': '#2ea88a', '--board-dark': '#1c7a63' },
+      wood: { stops: ['#35b896', '#2ea88a', '#17715c'],
+              grain: [10, 64, 52], knot: [8, 52, 42], vignette: [4, 32, 26] },
+      filter: 'drop-shadow(0 0 14px rgba(46,168,138,.45))' }              // ← hue-rotate 폐기, 글로우만 유지
   ];
 
   P.shop = {
@@ -224,10 +240,10 @@
       return s;
     },
     catalog() {
-      // THEME_DEFS + 소유/활성 여부 — 스와치 프리뷰와 suiji 테마 훅이 같이 읽는다
+      // THEME_DEFS + 소유/활성 여부 — 스와치 프리뷰(vars)와 suiji 테마 훅(wood)이 같이 읽는다
       const s = this._store();
       return THEME_DEFS.map(d => ({
-        id: d.id, name: d.name, price: d.price, vars: d.vars, filter: d.filter,
+        id: d.id, name: d.name, price: d.price, vars: d.vars, filter: d.filter, wood: d.wood,
         owned: s.owned.indexOf(d.id) >= 0,
         active: s.active === d.id
       }));
