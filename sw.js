@@ -3,7 +3,7 @@
    Cache-first offline support for the whole game suite.
    Bump CACHE_VERSION whenever suite files change.
    ============================================================ */
-const CACHE_VERSION = 'polaris-v22';
+const CACHE_VERSION = 'polaris-v23';
 const PRECACHE = [
   // 통합 포털 + 아케이드 게임
   'index.html',
@@ -94,6 +94,9 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const req = event.request;
+  // /api/* 요청은 SW 캐시를 전혀 거치지 않고 네트워크 직통 (respondWith 미호출) —
+  // 크로스 origin 계정·리더보드 응답이 stale 캐시로 떨어지는 것을 방지
+  if (req.url.includes('/api/')) return;
   if (req.method !== 'GET') return;
 
   // App navigations: network-first, fall back to cache (then to the hub page)

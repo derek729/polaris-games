@@ -180,12 +180,107 @@
 </div>
 <script src="polaris-common.js"></script>
 <script>
-  // 포털 상단바: 닉네임 · 도토리 · 일일 보너스 + 프로필 카드 · 오늘의 미션 · 보드 테마 상점 · 주간 성적표
+  // 포털 상단바: 닉네임 · 도토리 · 일일 보너스 + 계정 카드 · 프로필 카드 · 오늘의 미션 · 보드 테마 상점 · 주간 성적표 · 전국 랭킹
   Polaris.header.mount('.wrap');
+
+  // 클라우드 계정 카드 (Phase 2 사이클 B) — 프로필 카드 위 전체 행. prompt/confirm 미사용, 입력 form 방식
+  (function () {
+    const meta = document.getElementById('portal-meta');
+    const card = document.createElement('div');
+    card.id = 'polaris-account-card';
+    card.style.cssText = 'grid-column:1/-1;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px 20px;';
+    meta.insertBefore(card, meta.firstChild);
+
+    const TITLE = '<div style="font-size:13px;letter-spacing:.15em;color:var(--muted);margin-bottom:12px">☁ 클라우드 계정</div>';
+    const INPUT = 'background:var(--card-hover);border:1px solid var(--line);border-radius:8px;color:var(--text);padding:8px 10px;font-size:13px;font-family:inherit;width:100%;';
+    const BTN = 'background:var(--accent);color:#0d1021;border:0;border-radius:8px;padding:8px 14px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;';
+    const BTN_LOGOUT = 'background:var(--card-hover);color:var(--muted);border:1px solid var(--line);border-radius:8px;padding:7px 14px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;';
+
+    function showError(msg) {
+      const err = card.querySelector('#ac-err');
+      if (err) { err.textContent = msg; err.style.display = msg ? 'block' : 'none'; }
+    }
+    function message(res) {   // 서버 에러코드 → 카드 표시 문구 (기획서 §4-9 코드표 기준)
+      if (res.code === 'NETWORK') return '서버에 연결할 수 없어요 — 잠시 후 다시 시도해 주세요';
+      if (res.code === 'RATE_LIMITED') return '시도가 너무 많아요 — 잠시 후 다시 시도해 주세요';
+      if (res.code === 'NAME_TAKEN') return res.reason || '이미 사용 중인 닉네임이에요';
+      if (res.code === 'FIELD_INVALID') return res.reason || '입력값을 확인해 주세요';
+      if (res.code === 'AUTH_FAILED') return '닉네임 또는 비밀번호가 올바르지 않아요';
+      return res.reason || ('실패했어요 (' + res.code + ')');
+    }
+    function render() {
+      const st = Polaris.cloud.state();
+      if (!st.available) {
+        card.innerHTML = TITLE +
+          '<div style="font-size:12.5px;color:var(--muted)">클라우드가 비활성 상태예요 — 오프라인으로 계속 플레이할 수 있어요.</div>';
+        return;
+      }
+      if (st.loggedIn) {
+        const expDate = st.expiresAt ? new Date(st.expiresAt).toLocaleDateString() : '';
+        card.innerHTML = TITLE +
+          '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:13.5px">' +
+          '<span id="ac-hello"></span>' +
+          '<button id="ac-logout" style="' + BTN_LOGOUT + '">로그아웃</button></div>' +
+          '<div id="ac-err" style="display:none;margin-top:10px;font-size:12.5px;color:#ff8f8f"></div>';
+        // 닉네임(서버 저장 사용자 입력)은 innerHTML 연결 없이 textContent 조립으로만 렌더 — 방어계층
+        const hello = card.querySelector('#ac-hello');
+        hello.appendChild(document.createTextNode('✅ '));
+        const nameEl = document.createElement('b');
+        nameEl.style.color = 'var(--accent2)';
+        nameEl.textContent = st.name;
+        hello.appendChild(nameEl);
+        hello.appendChild(document.createTextNode(' 님 — 클라우드 연동 중'));
+        if (expDate) {
+          const expEl = document.createElement('span');
+          expEl.style.cssText = 'color:var(--muted);font-size:11.5px';
+          expEl.textContent = ' (로그인 만료: ' + expDate + ')';
+          hello.appendChild(expEl);
+        }
+        card.querySelector('#ac-logout').addEventListener('click', function () {
+          Polaris.cloud.logout();
+          Polaris.toast('로그아웃했어요 — 로컬 기록은 그대로 유지돼요');
+        });
+        return;
+      }
+      card.innerHTML = TITLE +
+        '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px">' +
+        '<form id="ac-join" style="display:flex;flex-direction:column;gap:8px">' +
+        '<span style="font-size:12.5px;color:var(--text)">처음이신가요? <b>클라우드 계정 만들기</b></span>' +
+        '<input id="ac-join-name" maxlength="12" placeholder="닉네임 (2~12자)" autocomplete="username" style="' + INPUT + '">' +
+        '<input id="ac-join-pw" type="password" minlength="6" maxlength="128" placeholder="비밀번호 (6자 이상)" autocomplete="new-password" style="' + INPUT + '">' +
+        '<button type="submit" style="' + BTN + '">클라우드 계정 만들기</button></form>' +
+        '<form id="ac-login" style="display:flex;flex-direction:column;gap:8px">' +
+        '<span style="font-size:12.5px;color:var(--text)">이미 계정이 있어요 <b>로그인</b></span>' +
+        '<input id="ac-login-name" maxlength="12" placeholder="닉네임" autocomplete="username" style="' + INPUT + '">' +
+        '<input id="ac-login-pw" type="password" maxlength="128" placeholder="비밀번호" autocomplete="current-password" style="' + INPUT + '">' +
+        '<button type="submit" style="' + BTN_LOGOUT + ';color:var(--accent2)">로그인</button></form></div>' +
+        '<div id="ac-err" style="display:none;margin-top:10px;font-size:12.5px;color:#ff8f8f"></div>';
+      card.querySelector('#ac-join').addEventListener('submit', function (ev) {
+        ev.preventDefault();
+        Polaris.cloud.register(card.querySelector('#ac-join-name').value, card.querySelector('#ac-join-pw').value)
+          .then(function (res) {
+            if (res.ok) { Polaris.toast('클라우드 계정 만들기 완료 — 전국 랭킹에 참여해요!'); }
+            else showError(message(res));
+          });
+      });
+      card.querySelector('#ac-login').addEventListener('submit', function (ev) {
+        ev.preventDefault();
+        Polaris.cloud.login(card.querySelector('#ac-login-name').value, card.querySelector('#ac-login-pw').value)
+          .then(function (res) {
+            if (res.ok) { Polaris.toast('다시 오셨군요, ' + (res.account && res.account.name || '') + ' 님!'); }
+            else showError(message(res));
+          });
+      });
+    }
+    render();
+    document.addEventListener('polaris:cloud', render);
+  })();
+
   Polaris.widgets.profileCard('#portal-meta');
   Polaris.widgets.missionsPanel('#portal-meta');
   Polaris.widgets.shopPanel('#portal-meta');
   Polaris.widgets.weeklyPanel('#portal-meta');
+  Polaris.widgets.leaderboardPanel('#portal-meta');   // 전국 주간 랭킹 — weeklyPanel 옆
 </script>
 </body>
 </html>

@@ -340,6 +340,146 @@
     }
   };
 
+  /* ---------------- 클라우드 계정·전적·주간 리더보드 (Phase 2 사이클 B) ---------------- */
+  /* 서버: 두마당 API (docs/design/portal-phase2-account-server.md §4 — 구현된 server.cjs가 진실)
+     - API base: window.POLARIS_API_URL → localStorage 'polaris.api.v1' → ''(=비활성)
+     - 비활성 시 P.cloud 전체 no-op — 기존 localStorage 동작 100% 유지 (file:// 폴백)
+     - 토큰은 'polaris.auth.v1' 단 1개 키 {name, token, expiresAt}
+     - fetch 실패·403·401(토큰 만료) → 조용히 폴백(로그아웃 처리 + 로컬 동작 유지, 절대 throw 안 함)
+       사용자 입력 오류(400/409/429)는 {ok:false, code, field, reason} 반환으로 전달 — UI 표시용 */
+  const API_KEY = 'polaris.api.v1';
+  const AUTH_KEY = 'polaris.auth.v1';
+
+  function apiBase() {
+    try {
+      if (typeof window.POLARIS_API_URL === 'string' && window.POLARIS_API_URL.trim()) {
+        return window.POLARIS_API_URL.trim().replace(/\/+$/, '');
+      }
+      const saved = localStorage.getItem(API_KEY);
+      if (typeof saved === 'string' && saved.trim()) return saved.trim().replace(/\/+$/, '');
+    } catch (e) { /* localStorage 불가 환경 — 비활성 */ }
+    return '';
+  }
+
+  function readAuth() { return readJSON(AUTH_KEY, null); }
+  function clearAuth() { try { localStorage.removeItem(AUTH_KEY); } catch (e) { /* 무시 */ } }
+  function emitCloud() { emit('cloud', P.cloud.state()); }
+
+  /* 공용 fetch — 네트워크 실패는 {status:0}로 정규화(호출부가 조용히 폴백), 응답 본문 JSON 파싱 */
+  function apiFetch(pathname, options) {
+    return fetch(apiBase() + pathname, options).then(function (res) {
+      return res.json().catch(function () { return {}; }).then(function (body) {
+        return { status: res.status, body: body || {} };
+      });
+    });
+  }
+
+  P.cloud = {
+    available() { return apiBase() !== ''; },
+    state() {
+      const a = readAuth();
+      const loggedIn = !!(a && a.token) && this.available();
+      // expiresAt는 epoch 밀리초(~1.78e12) — 비트 연산자(|0)는 ToInt32 래핑으로 값을 파손하므로 Number()로 정규화
+      return { available: this.available(), loggedIn: loggedIn, name: loggedIn ? (a.name || '') : '', expiresAt: loggedIn ? (Number(a.expiresAt) || 0) : 0 };
+    },
+    register(name, pw) {
+      const self = this;
+      if (!this.available()) return Promise.resolve({ ok: false, code: 'CLOUD_DISABLED' });
+      return apiFetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: String(name || ''), password: String(pw || '') })
+      }).then(function (r) {
+        const b = r.body;
+        if (r.status === 201 && b.ok && b.token) {
+          writeJSON(AUTH_KEY, {
+            name: (b.account && b.account.name) || String(name || '').trim(),
+            token: b.token,
+            expiresAt: Date.now() + (b.expiresInDays || 30) * 86400000
+          });
+          emitCloud();
+          return { ok: true, account: b.account };
+        }
+        if (r.status === 0 || r.status === 403 || r.status >= 500) return { ok: false, code: 'NETWORK' };
+        return { ok: false, code: b.code || 'ERROR', field: b.field, reason: b.reason };   // 400/409/429 — 입력 오류 전달
+      }).catch(function () { return { ok: false, code: 'NETWORK' }; });
+    },
+    login(name, pw) {
+      if (!this.available()) return Promise.resolve({ ok: false, code: 'CLOUD_DISABLED' });
+      return apiFetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: String(name || ''), password: String(pw || '') })
+      }).then(function (r) {
+        const b = r.body;
+        if (r.status === 200 && b.ok && b.token) {
+          writeJSON(AUTH_KEY, {
+            name: (b.account && b.account.name) || String(name || '').trim(),
+            token: b.token,
+            expiresAt: Date.now() + (b.expiresInDays || 30) * 86400000
+          });
+          emitCloud();
+          return { ok: true, account: b.account };
+        }
+        if (r.status === 0 || r.status === 403 || r.status >= 500) return { ok: false, code: 'NETWORK' };
+        return { ok: false, code: b.code || 'ERROR', field: b.field, reason: b.reason };   // 401 AUTH_FAILED 등 — UI 표시
+      }).catch(function () { return { ok: false, code: 'NETWORK' }; });
+    },
+    /* 로컬 로그아웃은 항상 즉시 완료 — 서버 토큰 폐기는 fire-and-forget (네트워크 실패 무음) */
+    logout() {
+      const a = readAuth();
+      clearAuth();
+      emitCloud();
+      if (a && a.token && apiBase()) {
+        apiFetch('/api/auth/logout', { method: 'POST', headers: { 'Authorization': 'Bearer ' + a.token } }).catch(function () {});
+      }
+    },
+    /* 판 종료 전적 업로드 — settle 훅 전용. 실패해도 로컬 기록은 이미 저장된 뒤라 무음 폴백이 정답.
+       401(토큰 만료) 시 조용히 로그아웃 처리하고 다음 판부터는 로컬 동작만 유지 */
+    uploadMatch(result) {
+      const a = readAuth();
+      if (!apiBase() || !a || !a.token) return Promise.resolve({ ok: false, code: 'CLOUD_DISABLED' });
+      return apiFetch('/api/matches', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + a.token },
+        body: JSON.stringify({ game: String(result.game || ''), outcome: String(result.outcome || ''), delta: result.delta | 0, exp: result.exp | 0 })
+      }).then(function (r) {
+        const b = r.body;
+        if (r.status === 201 && b.ok) return { ok: true, weekly: b.weekly, matchesTotal: b.matchesTotal };
+        if (r.status === 401) { clearAuth(); emitCloud(); return { ok: false, code: b.code || 'TOKEN_EXPIRED', loggedOut: true }; }
+        if (r.status === 0 || r.status === 403 || r.status >= 500) return { ok: false, code: 'NETWORK' };
+        return { ok: false, code: b.code || 'ERROR', field: b.field, reason: b.reason };
+      }).catch(function () { return { ok: false, code: 'NETWORK' }; });
+    },
+    /* 주간 리더보드 — 공개 조회(토큰 없이 가능)하되 토큰이 있으면 me 를 받는다.
+       401(만료) 시 조용히 로그아웃 후 비인증으로 1회 재시도 — 목록은 계속 보이게 */
+    leaderboard(week, game) {
+      if (!this.available()) return Promise.resolve({ ok: false, code: 'CLOUD_DISABLED' });
+      const qs = new URLSearchParams();
+      if (week) qs.set('week', String(week));
+      if (game) qs.set('game', String(game));
+      qs.set('limit', '20');
+      const get = function (withAuth) {
+        const a = withAuth ? readAuth() : null;
+        const headers = (a && a.token) ? { 'Authorization': 'Bearer ' + a.token } : {};
+        return apiFetch('/api/leaderboard/weekly?' + qs.toString(), { headers: headers });
+      };
+      return get(true).catch(function () { return { status: 0, body: {} }; }).then(function (r) {
+        if (r.status === 401) {
+          clearAuth(); emitCloud();
+          return get(false).catch(function () { return { status: 0, body: {} }; });
+        }
+        return r;
+      }).then(function (r) {
+        const b = r.body;
+        if (r.status === 200 && b.ok) return { ok: true, weekStart: b.weekStart, metric: b.metric, entries: b.entries || [], me: b.me || null };
+        if (r.status === 404 && b.code === 'WEEK_NOT_FOUND') return { ok: false, code: 'WEEK_NOT_FOUND' };
+        if (r.status === 0 || r.status === 403 || r.status >= 500) return { ok: false, code: 'NETWORK' };
+        return { ok: false, code: b.code || 'ERROR', field: b.field, reason: b.reason };
+      });
+    }
+  };
+
   /* ---------------- 판 정산 (승/무/패 → 판돈·경험치·미션·주간 성적표) ---------------- */
   const STAKE = 50; // 기본 판돈 — 잔액 부족 시 보유 전액(올인)
   P.settle = function (game, outcome) {
@@ -354,6 +494,7 @@
     P.missions._report(game, outcome);
     // 주간 성적표 집계 (§2-1) — settle을 호출하는 게임은 향후 자동 포함, 로비 패널 즉시 갱신용 emit
     emit('weekly', P.weekly.record(game, outcome, delta, expGain));
+    if (P.cloud.available()) P.cloud.uploadMatch({ game: game, outcome: outcome, delta: delta, exp: expGain }).catch(function () {});   // 클라우드 전적 업로드 — 비동기 fire-and-forget, 게임 흐름 비차단·실패 무음
     return { delta: delta, exp: expGain, level: after.level, levelUp: after.level > before };
   };
 
@@ -657,6 +798,108 @@
       render();
       document.addEventListener('polaris:weekly', render); // 신규 이벤트 — 판 종료 직후 로비 복귀 시 즉시 갱신
       document.addEventListener('polaris:coins', render);
+      host.appendChild(el);
+      return el;
+    },
+
+    /* 전국 주간 랭킹 — P.cloud 리더보드 표시 (상위 20 · 내 순위 강조).
+       자동 폴링 금지(서버 부하 방지) — 수동 갱신 버튼만, 10초 쿨다운.
+       닉네임은 서버 저장 사용자 입력이므로 textContent 조립으로만 렌더 (weeklyPanel과 같은 경화) */
+    leaderboardPanel(selector) {
+      const host = document.querySelector(selector);
+      if (!host) return null;
+      const REFRESH_COOLDOWN_MS = 10000;
+      let loading = false;
+      let lastFetchAt = 0;
+      const el = document.createElement('div');
+      el.style.cssText = BOX_STYLE;
+      el.innerHTML =
+        '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:12px">' +
+        '<div style="font-size:13px;letter-spacing:.15em;color:#9aa3c7">🏆 전국 주간 랭킹</div>' +
+        '<button id="lb-refresh" style="background:#1e2440;color:#4fd1c5;border:1px solid #2a3154;border-radius:8px;' +
+        'padding:5px 12px;font-size:12px;cursor:pointer;font-family:inherit">갱신</button></div>' +
+        '<div id="lb-body" style="font-size:13px;color:#9aa3c7"></div>';
+      const body = el.querySelector('#lb-body');
+      const refreshBtn = el.querySelector('#lb-refresh');
+
+      function setBusy(busy) {
+        loading = busy;
+        refreshBtn.disabled = busy;
+        refreshBtn.style.opacity = busy ? '.5' : '1';
+      }
+      function guidance() {
+        body.textContent = P.cloud.available()
+          ? '계정에 로그인하면 전국 랭킹에 참여해요'
+          : '클라우드가 비활성 상태예요 — 계정에 로그인하면 전국 랭킹에 참여해요';
+      }
+      function row(rank, name, level, exp, wins, highlight) {
+        const r = document.createElement('div');
+        r.style.cssText = 'display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:8px;' +
+          (highlight ? 'background:#242b4d;border:1px solid ' + GOLD + ';' : '');
+        const rankEl = document.createElement('b');
+        rankEl.style.cssText = 'width:30px;flex-shrink:0;color:' + (rank <= 3 ? GOLD : '#9aa3c7');
+        rankEl.textContent = rank + '.';
+        const nameEl = document.createElement('span');
+        nameEl.style.cssText = 'flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' +
+          'color:' + (highlight ? GOLD : '#e8eaf6') + (highlight ? ';font-weight:700' : '');
+        nameEl.textContent = name + (highlight ? ' (나)' : '');
+        const metaEl = document.createElement('span');
+        metaEl.style.cssText = 'flex-shrink:0;font-size:11.5px;color:#9aa3c7';
+        metaEl.textContent = (level != null ? 'Lv.' + level + ' · ' : '') + exp + ' EXP · ' + wins + '승';
+        r.appendChild(rankEl); r.appendChild(nameEl); r.appendChild(metaEl);
+        return r;
+      }
+      function renderList(res) {
+        body.innerHTML = '';
+        body.style.color = '#e8eaf6';
+        const head = document.createElement('div');
+        head.style.cssText = 'font-size:11px;color:#9aa3c7;margin-bottom:6px';
+        head.textContent = '지표: EXP (이번 주: ' + res.weekStart + ')';
+        body.appendChild(head);
+        for (const e of res.entries) {
+          const mine = !!(res.me && res.me.rank === e.rank);
+          body.appendChild(row(e.rank, e.name, e.level, e.exp, e.wins, mine));
+        }
+        // 내 순위가 상위 20 밖이면 목록 아래에 별도 강조 행
+        if (res.me && res.me.rank > res.entries.length) {
+          const dots = document.createElement('div');
+          dots.style.cssText = 'text-align:center;color:#9aa3c7;padding:2px 0';
+          dots.textContent = '⋯';
+          body.appendChild(dots);
+          body.appendChild(row(res.me.rank, res.me.name, null, res.me.exp, res.me.wins, true));
+        }
+        if (!res.entries.length && !res.me) {
+          body.style.color = '#9aa3c7';
+          body.appendChild(document.createTextNode('아직 이번 주 기록이 없어요'));
+        }
+      }
+      function load() {
+        lastFetchAt = Date.now();
+        setBusy(true);
+        body.style.color = '#9aa3c7';
+        body.textContent = '랭킹을 불러오는 중…';
+        P.cloud.leaderboard().then(function (res) {
+          setBusy(false);
+          if (!res.ok) {
+            body.style.color = '#9aa3c7';
+            body.textContent = res.code === 'WEEK_NOT_FOUND' ? '아직 이번 주 기록이 없어요'
+              : res.code === 'NETWORK' ? '랭킹 서버에 연결할 수 없어요'
+              : '랭킹을 불러오지 못했어요';
+            return;
+          }
+          renderList(res);
+        });
+      }
+      refreshBtn.addEventListener('click', function () {
+        if (loading || !P.cloud.state().loggedIn) return;
+        if (Date.now() - lastFetchAt < REFRESH_COOLDOWN_MS) return;   // 10초 쿨다운 — 연타 방지 (자동 폴링 없음)
+        load();
+      });
+      // 로그인/로그아웃 전환 시 1회 갱신 (폴링 아님 — 상태 변화 대응)
+      document.addEventListener('polaris:cloud', function () {
+        if (P.cloud.state().loggedIn) load(); else { body.style.color = '#9aa3c7'; guidance(); }
+      });
+      if (P.cloud.state().loggedIn) load(); else guidance();
       host.appendChild(el);
       return el;
     }

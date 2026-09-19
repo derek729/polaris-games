@@ -47,6 +47,9 @@ const MIME = {
    - 무DB: DATA_DIR 하위 JSON (원자적 쓰기: writeFileSync tmp → renameSync)
    ============================================================ */
 const DATA_DIR = process.env.DATA_DIR || './data';
+/* [게이트1] 정적 서빙 차단용 DATA_DIR 절대 경로 — 기동 cwd 기준·웹루트 기준 둘 다 계산해
+   어느 쪽으로 기동했든 DATA_DIR 내부 파일이 정적 서빙되지 않게 한다 (아래 createServer 분기) */
+const DATA_DIR_ABS = [path.resolve(DATA_DIR), path.resolve(ROOT, DATA_DIR)];
 const AUTH_SALT = process.env.AUTH_SALT || '';
 if (!AUTH_SALT) {
   console.error('[치명적] AUTH_SALT 환경변수가 비어 있습니다 — 비밀번호 scrypt 페퍼는 필수입니다.');
@@ -219,6 +222,16 @@ function authenticate(req) {
 
 /* ---------------- 레이트 리미트 — in-memory 분 카운터 (§5-5) ---------------- */
 const rateCounters = new Map();
+/* [게이트2] 레이트리밋용 클라이언트 IP — Railway 프록시 전제: 프록시 뒤에서는 socket.remoteAddress가
+   프록시 주소로 수렴해 모든 유저가 같은 IP가 되므로, X-Forwarded-For 첫 항목을 사용자 IP로 사용한다.
+   주의: 헤더 위조 시 레이트리밋만 우회 가능(인증 자체는 토큰) — 헤더가 없으면 기존 socket.remoteAddress.
+   IP 형식(IPv4/IPv6, 최대 45자) 검증을 통과한 값만 키로 쓴다 — 위조 임의 문자열로 rateCounters
+   Map 키가 무한 생성되는 것을 막고, 불일치 시 안전한 socket IP로 폴백한다. */
+function clientIp(req) {
+  const first = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
+  if (/^[0-9a-fA-F.:]{1,45}$/.test(first)) return first;
+  return req.socket.remoteAddress || 'unknown';
+}
 function allowRate(key, maxPerMin) {
   const now = Date.now();
   let c = rateCounters.get(key);
@@ -388,7 +401,7 @@ function validateAccountFields(body) {
 function apiRegister(req, res, h, body) {
   if (body === undefined) return;   // parseJsonBody가 이미 400 BAD_JSON으로 응답
   if (body === null || typeof body !== 'object' || Array.isArray(body)) return sendErr(res, 400, 'BAD_JSON', {}, h);
-  const ip = req.socket.remoteAddress || 'unknown';
+  const ip = clientIp(req);
   if (!allowRate('ip:' + ip, RATE_IP_PER_MIN)) return sendErr(res, 429, 'RATE_LIMITED', {}, h);
   const bad = validateAccountFields(body);
   if (bad) return sendErr(res, 400, 'FIELD_INVALID', { field: bad.field, reason: bad.reason }, h);
@@ -414,7 +427,7 @@ function apiRegister(req, res, h, body) {
 function apiLogin(req, res, h, body) {
   if (body === undefined) return;   // parseJsonBody가 이미 400 BAD_JSON으로 응답
   if (body === null || typeof body !== 'object' || Array.isArray(body)) return sendErr(res, 400, 'BAD_JSON', {}, h);
-  const ip = req.socket.remoteAddress || 'unknown';
+  const ip = clientIp(req);
   if (!allowRate('ip:' + ip, RATE_IP_PER_MIN)) return sendErr(res, 429, 'RATE_LIMITED', {}, h);
   const account = (typeof body.name === 'string')
     ? accounts.find(a => a.nameLower === body.name.trim().toLowerCase()) : null;
@@ -436,7 +449,7 @@ function apiMe(res, h, account) {
 
 /* 전적 업로드 — 토큰 인증·필드 화이트리스트·수치 상한·1요청 1판 (§5) */
 function apiMatches(req, res, h, body, account) {
-  const ip = req.socket.remoteAddress || 'unknown';
+  const ip = clientIp(req);
   if (!allowRate('ip:' + ip, RATE_IP_PER_MIN) || !allowRate('acct:' + account.id, RATE_ACCOUNT_PER_MIN)) {
     return sendErr(res, 429, 'RATE_LIMITED', {}, h);
   }
@@ -551,6 +564,9 @@ const server = http.createServer((req, res) => {
   if (urlPath === '/') urlPath = '/index.html';
   const filePath = path.join(ROOT, path.normalize(urlPath).replace(/^(\.\.[/\\])+/, ''));
   if (!filePath.startsWith(ROOT)) { res.writeHead(403); res.end(); return; }
+  // [게이트1] DATA_DIR 내부 파일은 웹루트 하위에 있어도 절대 정적 서빙하지 않는다 —
+  // GET /data/accounts.json 류의 계정·토큰 파일 유출 차단 (DATA_DIR_ABS는 DATA_DIR 정의 옆에서 계산)
+  if (DATA_DIR_ABS.some(d => filePath === d || filePath.startsWith(d + path.sep))) { res.writeHead(403); res.end(); return; }
   fs.readFile(filePath, (err, data) => {
     if (err) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('404'); return; }
     res.writeHead(200, {
