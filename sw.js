@@ -3,10 +3,11 @@
    Cache-first offline support for the whole game suite.
    Bump CACHE_VERSION whenever suite files change.
    ============================================================ */
-const CACHE_VERSION = 'polaris-v24';
+const CACHE_VERSION = 'polaris-v25';
 const PRECACHE = [
   // 통합 포털 + 아케이드 게임
   'index.html',
+  'design-tokens.css',
   'game-assets/fonts/fonts.css',
   'game-assets/fonts/Galmuri11.woff2',
   'game-assets/fonts/Galmuri9.woff2',

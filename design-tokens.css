@@ -1,0 +1,81 @@
+/* ============================================================
+   폴라리스 디자인 시스템 v1 — 공통 디자인 토큰 (design-tokens.css)
+   기획서(단일 출처): docs/design/디자인시스템-v1.md §3 — 김실장 승인 (2026-09-20)
+   규약: --p-{분류}-{단계|역할} — open-color --oc-(color)-(number) 준용 (§3-1)
+   - 순수 CSS 변수 파일: 컴포넌트·레이아웃 0개 — 레이아웃은 각 게임이 정의 (§0-2, NES.css 원칙)
+   - 서버 없음·file:// 동작: 상대경로 링크 1줄로 채택 (§0-3)
+   - 게임별 임의 수정 금지 — 변경은 기획 승인 후 (§9)
+   ============================================================ */
+
+:root {
+  /* --- 표면: 네이비 5단 (§3-2) --- */
+  --p-navy-900: #0d1021;   /* 페이지 배경 — 로비 --bg 그대로 */
+  --p-navy-800: #171b31;   /* 카드 — 로비 --card */
+  --p-navy-700: #1e2440;   /* 카드 hover — 로비 --card-hover */
+  --p-navy-600: #2a3154;   /* 보더·구분선 — 로비 --line */
+
+  /* --- 텍스트 (네이비-900 배경 기준 WCAG 대비 실측, §1-2) --- */
+  --p-text:  #e8eaf6;      /* 본문 — 15.75:1 · 로비 --text */
+  --p-muted: #9aa3c7;      /* 보조 텍스트 — 7.58:1 · 로비 --muted */
+
+  /* --- 브랜드: 도토리 골드 3단 (§3-2) --- */
+  --p-gold-500: #d9a441;   /* 브랜드 액센트 — 버튼·링크·강조 (8.39:1, AA·AAA) · 신규 */
+  --p-gold-300: #e6b95c;   /* 골드 hover (10.29:1) · 신규 */
+  --p-gold-700: #a8781f;   /* 골드 눌림·보더 · 신규 */
+
+  /* --- 게임 액센트 3종 — 신규 색 추가 금지, 이 3종 이내에서만 선택 (§3-2 규칙) --- */
+  --p-teal-400:   #4fd1c5; /* 액센트 ① (10.11:1) — 로비 --accent2 */
+  --p-violet-400: #7c6cff; /* 액센트 ② — 특정 이벤트·베타 배지 — 로비 --accent 강등(4.89:1, 대형 텍스트 한정) */
+  --p-coral-400:  #FF6B6B; /* 액센트 ③·위험 강조 — beatcraft */
+
+  /* --- 상태색 (범용 관례 — 브랜드 색은 자체 정의, §2 open-color 교훈) --- */
+  --p-success: #4ADE80;    /* 성공 — beatcraft */
+  --p-danger:  #d8443c;    /* 실패·피해 — pvz */
+  --p-warn:    #ffd23e;    /* 경고·보상 — pvz */
+
+  /* --- 보드게임 표면 --- */
+  --p-paper: #c8c0a8;      /* 한지 종이톤 — suiji */
+
+  /* --- 폰트 스택 3종 (§3-3) --- */
+  --p-font-ko:      "Galmuri11", "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  /* 영문·숫자 디스플레이 — 비라틴은 Galmuri11 폴스루(NES.css Fonts 구조, §2) · 한글 타이틀도 안전 */
+  --p-font-display: "Press Start 2P", "Galmuri11", monospace;
+  /* 좌표·점수·로그 — woff2 동봉(JetBrains Mono, OFL)은 후속 S 과제 · 현재 CDN 의존 흡수 준비(§11) */
+  --p-font-data:    "JetBrains Mono", ui-monospace, "SF Mono", Consolas, monospace;
+
+  /* --- 간격 — 4px 기본 격자 (§3-4) --- */
+  --p-space-1: 4px;
+  --p-space-2: 8px;
+  --p-space-3: 12px;
+  --p-space-4: 16px;
+  --p-space-5: 24px;
+  --p-space-6: 32px;
+  --p-space-7: 48px;
+  --p-space-8: 64px;
+
+  /* --- 반경 — 레트로 원칙은 0(NES.css), 기존 카드 호환분만 유지 (§3-4) --- */
+  --p-radius-0: 0;
+  --p-radius-1: 4px;
+  --p-radius-2: 8px;
+
+  /* --- 그림자 — blur 0 하드 픽셀 그림자 (NES.css 버튼·컨테이너 방식, §3-4) --- */
+  --p-shadow-pixel-s: 2px 2px 0 rgba(5, 8, 20, .55);
+  --p-shadow-pixel-m: 4px 4px 0 rgba(5, 8, 20, .55);
+  --p-shadow-gold:    0 0 12px rgba(217, 164, 65, .35);  /* 강조 글로우 — 예외적 blur 허용 */
+}
+
+/* ------------------------------------------------------------
+   레거시 별칭 — index.html 인라인 :root 블록 삭제 후 호환. 신규 코드 금지 (§3-5)
+   로비의 var( ) 소비 25곳(polaris-common.js 계통 인라인 스타일 포함)이
+   소비처 수정 0행으로 토큰을 따라간다.
+   ------------------------------------------------------------ */
+:root {
+  --bg: var(--p-navy-900);
+  --card: var(--p-navy-800);
+  --card-hover: var(--p-navy-700);
+  --line: var(--p-navy-600);
+  --text: var(--p-text);
+  --muted: var(--p-muted);
+  --accent: var(--p-gold-500);    /* ★ 유일한 값 변경: 바이올렛 #7c6cff → 도토리 골드 전환 (§0-6) */
+  --accent2: var(--p-teal-400);
+}
