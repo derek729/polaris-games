@@ -347,22 +347,23 @@
      - 토큰은 'polaris.auth.v1' 단 1개 키 {name, token, expiresAt}
      - fetch 실패·403·401(토큰 만료) → 조용히 폴백(로그아웃 처리 + 로컬 동작 유지, 절대 throw 안 함)
        사용자 입력 오류(400/409/429)는 {ok:false, code, field, reason} 반환으로 전달 — UI 표시용 */
-  const API_KEY = 'polaris.api.v1';
-  const AUTH_KEY = 'polaris.auth.v1';
+  // localStorage 스토리지 키 이름 (자격증명 아님) — 스캐너 오탐 방지 위해 명시적 네이밍
+  const LS_KEY_API_BASE = 'polaris.api.v1';
+  const LS_KEY_AUTH = 'polaris.auth.v1';
 
   function apiBase() {
     try {
       if (typeof window.POLARIS_API_URL === 'string' && window.POLARIS_API_URL.trim()) {
         return window.POLARIS_API_URL.trim().replace(/\/+$/, '');
       }
-      const saved = localStorage.getItem(API_KEY);
+      const saved = localStorage.getItem(LS_KEY_API_BASE);
       if (typeof saved === 'string' && saved.trim()) return saved.trim().replace(/\/+$/, '');
     } catch (e) { /* localStorage 불가 환경 — 비활성 */ }
     return '';
   }
 
-  function readAuth() { return readJSON(AUTH_KEY, null); }
-  function clearAuth() { try { localStorage.removeItem(AUTH_KEY); } catch (e) { /* 무시 */ } }
+  function readAuth() { return readJSON(LS_KEY_AUTH, null); }
+  function clearAuth() { try { localStorage.removeItem(LS_KEY_AUTH); } catch (e) { /* 무시 */ } }
   function emitCloud() { emit('cloud', P.cloud.state()); }
 
   /* 공용 fetch — 네트워크 실패는 {status:0}로 정규화(호출부가 조용히 폴백), 응답 본문 JSON 파싱 */
@@ -392,7 +393,7 @@
       }).then(function (r) {
         const b = r.body;
         if (r.status === 201 && b.ok && b.token) {
-          writeJSON(AUTH_KEY, {
+          writeJSON(LS_KEY_AUTH, {
             name: (b.account && b.account.name) || String(name || '').trim(),
             token: b.token,
             expiresAt: Date.now() + (b.expiresInDays || 30) * 86400000
@@ -413,7 +414,7 @@
       }).then(function (r) {
         const b = r.body;
         if (r.status === 200 && b.ok && b.token) {
-          writeJSON(AUTH_KEY, {
+          writeJSON(LS_KEY_AUTH, {
             name: (b.account && b.account.name) || String(name || '').trim(),
             token: b.token,
             expiresAt: Date.now() + (b.expiresInDays || 30) * 86400000

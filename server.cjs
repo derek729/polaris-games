@@ -560,7 +560,15 @@ const server = http.createServer((req, res) => {
   // Phase 2 API 분기 — 정적 서빙·WS보다 먼저 (/api/* 는 정적 파일 경로와 절대 충돌하지 않는다)
   const rawPath = (req.url || '/').split('?')[0];
   if (rawPath === '/api' || rawPath.startsWith('/api/')) { handleApi(req, res); return; }
-  let urlPath = decodeURIComponent(rawPath);
+  let urlPath;
+  try {
+    urlPath = decodeURIComponent(rawPath); // malformed %(예: GET /%)에서 URIError — 미포착 시 프로세스 크래시(DoS)
+  } catch {
+    res.writeHead(400);
+    res.end();
+    return;
+  }
+  if (urlPath.includes('\0')) { res.writeHead(400); res.end(); return; } // %00 NUL 바이트 — fs.readFile에서 동기 throw → 크래시
   if (urlPath === '/') urlPath = '/index.html';
   const filePath = path.join(ROOT, path.normalize(urlPath).replace(/^(\.\.[/\\])+/, ''));
   if (!filePath.startsWith(ROOT)) { res.writeHead(403); res.end(); return; }

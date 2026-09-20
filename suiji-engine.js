@@ -718,7 +718,9 @@
     }
 
     for (let i = 0; i < 40; i++) {
-      ctx.strokeStyle = `rgba(${100 + Math.random() * 40}, ${60 + Math.random() * 30}, ${20 + Math.random() * 20}, ${0.025 + Math.random() * 0.05})`;
+      // 가로결 기준색 — 팔레트 있으면 grain을 따라가고(한지·네온에서도 결 톤 일관), 없으면 기존 출시색 그대로(하위호환)
+      const hr = p ? grain[0] : 100, hg = p ? grain[1] : 60, hb = p ? grain[2] : 20;
+      ctx.strokeStyle = `rgba(${hr + Math.random() * 40}, ${hg + Math.random() * 30}, ${hb + Math.random() * 20}, ${0.025 + Math.random() * 0.05})`;
       ctx.lineWidth = 0.3 + Math.random() * 0.6;
       const y = Math.random() * h;
       ctx.beginPath();
