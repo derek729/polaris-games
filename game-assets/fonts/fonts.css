@@ -1,0 +1,23 @@
+/* 폴라리스 게임 폰트 — Galmuri(한글 비트맵, SIL OFL 1.1) + Press Start 2P(영문 픽셀, SIL OFL 1.1)
+   라이선스: LICENSE.txt — 게임 폰트 도입 (아트팀 보완 과제 2026-09-20) */
+@font-face {
+  font-family: 'Galmuri11';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./Galmuri11.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Galmuri9';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./Galmuri9.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Press Start 2P';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./PressStart2P.ttf') format('truetype');
+}
