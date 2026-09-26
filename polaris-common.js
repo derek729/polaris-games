@@ -452,6 +452,25 @@
         return { ok: false, code: b.code || 'ERROR', field: b.field, reason: b.reason };
       }).catch(function () { return { ok: false, code: 'NETWORK' }; });
     },
+    /* 계정 삭제 (docs/design/account-delete.md §3) — 서버 하드 삭제 성공 시 로컬 auth 키까지 제거.
+       실패 시 {ok:false, code} 반환: AUTH_FAILED(비번 불일치 — 로그인 유지), TOKEN_EXPIRED/AUTH_REQUIRED
+       (본인 확인 불가 — 기존 401 규약대로 조용히 로그아웃 처리 후 재로그인 유도), NETWORK, FIELD_INVALID 등 */
+    deleteAccount(password) {
+      const a = readAuth();
+      if (!apiBase() || !a || !a.token) return Promise.resolve({ ok: false, code: 'CLOUD_DISABLED' });
+      return apiFetch('/api/account/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + a.token },
+        body: JSON.stringify({ password: String(password || '') })
+      }).then(function (r) {
+        const b = r.body;
+        if (r.status === 200 && b.ok) { clearAuth(); emitCloud(); return { ok: true }; }
+        if (r.status === 401 && b.code === 'AUTH_FAILED') return { ok: false, code: 'AUTH_FAILED' };
+        if (r.status === 401) { clearAuth(); emitCloud(); return { ok: false, code: b.code || 'TOKEN_EXPIRED', loggedOut: true }; }
+        if (r.status === 0 || r.status === 403 || r.status >= 500) return { ok: false, code: 'NETWORK' };
+        return { ok: false, code: b.code || 'ERROR', field: b.field, reason: b.reason };   // 400/429 — 입력 오류 전달
+      }).catch(function () { return { ok: false, code: 'NETWORK' }; });
+    },
     /* 주간 리더보드 — 공개 조회(토큰 없이 가능)하되 토큰이 있으면 me 를 받는다.
        401(만료) 시 조용히 로그아웃 후 비인증으로 1회 재시도 — 목록은 계속 보이게 */
     leaderboard(week, game) {

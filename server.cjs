@@ -7,6 +7,9 @@
    - v2.1 (Phase 2 사이클 A): 계정·전적·주간 리더보드 HTTP API (/api/*)
          기획서: docs/design/portal-phase2-account-server.md
          WS 대전 프로토콜·정적 서빙은 무수정 — http 핸들러 선두의 /api/* 분기만 추가
+   - v2.2: 계정 삭제 API — POST /api/account/delete
+         기획서: docs/design/account-delete.md
+         switch case 1개 + 헬퍼 2개 추가만 — 기존 엔드포인트·프로토콜 무수정
    ============================================================ */
 const http = require('http');
 const fs = require('fs');
@@ -357,6 +360,14 @@ function handleApi(req, res) {
             return sendJson(res, 200, { ok: true }, h);
           } catch (e) { fail500(res, e); }
         });
+      case 'POST /api/account/delete':
+        // 계정 삭제 (account-delete.md §1) — 기존 POST /api/matches와 동일 순서:
+        // 본문 수신(413)/파싱(BAD_JSON) → handler 선두에서 authenticate(401) → 계정 카운터(429) → 재확인·삭제
+        return withBody(req, res, h, body => {
+          const auth = authenticate(req);
+          if (auth.error) return sendErr(res, 401, auth.error, {}, h);
+          return apiAccountDelete(req, res, h, body, auth);
+        });
       case 'GET /api/me': {
         const auth = authenticate(req);
         if (auth.error) return sendErr(res, 401, auth.error, {}, h);
@@ -435,6 +446,42 @@ function apiLogin(req, res, h, body) {
   if (!account || !passOk) return sendErr(res, 401, 'AUTH_FAILED', {}, h);
   const token = issueToken(account.id);
   sendJson(res, 200, { ok: true, token, expiresInDays: TOKEN_TTL_DAYS, account: publicAccount(account) }, h);
+}
+
+/* 계정 삭제 하드 정리 — WEEKLY_DIR의 모든 주 파일에서 해당 계정 전적 제거 (account-delete.md §1-3·§2).
+   loadWeek/saveWeek(weeklyCache) 경유 — 리더보드는 버킷에서 즉시 소실되고 남은 항목으로 재정렬된다 */
+function purgeWeeklyEntries(accountId) {
+  let files;
+  try { files = fs.readdirSync(WEEKLY_DIR).filter(f => /^\d{4}-\d{2}-\d{2}\.json$/.test(f)); }
+  catch (e) { return; }   // 버킷 디렉터리 부재·판독 실패 — 제거할 전적이 없는 것과 같다
+  for (const f of files) {
+    const ws = f.slice(0, -5);
+    const week = loadWeek(ws);
+    if (week.players[accountId] === undefined) continue;
+    delete week.players[accountId];
+    saveWeek(ws);
+  }
+}
+
+/* 계정 삭제 — authenticate 통과 후 호출됨 (본인 확인 = 유효 토큰 + 비밀번호 재확인 2단계, §4).
+   하드 삭제: accounts 제거 + 해당 계정 토큰 전부 폐기 + 전 주 파일 전적 제거 → 기존 원자적
+   저장 헬퍼(saveAccounts/saveTokens/주간 저장)로 기록. 롤백 가능성은 백업 4세대가 담당 (§1-4) */
+function apiAccountDelete(req, res, h, body, auth) {
+  const account = auth.account;
+  // 레이트리밋 — 계정 카운터 재사용 (§1 에러코드: 429 RATE_LIMITED). 재확인 비번 대입 시도도 같은 카운터로 지연
+  if (!allowRate('acct:' + account.id, RATE_ACCOUNT_PER_MIN)) return sendErr(res, 429, 'RATE_LIMITED', {}, h);
+  if (body === undefined) return;   // parseJsonBody가 이미 400 BAD_JSON으로 응답
+  if (body === null || typeof body !== 'object' || Array.isArray(body)) return sendErr(res, 400, 'BAD_JSON', {}, h);
+  if (typeof body.password !== 'string' || body.password.length === 0) {
+    return sendErr(res, 400, 'FIELD_INVALID', { field: 'password', reason: '비밀번호를 다시 입력해 주세요' }, h);
+  }
+  if (!verifyPassword(body.password, account.passHash)) return sendErr(res, 401, 'AUTH_FAILED', {}, h);
+  accounts = accounts.filter(a => a.id !== account.id);
+  tokens = tokens.filter(t => t.accountId !== account.id);
+  saveAccounts();
+  saveTokens();
+  purgeWeeklyEntries(account.id);
+  sendJson(res, 200, { ok: true }, h);
 }
 
 function apiMe(res, h, account) {
