@@ -158,6 +158,13 @@
 <header>
   <div class="brand">JARVIS<small>폴라리스 AI 서비스</small></div>
   <div style="display:flex;align-items:center;gap:12px">
+    <select id="langSel" style="background:rgba(6,14,22,0.8);border:1px solid var(--line-soft);color:var(--text);font-size:11px;padding:4px 6px;outline:none">
+      <option value="auto">🌐 AUTO</option>
+      <option value="ko">한국어</option>
+      <option value="en">English</option>
+      <option value="zh">中文</option>
+      <option value="ja">日本語</option>
+    </select>
     <button id="installBtn" style="display:none;background:none;border:1px solid var(--line);color:var(--cyan);font-size:10.5px;padding:5px 10px;cursor:pointer">⬇ 앱 설치</button>
     <div id="engstat">엔진 확인 중…</div>
   </div>
@@ -269,6 +276,43 @@ fetch('/api/health').then(r => r.json()).then(d => {
   document.getElementById('engstat').innerHTML = '엔진 <b class="off">오프라인</b>';
 });
 
+/* ── 글로벌 다국어 (P0) ── */
+const I18N = {
+  ko: { chat: '대화', review: '코드 리뷰', news: '뉴스', game: '게임', ph: '자비스에게 말 걸기', sub: 'ENTER 전송 · 마이크로 말하면 음성으로 답합니다' },
+  en: { chat: 'Chat', review: 'Code Review', news: 'News', game: 'Games', ph: 'Ask JARVIS anything', sub: 'ENTER to send · use mic to talk' },
+  zh: { chat: '对话', review: '代码审查', news: '新闻', game: '游戏', ph: '向贾维斯提问', sub: '回车发送 · 点击麦克风语音提问' },
+  ja: { chat: 'チャット', review: 'コードレビュー', news: 'ニュース', game: 'ゲーム', ph: 'ジャーヴィスに話しかける', sub: 'Enterで送信 · マイクで音声入力' },
+};
+let UI_LANG = localStorage.getItem('jarvis-ui-lang') || 'ko';
+function paintLang() {
+  const t = I18N[UI_LANG] || I18N.ko;
+  const map = { chat: '대화', review: '코드 리뷰', news: '뉴스', game: '게임' };
+  const tabOrder = ['chat', 'review', 'news', 'game'];
+  document.querySelectorAll('nav button').forEach((b, i) => {
+    b.innerHTML = b.innerHTML.replace(/(<span class="ic">[^<]+<\/span>).*$/s, `$1${t[tabOrder[i]]}`);
+  });
+  cmd.placeholder = t.ph;
+  subline.textContent = t.sub;
+}
+document.getElementById('langSel').addEventListener('change', e => {
+  UI_LANG = e.target.value;
+  localStorage.setItem('jarvis-ui-lang', UI_LANG);
+  paintLang();
+});
+(function initLang() {
+  document.getElementById('langSel').value = UI_LANG === 'ko' || I18N[UI_LANG] ? UI_LANG : 'ko';
+})();
+
+/* TTS·STT 언어 매핑 — 사용자 언어 or 메시지 자동 감지 */
+const TTS_LANG = { ko: 'ko-KR', en: 'en-US', zh: 'zh-CN', ja: 'ja-JP' };
+function msgLang(text) {
+  if (UI_LANG !== 'auto') return UI_LANG;
+  if (/[\uac00-\ud7af]/.test(text)) return 'ko';
+  if (/[\u3040-\u30ff]/.test(text)) return 'ja';
+  if (/[\u4e00-\u9fff]/.test(text)) return 'zh';
+  return 'en';
+}
+
 /* ── 대화 (v2: 세션 메모리 + 복원 + 음성 토글) ── */
 const chatlog = document.getElementById('chatlog');
 const cmd = document.getElementById('cmd');
@@ -339,9 +383,9 @@ function bub(role, text, cls) {
 function speak(text) {
   if (!speakOn || !('speechSynthesis' in window)) return;
   const u = new SpeechSynthesisUtterance(text.slice(0, 300).replace(/[*#`]/g, ''));
-  u.lang = 'ko-KR'; u.rate = 1.04;
-  const ko = speechSynthesis.getVoices().find(v => v.lang?.toLowerCase().startsWith('ko'));
-  if (ko) u.voice = ko;
+  u.lang = TTS_LANG[msgLang(text)] || 'ko-KR'; u.rate = 1.04;
+  const v = speechSynthesis.getVoices().find(x => x.lang?.toLowerCase().startsWith(u.lang.slice(0, 2)));
+  if (v) u.voice = v;
   speechSynthesis.cancel(); speechSynthesis.speak(u);
 }
 /* 스킬·모델 — OpenClaw 방식 능력 확장 */
@@ -399,7 +443,7 @@ async function send() {
   try {
     const r = await fetch('/api/chat', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ system: skillTag, prompt: text, sid: SID, model }),
+      body: JSON.stringify({ system: skillTag, prompt: text, sid: SID, model, lang: UI_LANG === 'auto' ? '' : UI_LANG }),
     });
     const d = await r.json();
     th.remove();
@@ -414,6 +458,7 @@ async function send() {
   }
 }
 cmd.addEventListener('keydown', e => { if (e.key === 'Enter') send(); });
+paintLang();
 
 /* 음성 인식 */
 const SR = window.webkitSpeechRecognition || window.SpeechRecognition;
@@ -442,6 +487,7 @@ if (SR) {
   };
   micBtn.addEventListener('click', () => {
     if (micBtn.classList.contains('listening')) { recog.stop(); return; }
+    recog.lang = TTS_LANG[UI_LANG === 'auto' ? 'ko' : UI_LANG] || 'ko-KR';
     fin = ''; micBtn.classList.add('listening');
     subline.textContent = '청취 중…'; subline.classList.add('listening');
     recog.start();

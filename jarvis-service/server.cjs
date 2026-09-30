@@ -96,6 +96,21 @@ function systemPromptFor(tag) {
   return DEFAULT_PROMPTS[sid_ === 'review' ? 'review' : 'chat'];
 }
 
+/* ── 글로벌 다국어 (P0, 로드맵 v1 §3) — 감지 + 응답 언어 강제 ── */
+function detectLang(t) {
+  const s = t || '';
+  if (/[\uac00-\ud7af]/.test(s)) return 'ko';
+  if (/[\u3040-\u30ff]/.test(s)) return 'ja';
+  if (/[\u4e00-\u9fff]/.test(s)) return 'zh';
+  return 'en';
+}
+const LANG_INSTRUCT = {
+  ko: '모든 답변은 한국어 존댓말로 한다.',
+  en: 'Always respond in English (polite tone).',
+  zh: '所有回答必须使用中文（简体），语气礼貌。',
+  ja: 'すべて丁寧な日本語（です・ます調）で答える。',
+};
+
 /* Particle 방식 요약 스타일 — 뉴스 요약 프롬프트 확장 */
 const SUM_STYLES = {
   basic: '',
@@ -323,6 +338,9 @@ const server = http.createServer(async (req, res) => {
 
       let sysPrompt = systemPromptFor(system);
       if (style && SUM_STYLES[style]) sysPrompt += SUM_STYLES[style];
+      /* 글로벌: 사용자 설정 언어 우선, 없으면 자동 감지 */
+      const lang = (typeof body.lang === 'string' && LANG_INSTRUCT[body.lang]) ? body.lang : detectLang(prompt);
+      sysPrompt += '\n' + LANG_INSTRUCT[lang];
 
       /* 멀티턴: 세션 기억 + 이번 발화 */
       const history = system === 'review' ? [] : sessionHistory(sid);
@@ -336,7 +354,7 @@ const server = http.createServer(async (req, res) => {
       if (system !== 'review' && out.engine !== 'fallback') {
         sessionRemember(sid, prompt, out.text);
       }
-      return sendJson(res, 200, { reply: out.text, engine: out.engine });
+      return sendJson(res, 200, { reply: out.text, engine: out.engine, lang });
     }
 
     if (req.method === 'GET' && url.pathname === '/api/news') {
