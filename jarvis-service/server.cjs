@@ -61,16 +61,39 @@ const DEFAULT_PROMPTS = {
   review:
     '너는 시니어 코드 리뷰어다. 코드를 검토해 ①치명적 결함 ②개선점 ③한 줄 총평 순서로 한국어로 간결히 답한다. 코드 전체를 다시 출력하지 않는다.',
 };
+/* ── 실데이터 브리핑 — data/status-brief.md를 스킬에 주입 ── */
+const BRIEF_PATH = path.join(__dirname, 'data', 'status-brief.md');
+let briefData = '';
+function loadBrief() {
+  try {
+    briefData = fs.readFileSync(BRIEF_PATH, 'utf8');
+  } catch (e) {
+    briefData = '';
+  }
+}
+loadBrief();
+try {
+  fs.watch(path.dirname(BRIEF_PATH), () => loadBrief());
+} catch (e) { /* data 폴더 없음 */ }
+
 function systemPromptFor(tag) {
   /* tag: 'chat'|'review'|'news'|'game'|'briefing'|'skill:<id>' */
-  if (tag && tag.startsWith('skill:')) {
-    const s = SKILLS.get(tag.slice(6));
-    if (s) return s.body;
-    tag = 'chat';
+  let sid_ = tag;
+  if (sid_ && sid_.startsWith('skill:')) {
+    const s = SKILLS.get(sid_.slice(6));
+    if (s) {
+      /* 브리핑 스킬엔 실데이터를 붙인다 — 창작이 아니라 실측 보고 */
+      const isBrief = s.id === 'polaris-briefing' && briefData;
+      return s.body + (isBrief ? '\n\n## 실측 데이터 (이 내용만 근거로 답한다 — 이 밖은 추측 금지)\n' + briefData : '');
+    }
+    sid_ = 'chat';
   }
-  const byTag = [...SKILLS.values()].find(s => s.tag === tag);
-  if (byTag) return byTag.body;
-  return DEFAULT_PROMPTS[tag === 'review' ? 'review' : 'chat'];
+  const byTag = [...SKILLS.values()].find(s => s.tag === sid_);
+  if (byTag) {
+    const isBrief = byTag.id === 'polaris-briefing' && briefData;
+    return byTag.body + (isBrief ? '\n\n## 실측 데이터 (이 내용만 근거로 답한다 — 이 밖은 추측 금지)\n' + briefData : '');
+  }
+  return DEFAULT_PROMPTS[sid_ === 'review' ? 'review' : 'chat'];
 }
 
 /* Particle 방식 요약 스타일 — 뉴스 요약 프롬프트 확장 */
@@ -337,5 +360,46 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`[jarvis-service v2] http://0.0.0.0:${PORT} — 세션 메모리 활성 (세션당 ${MAX_TURNS}턴)`);
+  console.log(`[jarvis-service v3] http://0.0.0.0:${PORT} — 세션 메모리·스킬(${SKILLS.size}종)·브리핑 실데이터 활성`);
 });
+
+/* ── 텔레그램 채널 (OpenClaw 방식 — TELEGRAM_BOT_TOKEN 있으면 자동 가동) ──
+   BotFather에서 봇 생성 → 토큰을 환경변수로 주면 폰·PC 어디서든 채팅으로 자비스와 대화 */
+const TG_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
+let tgOffset = 0;
+async function tgSend(chatId, text) {
+  await fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chat_id: chatId, text: text.slice(0, 4000) }),
+  }).catch(() => {});
+}
+async function tgLoop() {
+  console.log('[telegram] 토큰 없음 — 채널 대기 (TELEGRAM_BOT_TOKEN 환경변수로 활성)');
+  while (true) {
+    try {
+      const r = await fetch(`https://api.telegram.org/bot${TG_TOKEN}/getUpdates?timeout=25&offset=${tgOffset}`);
+      const d = await r.json();
+      for (const u of d.result || []) {
+        tgOffset = u.update_id + 1;
+        const msg = u.message;
+        if (!msg?.text) continue;
+        const memId = 'tg' + msg.chat.id;
+        const messages = [
+          { role: 'system', content: systemPromptFor('chat') },
+          ...sessionHistory(memId),
+          { role: 'user', content: msg.text.slice(0, 2000) },
+        ];
+        const out = await think(messages);
+        if (out.engine !== 'fallback') sessionRemember(memId, msg.text, out.text);
+        await tgSend(msg.chat.id, out.text);
+      }
+    } catch (e) {
+      await new Promise(r2 => setTimeout(r2, 5000));
+    }
+  }
+}
+if (TG_TOKEN) {
+  console.log('[telegram] 채널 가동 — long polling 시작');
+  tgLoop();
+}
