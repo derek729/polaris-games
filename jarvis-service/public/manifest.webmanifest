@@ -1,0 +1,14 @@
+{
+  "name": "JARVIS — 폴라리스 AI 서비스",
+  "short_name": "JARVIS",
+  "description": "대화·코드 리뷰·뉴스·게임을 한 곳에서 — 폴라리스의 AI 비서",
+  "start_url": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#04070c",
+  "theme_color": "#04070c",
+  "lang": "ko",
+  "icons": [
+    { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
