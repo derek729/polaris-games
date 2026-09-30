@@ -36,6 +36,7 @@ from PIL import Image
 SPRITE_SIDE_KB = {32: 8, 64: 15, 96: 15, 128: 40}
 RULES = {
     "sprite":     {"dims": "32/64/96/128 정사각", "transparent": True},
+    "tile":       {"dims": (128, 128), "max_kb": 40, "transparent": False},
     "background": {"dims": (672, 384), "max_kb": 120, "transparent": False},
     "cover":      {"dims": (1200, 630), "max_kb": 250, "transparent": False},
 }
@@ -52,6 +53,8 @@ def infer_rule(path: Path):
         return "background"
     if name.startswith("cover"):
         return "cover"
+    if name.startswith("tile-"):
+        return "tile"
     return "sprite"
 
 

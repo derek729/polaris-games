@@ -468,7 +468,8 @@ function purgeWeeklyEntries(accountId) {
    저장 헬퍼(saveAccounts/saveTokens/주간 저장)로 기록. 롤백 가능성은 백업 4세대가 담당 (§1-4) */
 function apiAccountDelete(req, res, h, body, auth) {
   const account = auth.account;
-  // 레이트리밋 — 계정 카운터 재사용 (§1 에러코드: 429 RATE_LIMITED). 재확인 비번 대입 시도도 같은 카운터로 지연
+  // 레이트리밋 — 삭제 전용 카운터(비번 대입 방어) + 계정 카운터 병행 (리뷰 NON-BLOCKING 3건 반영)
+  if (!allowRate('del:' + account.id, 10)) return sendErr(res, 429, 'RATE_LIMITED', {}, h);
   if (!allowRate('acct:' + account.id, RATE_ACCOUNT_PER_MIN)) return sendErr(res, 429, 'RATE_LIMITED', {}, h);
   if (body === undefined) return;   // parseJsonBody가 이미 400 BAD_JSON으로 응답
   if (body === null || typeof body !== 'object' || Array.isArray(body)) return sendErr(res, 400, 'BAD_JSON', {}, h);
@@ -476,11 +477,13 @@ function apiAccountDelete(req, res, h, body, auth) {
     return sendErr(res, 400, 'FIELD_INVALID', { field: 'password', reason: '비밀번호를 다시 입력해 주세요' }, h);
   }
   if (!verifyPassword(body.password, account.passHash)) return sendErr(res, 401, 'AUTH_FAILED', {}, h);
+  // 부분 실패 창 축소 — purge 선행 (리뷰 NON-BLOCKING 1건 반영: 고아 노출 순간 최소화)
+  checkWeeklyRollover();
+  purgeWeeklyEntries(account.id);
   accounts = accounts.filter(a => a.id !== account.id);
   tokens = tokens.filter(t => t.accountId !== account.id);
   saveAccounts();
   saveTokens();
-  purgeWeeklyEntries(account.id);
   sendJson(res, 200, { ok: true }, h);
 }
 
