@@ -193,6 +193,12 @@
           <path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/>
         </svg>
       </button>
+      <button class="rbtn" id="cfgBtn" title="AI 엔진 설정 (BYOK)">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.01a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+      </button>
       <button class="rbtn" id="mic" title="음성으로 말하기">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
           <rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/>
@@ -257,6 +263,32 @@
   <button data-t="news"><span class="ic">📰</span>뉴스</button>
   <button data-t="game"><span class="ic">🎮</span>게임</button>
 </nav>
+
+<!-- BYOK 설정 모달 — 키는 이 브라우저에만 저장(서버는 호출에만 사용, 기록 없음) -->
+<div id="cfgModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:20;align-items:center;justify-content:center">
+  <div style="width:min(420px,calc(100vw - 32px));border:1px solid var(--line);background:#0a121b;padding:20px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <b style="font-size:14px;color:var(--cyan)">⚙ AI 엔진 설정</b>
+      <button id="cfgClose" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer">✕</button>
+    </div>
+    <p style="font-size:11.5px;color:var(--muted);line-height:1.7;margin-bottom:14px">
+      API 키는 <b style="color:var(--text)">이 브라우저에만</b> 저장되고 서버에는 기록되지 않습니다.
+      키가 없으면 로컬 엔진(Ollama)으로 동작합니다. 무료 티어: OpenRouter·Gemini·Groq.
+    </p>
+    <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px">프로바이더</label>
+    <select id="cfgProvider" style="width:100%;box-sizing:border-box;background:rgba(6,14,22,0.8);border:1px solid var(--line);color:var(--text);font-size:13px;padding:9px;outline:none;margin-bottom:10px">
+      <option value="">로컬 엔진 (Ollama — 키 불필요)</option>
+    </select>
+    <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px">모델</label>
+    <input id="cfgModel" placeholder="기본값 자동" style="width:100%;box-sizing:border-box;background:rgba(6,14,22,0.8);border:1px solid var(--line);color:var(--text);font-family:var(--mono);font-size:12px;padding:9px;outline:none;margin-bottom:10px" />
+    <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px">API 키</label>
+    <input id="cfgKey" type="password" placeholder="이 브라우저에만 저장됨" style="width:100%;box-sizing:border-box;background:rgba(6,14,22,0.8);border:1px solid var(--line);color:var(--text);font-family:var(--mono);font-size:12px;padding:9px;outline:none;margin-bottom:14px" />
+    <div style="display:flex;gap:8px">
+      <button id="cfgSave" style="flex:1;padding:11px;background:rgba(102,217,232,0.12);border:1px solid rgba(102,217,232,0.4);color:var(--cyan);font-size:13px;cursor:pointer">저장</button>
+      <button id="cfgClear" style="flex:1;padding:11px;background:none;border:1px solid var(--line);color:var(--muted);font-size:13px;cursor:pointer">로컬 엔진으로</button>
+    </div>
+  </div>
+</div>
 
 <script>
 /* ── 탭 전환 ── */
@@ -388,6 +420,50 @@ function speak(text) {
   if (v) u.voice = v;
   speechSynthesis.cancel(); speechSynthesis.speak(u);
 }
+/* ── BYOK 설정 — 프로바이더·모델·키 (localStorage만, 서버 기록 없음) ── */
+const CAT_MODELS = { openrouter: 'qwen/qwen3.8-27b:free', openai: 'gpt-4o-mini', gemini: 'gemini-2.0-flash', groq: 'llama-3.3-70b-versatile' };
+const BYOK_KEY = 'jarvis-byok';
+function getBYOK() {
+  try { return JSON.parse(localStorage.getItem(BYOK_KEY) || 'null') || null; } catch (e) { return null; }
+}
+(function initCfg() {
+  const modal = document.getElementById('cfgModal');
+  const sel = document.getElementById('cfgProvider');
+  document.getElementById('cfgBtn').addEventListener('click', () => {
+    const c = getBYOK();
+    sel.value = c?.provider || '';
+    document.getElementById('cfgModel').value = c?.model || '';
+    document.getElementById('cfgKey').value = c?.apiKey || '';
+    modal.style.display = 'flex';
+  });
+  document.getElementById('cfgClose').addEventListener('click', () => (modal.style.display = 'none'));
+  modal.addEventListener('click', e => { if (e.target === modal) modal.style.display = 'none'; });
+  sel.addEventListener('change', () => {
+    document.getElementById('cfgModel').placeholder = CAT_MODELS[sel.value] ? `기본: ${CAT_MODELS[sel.value]}` : '기본값 자동';
+  });
+  document.getElementById('cfgSave').addEventListener('click', () => {
+    const provider = sel.value;
+    if (!provider) return paintEngine('로컬 엔진');
+    const apiKey = document.getElementById('cfgKey').value.trim();
+    if (!apiKey) { alert('API 키를 입력해 주세요. (키 없이는 로컬 엔진을 사용합니다)'); return; }
+    const model = document.getElementById('cfgModel').value.trim() || CAT_MODELS[provider] || '';
+    localStorage.setItem(BYOK_KEY, JSON.stringify({ provider, model, apiKey }));
+    paintEngine(`${provider} · ${model}`);
+    modal.style.display = 'none';
+    subline.textContent = `엔진 전환: ${provider} — 이제 클라우드로 답합니다`;
+  });
+  document.getElementById('cfgClear').addEventListener('click', () => {
+    localStorage.removeItem(BYOK_KEY);
+    sel.value = ''; document.getElementById('cfgModel').value = ''; document.getElementById('cfgKey').value = '';
+    paintEngine('로컬 엔진');
+    modal.style.display = 'none';
+  });
+})();
+function paintEngine(label) {
+  const el = document.getElementById('engstat');
+  el.innerHTML = `엔진 <b>${label}</b>`;
+}
+
 /* 스킬·모델 — OpenClaw 방식 능력 확장 */
 let activeSkill = ''; /* 선택 스킬 id — 한 번 전송 후 해제 */
 async function loadSkills() {
@@ -436,6 +512,7 @@ async function send() {
   document.querySelectorAll('.skillbar .sk.on').forEach(x => x.classList.remove('on'));
   subline.textContent = 'ENTER 전송 · 마이크로 말하면 음성으로 답합니다';
   const model = document.getElementById('modelSel').value;
+  const byok = getBYOK();
   const label = skillName ? `[${skillName}] ` : '';
   bub('me', label + text);
   saveChat('me', label + text);
@@ -443,7 +520,12 @@ async function send() {
   try {
     const r = await fetch('/api/chat', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ system: skillTag, prompt: text, sid: SID, model, lang: UI_LANG === 'auto' ? '' : UI_LANG }),
+      body: JSON.stringify({
+        system: skillTag, prompt: text, sid: SID,
+        model: byok ? (byok.model || '') : model,
+        lang: UI_LANG === 'auto' ? '' : UI_LANG,
+        provider: byok?.provider || '', apiKey: byok?.apiKey || '',
+      }),
     });
     const d = await r.json();
     th.remove();

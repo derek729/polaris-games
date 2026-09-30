@@ -111,6 +111,63 @@ const LANG_INSTRUCT = {
   ja: 'すべて丁寧な日本語（です・ます調）で答える。',
 };
 
+/* ── BYOK 멀티 프로바이더 (사장님 설계: 구독 인프라 없이 API 라우팅) ──
+   고객 키는 서버에 저장하지 않는다 — 클라가 요청마다 전달, 서버는 호출에만 사용.
+   카탈로그 전부 OpenAI 호환 형식(base URL만 다름). free: 무료 티어 존재. */
+const PROVIDER_CATALOG = {
+  openrouter: {
+    label: 'OpenRouter (free 티어 포함)',
+    base: 'https://openrouter.ai/api/v1/chat/completions',
+    free: true, defaultModel: 'qwen/qwen3.8-27b:free', keyPrefix: 'sk-or-v1-…',
+  },
+  openai: {
+    label: 'OpenAI',
+    base: 'https://api.openai.com/v1/chat/completions',
+    free: false, defaultModel: 'gpt-4o-mini', keyPrefix: 'sk-…',
+  },
+  gemini: {
+    label: 'Google Gemini (free 티어)',
+    base: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
+    free: true, defaultModel: 'gemini-2.0-flash', keyPrefix: 'AIza…',
+  },
+  groq: {
+    label: 'Groq (free 티어·초고속)',
+    base: 'https://api.groq.com/openai/v1/chat/completions',
+    free: true, defaultModel: 'llama-3.3-70b-versatile', keyPrefix: 'gsk_…',
+  },
+};
+
+async function askCloud(provider, key, model, messages) {
+  const p = PROVIDER_CATALOG[provider];
+  if (!p || !key) throw new Error('no-provider');
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 45_000);
+  try {
+    const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` };
+    if (provider === 'openrouter') {
+      headers['HTTP-Referer'] = 'https://jarvis.polaris';
+      headers['X-Title'] = 'JARVIS Service';
+    }
+    const r = await fetch(p.base, {
+      method: 'POST',
+      headers,
+      signal: ctrl.signal,
+      body: JSON.stringify({
+        model: model || p.defaultModel, messages, max_tokens: 800,
+        reasoning: { exclude: true }, /* thinking 모델의 reasoning 토큰이 content를 압축하는 것 방지 */
+      }),
+    });
+    if (!r.ok) throw new Error(`${provider} ${r.status}`);
+    const d = await r.json();
+    const msg = d?.choices?.[0]?.message || {};
+    const out = msg.content?.trim();
+    if (!out) throw new Error('empty');
+    return { text: out, engine: `${provider}:${model || p.defaultModel}` };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /* Particle 방식 요약 스타일 — 뉴스 요약 프롬프트 확장 */
 const SUM_STYLES = {
   basic: '',
@@ -221,7 +278,16 @@ function fallbackReply(user) {
   if (/게임/.test(t)) return '게임 탭에서 가위바위보와 숫자야구가 준비되어 있습니다. 도전해 보시죠!';
   return '로컬 엔진이 잠시 응답하지 않습니다. 곧 복구되니 다시 말씀해 주세요.';
 }
-async function think(messages, model) {
+async function think(messages, model, body) {
+  /* BYOK 우선 — 클라가 전달한 프로바이더·키로 직접 호출(서버 저장 없음), 실패 시 기존 체인 */
+  if (body && body.provider && PROVIDER_CATALOG[body.provider]) {
+    const key = typeof body.apiKey === 'string' ? body.apiKey.trim().slice(0, 400) : '';
+    if (key) {
+      try {
+        return await askCloud(body.provider, key, typeof body.model === 'string' ? body.model : '', messages);
+      } catch (e) { /* 클라우드 실패 → 로컬 체인으로 계속 */ }
+    }
+  }
   try { return await askOllama(messages, model); } catch (e) { /* fall through */ }
   try { return await askOpenRouter(messages); } catch (e) { /* fall through */ }
   const lastUser = [...messages].reverse().find(m => m.role === 'user');
@@ -289,6 +355,15 @@ const server = http.createServer(async (req, res) => {
       });
     }
 
+    /* BYOK 프로바이더 카탈로그 — 키는 클라가 보관, 서버는 저장 안 함 */
+    if (req.method === 'GET' && url.pathname === '/api/providers') {
+      return sendJson(res, 200, {
+        providers: Object.entries(PROVIDER_CATALOG).map(([id, p]) => ({
+          id, label: p.label, free: p.free, defaultModel: p.defaultModel, keyPrefix: p.keyPrefix,
+        })),
+      });
+    }
+
     /* 사용 가능한 로컬 모델 목록 (모델 스위처용) */
     if (req.method === 'GET' && url.pathname === '/api/models') {
       let models = [];
@@ -350,7 +425,7 @@ const server = http.createServer(async (req, res) => {
         { role: 'user', content: prompt },
       ];
 
-      const out = await think(messages, typeof body.model === 'string' ? body.model.slice(0, 80) : '');
+      const out = await think(messages, typeof body.model === 'string' ? body.model.slice(0, 80) : '', body);
       if (system !== 'review' && out.engine !== 'fallback') {
         sessionRemember(sid, prompt, out.text);
       }
