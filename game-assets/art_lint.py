@@ -43,6 +43,12 @@ RULES = {
 BORDER_OPAQUE_PASS_MAX = 0.50   # 테두리 완전 불투명 비율이 이 이상이면 배경제거 미확인(위반)
 SEMI_ALPHA_WARN = 0.05          # 알파 반톤(0/255 제외) 비율 경고 임계 (§6-3-5②)
 
+# 검사 제외 폴더 — 납품 규격(§4-1) 적용 대상이 아닌 자료. 인게임 스프라이트·타일만 규격 검사를 받는다.
+EXCLUDED_DIRS = {
+    "infinity-blade-ue-only",  # Epic EULA UE 전용 텍스처 — UE5 네이티브 경로(P3) 전용 (폴더 README 참조)
+    "ember-citadel",           # 상점 썸네일·표지 등 마케팅 자료 — 채널별 규격이 별도임
+}
+
 
 def infer_rule(path: Path):
     """§6-2 규칙 추론 — 제외면 None."""
@@ -173,7 +179,10 @@ def lint_png(path: Path):
 
 
 def collect_pngs(root: Path):
-    return sorted(p for p in root.rglob("*.png") if infer_rule(p) is not None)
+    return sorted(
+        p for p in root.rglob("*.png")
+        if infer_rule(p) is not None and not (EXCLUDED_DIRS & set(p.parts))
+    )
 
 
 def main():
