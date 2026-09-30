@@ -104,6 +104,12 @@
   .news-item .sum.show { display: block; }
   .news-item button { margin-top: 8px; background: none; border: none; color: var(--muted); font-size: 11.5px; cursor: pointer; padding: 0; }
   .news-item button:hover { color: var(--cyan); }
+  .news-item button.style {
+    margin: 8px 6px 0 0; background: rgba(102,217,232,0.06); border: 1px solid var(--line-soft);
+    color: var(--muted); font-size: 10.5px; padding: 4px 9px; cursor: pointer;
+  }
+  .news-item button.style:hover { color: var(--cyan); border-color: var(--line); }
+  .news-item button.style.on { color: var(--cyan); border-color: rgba(102,217,232,0.5); }
   .empty { text-align: center; color: var(--muted); font-size: 12.5px; padding: 30px 0; line-height: 1.9; }
 
   /* 게임 */
@@ -137,20 +143,33 @@
 
 <header>
   <div class="brand">JARVIS<small>폴라리스 AI 서비스</small></div>
-  <div id="engstat">엔진 확인 중…</div>
+  <div style="display:flex;align-items:center;gap:12px">
+    <button id="installBtn" style="display:none;background:none;border:1px solid var(--line);color:var(--cyan);font-size:10.5px;padding:5px 10px;cursor:pointer">⬇ 앱 설치</button>
+    <div id="engstat">엔진 확인 중…</div>
+  </div>
 </header>
 
 <main>
   <!-- 대화 -->
   <section class="tab on" id="tab-chat">
     <div id="chatlog">
-      <div class="hint">자비스 온라인.<br />무엇이든 물어보세요 — 코드 리뷰 탭도 준비돼 있습니다.</div>
+      <div class="hint">자비스 온라인.<br />무엇이든 물어보세요 — 이제 대화 맥락을 기억합니다.</div>
     </div>
     <div class="subline" id="subline">ENTER 전송 · 마이크로 말하면 음성으로 답합니다</div>
     <div class="chatbar">
       <div class="field">
         <input id="cmd" placeholder="자비스에게 말 걸기" autocomplete="off" />
       </div>
+      <button class="rbtn" id="ttsBtn" title="음성 응답 켜기/끄기">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+          <path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/>
+        </svg>
+      </button>
+      <button class="rbtn" id="resetBtn" title="대화 초기화 (기억 지우기)">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+          <path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/>
+        </svg>
+      </button>
       <button class="rbtn" id="mic" title="음성으로 말하기">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
           <rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/>
@@ -234,13 +253,61 @@ fetch('/api/health').then(r => r.json()).then(d => {
   document.getElementById('engstat').innerHTML = '엔진 <b class="off">오프라인</b>';
 });
 
-/* ── 대화 ── */
+/* ── 대화 (v2: 세션 메모리 + 복원 + 음성 토글) ── */
 const chatlog = document.getElementById('chatlog');
 const cmd = document.getElementById('cmd');
 const subline = document.getElementById('subline');
 const micBtn = document.getElementById('mic');
-const HISTORY = [];
-let speaking = false;
+const ttsBtn = document.getElementById('ttsBtn');
+
+/* 세션 ID — 서버가 이 ID로 맥락을 기억한다 */
+let SID = localStorage.getItem('jarvis-sid');
+if (!SID) {
+  SID = (crypto.randomUUID ? crypto.randomUUID() : 's' + Date.now() + Math.random().toString(36).slice(2));
+  localStorage.setItem('jarvis-sid', SID);
+}
+
+/* 대화 로그 복원/저장 — 재접속해도 이어짐 */
+const CHAT_KEY = 'jarvis-chat-v2';
+function saveChat(role, text) {
+  try {
+    const log = JSON.parse(localStorage.getItem(CHAT_KEY) || '[]');
+    log.push({ role, text });
+    localStorage.setItem(CHAT_KEY, JSON.stringify(log.slice(-40)));
+  } catch (e) { /* 저장 실패는 무시 */ }
+}
+(function restoreChat() {
+  try {
+    const log = JSON.parse(localStorage.getItem(CHAT_KEY) || '[]');
+    if (log.length) {
+      chatlog.querySelector('.hint')?.remove();
+      for (const m of log.slice(-20)) bub(m.role, m.text);
+      chatlog.scrollTop = chatlog.scrollHeight;
+    }
+  } catch (e) { /* 복원 실패는 무시 */ }
+})();
+
+/* 음성 응답 토글 */
+let speakOn = localStorage.getItem('jarvis-tts') !== 'off';
+function paintTts() {
+  ttsBtn.style.color = speakOn ? 'var(--cyan)' : '';
+  ttsBtn.title = speakOn ? '음성 응답 끄기' : '음성 응답 켜기';
+}
+ttsBtn.addEventListener('click', () => {
+  speakOn = !speakOn;
+  localStorage.setItem('jarvis-tts', speakOn ? 'on' : 'off');
+  if (!speakOn) speechSynthesis?.cancel();
+  paintTts();
+});
+paintTts();
+
+/* 대화 초기화 — 화면 + 서버 기억 모두 지움 (Replika Memory 탭의 초기화에 해당) */
+document.getElementById('resetBtn').addEventListener('click', async () => {
+  if (!confirm('대화 기록과 자비스의 기억을 모두 지울까요?')) return;
+  localStorage.removeItem(CHAT_KEY);
+  try { await fetch('/api/memory?sid=' + encodeURIComponent(SID), { method: 'DELETE' }); } catch (e) { /* 오프라인 */ }
+  chatlog.innerHTML = '<div class="hint">기억을 지웠습니다.<br />새로운 대화를 시작하세요.</div>';
+});
 
 function bub(role, text, cls) {
   const hint = chatlog.querySelector('.hint'); if (hint) hint.remove();
@@ -254,7 +321,7 @@ function bub(role, text, cls) {
   return d;
 }
 function speak(text) {
-  if (!('speechSynthesis' in window)) return;
+  if (!speakOn || !('speechSynthesis' in window)) return;
   const u = new SpeechSynthesisUtterance(text.slice(0, 300).replace(/[*#`]/g, ''));
   u.lang = 'ko-KR'; u.rate = 1.04;
   const ko = speechSynthesis.getVoices().find(v => v.lang?.toLowerCase().startsWith('ko'));
@@ -266,16 +333,20 @@ async function send() {
   if (!text) return;
   cmd.value = '';
   bub('me', text);
+  saveChat('me', text);
   const th = bub('ai', '생각 중', 'think');
   try {
     const r = await fetch('/api/chat', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ system: 'chat', prompt: text, history: HISTORY.slice(-6) }),
+      body: JSON.stringify({ system: 'chat', prompt: text, sid: SID }),
     });
     const d = await r.json();
     th.remove();
-    if (d.reply) { bub('ai', d.reply); speak(d.reply); HISTORY.push({ role: 'user', content: text }, { role: 'assistant', content: d.reply }); }
-    else bub('ai', '응답을 만들지 못했습니다. 다시 시도해 주세요.');
+    if (d.reply) {
+      bub('ai', d.reply);
+      saveChat('ai', d.reply);
+      speak(d.reply);
+    } else bub('ai', '응답을 만들지 못했습니다. 다시 시도해 주세요.');
   } catch (e) {
     th.remove();
     bub('ai', '서버에 연결할 수 없습니다.');
@@ -368,28 +439,41 @@ async function loadNews() {
     const d = await r.json();
     if (!d.items?.length) { list.innerHTML = '<div class="empty">뉴스 피드를 가져오지 못했습니다.<br />잠시 후 다시 열어 주세요.</div>'; return; }
     list.innerHTML = '';
+    const STYLES = [['basic', '요약'], ['eli5', '쉽게'], ['5w1h', '5W1H'], ['bullets', '불릿']];
     for (const it of d.items) {
       const div = document.createElement('div');
       div.className = 'news-item';
       div.innerHTML = `<div class="src">${it.source}</div><div class="ttl"></div>
-        <div class="sum"></div><button>✦ 자비스에게 요약시키기</button>`;
+        <div class="sum"></div><div class="styles"></div>`;
       div.querySelector('.ttl').textContent = it.title;
       const sumEl = div.querySelector('.sum');
-      const btn = div.querySelector('button');
-      btn.addEventListener('click', async () => {
-        btn.disabled = true; btn.textContent = '요약 중…';
+      const stylesEl = div.querySelector('.styles');
+      let picked = 'basic';
+      const btns = STYLES.map(([val, label], i) => {
+        const b = document.createElement('button');
+        b.className = 'style' + (i === 0 ? ' on' : '');
+        b.textContent = '✦ ' + label;
+        b.addEventListener('click', () => {
+          btns.forEach(x => x.classList.toggle('on', x === b));
+          picked = val;
+          summarize();
+        });
+        stylesEl.appendChild(b);
+        return b;
+      });
+      async function summarize() {
+        btns.forEach(b => (b.disabled = true));
         sumEl.classList.add('show'); sumEl.textContent = '요약하는 중…';
         try {
           const r = await fetch('/api/chat', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ system: 'chat', prompt: `다음 뉴스 제목을 한국어로 두 문장 요약하고 왜 중요한지 짧게 코멘트해줘:\n[${it.source}] ${it.title}` }),
+            body: JSON.stringify({ system: 'chat', prompt: `다음 뉴스 제목을 요약하고 짧게 코멘트해줘:\n[${it.source}] ${it.title}`, style: picked, sid: SID }),
           });
-          const d = await r.json();
-          sumEl.textContent = d.reply || '요약 실패';
-          btn.textContent = '다시 요약';
+          const dd = await r.json();
+          sumEl.textContent = dd.reply || '요약 실패';
         } catch (e) { sumEl.textContent = '연결 실패'; }
-        btn.disabled = false;
-      });
+        btns.forEach(b => (b.disabled = false));
+      }
       if (it.link) {
         div.querySelector('.ttl').style.cursor = 'pointer';
         div.querySelector('.ttl').addEventListener('click', () => window.open(it.link, '_blank'));
@@ -402,10 +486,16 @@ async function loadNews() {
   }
 }
 
-/* ── 게임: 가위바위보 ── */
+/* ── 게임: 가위바위보 (전적 저장) ── */
 const RPS = ['✊', '✋', '✌️'];
 const RPS_NAME = ['바위', '보', '가위'];
 let rpsScore = { w: 0, d: 0, l: 0 };
+try { rpsScore = JSON.parse(localStorage.getItem('jarvis-rps') || '') || rpsScore; } catch (e) { /* 초기값 */ }
+function paintRps() {
+  document.getElementById('rpsW').textContent = `승 ${rpsScore.w}`;
+  document.getElementById('rpsD').textContent = `무 ${rpsScore.d}`;
+  document.getElementById('rpsL').textContent = `패 ${rpsScore.l}`;
+}
 const rpsOut = document.getElementById('rpsOut');
 document.querySelectorAll('.rps-row button').forEach(b => b.addEventListener('click', () => {
   const h = +b.dataset.h;
@@ -415,11 +505,11 @@ document.querySelectorAll('.rps-row button').forEach(b => b.addEventListener('cl
   if (diff === 0) { rpsScore.d++; msg = `무승부! 서로 ${RPS_NAME[h]}.`; }
   else if (diff === 1) { rpsScore.l++; msg = `제가 이겼습니다 — ${RPS_NAME[h]} 대 ${RPS_NAME[c]}. 다음엔 안 봐줍니다.`; }
   else { rpsScore.w++; msg = `사장님 승! ${RPS_NAME[c]} 대 ${RPS_NAME[h]}. 제가 졌네요.`; }
+  localStorage.setItem('jarvis-rps', JSON.stringify(rpsScore));
   rpsOut.textContent = `자비스: ${RPS[c]}  vs  사장님: ${RPS[h]}\n${msg}`;
-  document.getElementById('rpsW').textContent = `승 ${rpsScore.w}`;
-  document.getElementById('rpsD').textContent = `무 ${rpsScore.d}`;
-  document.getElementById('rpsL').textContent = `패 ${rpsScore.l}`;
+  paintRps();
 }));
+paintRps();
 
 document.getElementById('g-rps').addEventListener('click', () => {
   document.getElementById('g-rps').classList.add('on');
@@ -465,7 +555,13 @@ function playBB() {
   const line = document.createElement('div');
   if (s === 3) {
     line.innerHTML = `<b>${v}</b> — 홈런! ${bbCount}회 만에 정답입니다.`;
-    document.getElementById('bbOut').textContent = `🎯 ${bbCount}회 만에 홈런! 다시 도전하시겠습니까?`;
+    const best = +(localStorage.getItem('jarvis-bb-best') || 99);
+    if (bbCount < best) {
+      localStorage.setItem('jarvis-bb-best', bbCount);
+      document.getElementById('bbOut').textContent = `🎯 ${bbCount}회 홈런 — 최고 기록 갱신! (이전 ${best === 99 ? '없음' : best + '회'})`;
+    } else {
+      document.getElementById('bbOut').textContent = `🎯 ${bbCount}회 만에 홈런! (최고 기록 ${best}회) 다시 도전하시겠습니까?`;
+    }
     bbAnswer = [];
   } else {
     line.innerHTML = `<b>${v}</b> — ${s ? `<b>${s}S</b>` : ''}${ball ? `<i>${ball}B</i>` : ''}${!s && !ball ? '아웃' : ''}`;
@@ -481,6 +577,20 @@ function playBB() {
 newBB();
 
 /* ── PWA ── */
+/* 설치 버튼 — 브라우저가 설치 이벤트를 주면 노출 (iOS는 수동: 공유 → 홈 화면에 추가) */
+let deferredPrompt = null;
+addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredPrompt = e;
+  const b = document.getElementById('installBtn');
+  b.style.display = '';
+  b.addEventListener('click', async () => {
+    b.style.display = 'none';
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+    deferredPrompt = null;
+  });
+});
 if ('serviceWorker' in navigator) {
   addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
 }

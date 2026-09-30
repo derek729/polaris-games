@@ -1,13 +1,16 @@
 #!/usr/bin/env node
-/* JARVIS Service — 웹·앱 서비스 서버 (의존성 0, Node 내장 모듈만)
-   사장님 지시(2026-09-30): 브라우저 AI를 웹+앱으로 — 대화·코드 리뷰·뉴스·게임 탑재.
-   - 정적 서빙(public/) + POST /api/chat + GET /api/news + GET /api/health
-   - 엔진 체인: Ollama(로컬) → OpenRouter(키 있으면) → 규칙 폴백
-   - 포트 8790 · 0.0.0.0 바인드(LAN/Tailscale 접속용) */
+/* JARVIS Service v2 — 웹·앱 서비스 서버 (의존성 0)
+   v2 업그레이드(2026-09-30, 업계 조사 반영):
+   - 세션 메모리 (Character.AI Chat Memories·Replika 2.0 Memory 탭 방향):
+     sessionId별 대화 맥락 최근 16턴 유지 → 멀티턴 기억 응답
+   - GET/DELETE /api/memory — 기억 열람·초기화 (Replika Memory 탭 축소판)
+   - 요약 스타일 4종 프롬프트 (Particle 방식): 기본/쉽게/5w1h/불릿
+   - 포트 8790 · 0.0.0.0 */
 
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const PORT = 8790;
 const PUB = path.join(__dirname, 'public');
@@ -17,9 +20,45 @@ const OR_KEY = process.env.OPENROUTER_API_KEY || '';
 const OR_MODEL = process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.2-3b-instruct:free';
 
 const SYS_CHAT =
-  '너는 자비스(JARVIS) — 주식회사 폴라리스가 만든 AI 비서다. 담백하고 친절한 한국어 존댓말로 답하며, 4문장을 넘기지 않는다.';
+  '너는 자비스(JARVIS) — 주식회사 폴라리스가 만든 AI 비서다. 담백하고 친절한 한국어 존댓말로 답하며, 4문장을 넘기지 않는다. 대화 기록 속 사용자 정보를 기억하고 활용한다.';
 const SYS_REVIEW =
   '너는 시니어 코드 리뷰어다. 붙여넣은 코드를 검토해 ①치명적 결함 ②개선점 ③한 줄 총평 순서로 한국어로 간결히 답한다. 코드 전체를 다시 출력하지 않는다.';
+
+/* Particle 방식 요약 스타일 — 뉴스 요약 프롬프트 확장 */
+const SUM_STYLES = {
+  basic: '',
+  eli5: ' 아주 쉬운 말(중학생도 이해하는 수준)로 설명하듯 요약한다.',
+  '5w1h': ' 누가·무엇을·언제·어디서·왜·어떻게(5W1H) 짚어 요약한다.',
+  bullets: ' 핵심을 불릿 3개로만 요약한다. 각 불릿은 "- "로 시작한다.',
+};
+
+/* ── 세션 메모리 ───────────────────────── */
+/* sessionId → { msgs: [{role, content}], at } — 세션당 최근 16턴, 세션 100개 상한(LRU) */
+const SESSIONS = new Map();
+const MAX_TURNS = 16;
+const MAX_SESSIONS = 100;
+
+function sessionHistory(sid) {
+  if (!sid || typeof sid !== 'string' || sid.length > 64) return [];
+  const s = SESSIONS.get(sid);
+  return s ? s.msgs.slice(-MAX_TURNS) : [];
+}
+function sessionRemember(sid, user, assistant) {
+  if (!sid || typeof sid !== 'string' || sid.length > 64) return;
+  let s = SESSIONS.get(sid);
+  if (!s) {
+    if (SESSIONS.size >= MAX_SESSIONS) {
+      const oldest = [...SESSIONS.entries()].sort((a, b) => a[1].at - b[1].at)[0][0];
+      SESSIONS.delete(oldest);
+    }
+    s = { msgs: [], at: Date.now() };
+    SESSIONS.set(sid, s);
+  }
+  s.at = Date.now();
+  s.msgs.push({ role: 'user', content: user });
+  if (assistant) s.msgs.push({ role: 'assistant', content: assistant });
+  if (s.msgs.length > MAX_TURNS) s.msgs = s.msgs.slice(-MAX_TURNS);
+}
 
 /* ── 유틸 ─────────────────────────────── */
 function sendJson(res, code, obj) {
@@ -54,7 +93,7 @@ function mimeOf(p) {
 }
 
 /* ── 엔진 ─────────────────────────────── */
-async function askOllama(system, user) {
+async function askOllama(messages) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 60_000);
   try {
@@ -62,12 +101,7 @@ async function askOllama(system, user) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       signal: ctrl.signal,
-      body: JSON.stringify({
-        model: MODEL,
-        messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
-        stream: false,
-        options: { num_predict: 400 },
-      }),
+      body: JSON.stringify({ model: MODEL, messages, stream: false, options: { num_predict: 400 } }),
     });
     if (!r.ok) throw new Error(`ollama ${r.status}`);
     const d = await r.json();
@@ -78,17 +112,12 @@ async function askOllama(system, user) {
     clearTimeout(timer);
   }
 }
-
-async function askOpenRouter(system, user) {
+async function askOpenRouter(messages) {
   if (!OR_KEY) throw new Error('no-key');
   const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${OR_KEY}` },
-    body: JSON.stringify({
-      model: OR_MODEL,
-      messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
-      max_tokens: 400,
-    }),
+    body: JSON.stringify({ model: OR_MODEL, messages, max_tokens: 400 }),
   });
   if (!r.ok) throw new Error(`openrouter ${r.status}`);
   const d = await r.json();
@@ -96,7 +125,6 @@ async function askOpenRouter(system, user) {
   if (!out) throw new Error('empty');
   return { text: out, engine: 'openrouter' };
 }
-
 function fallbackReply(user) {
   const t = (user || '').toLowerCase();
   const now = new Date();
@@ -106,11 +134,11 @@ function fallbackReply(user) {
   if (/게임/.test(t)) return '게임 탭에서 가위바위보와 숫자야구가 준비되어 있습니다. 도전해 보시죠!';
   return '로컬 엔진이 잠시 응답하지 않습니다. 곧 복구되니 다시 말씀해 주세요.';
 }
-
-async function think(system, user) {
-  try { return await askOllama(system, user); } catch (e) { /* fall through */ }
-  try { return await askOpenRouter(system, user); } catch (e) { /* fall through */ }
-  return { text: fallbackReply(user), engine: 'fallback' };
+async function think(messages) {
+  try { return await askOllama(messages); } catch (e) { /* fall through */ }
+  try { return await askOpenRouter(messages); } catch (e) { /* fall through */ }
+  const lastUser = [...messages].reverse().find(m => m.role === 'user');
+  return { text: fallbackReply(lastUser?.content), engine: 'fallback' };
 }
 
 /* ── 뉴스 (RSS, 10분 캐시) ─────────────── */
@@ -126,7 +154,6 @@ const dec = s => (s || '')
   .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
   .replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&nbsp;/g, ' ')
   .trim();
-
 async function loadNews() {
   if (Date.now() - newsCache.at < 10 * 60_000 && newsCache.items.length) return newsCache.items;
   const results = [];
@@ -155,7 +182,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'OPTIONS') {
       res.writeHead(204, {
         'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+        'Access-Control-Allow-Methods': 'GET,POST,DELETE,OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type',
       });
       return res.end();
@@ -171,7 +198,25 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, {
         ok: true, ollama, openrouter: !!OR_KEY, model: MODEL,
         engine: ollama ? 'ollama' : OR_KEY ? 'openrouter' : 'fallback',
+        sessions: SESSIONS.size,
       });
+    }
+
+    /* 기억 열람·초기화 (Replika Memory 탭 축소판) */
+    if (url.pathname === '/api/memory') {
+      const sid = url.searchParams.get('sid');
+      if (req.method === 'GET') {
+        if (!sid) return sendJson(res, 400, { error: 'NO_SID' });
+        const msgs = sessionHistory(sid);
+        return sendJson(res, 200, {
+          turns: Math.floor(msgs.length / 2),
+          memory: msgs.map(m => ({ role: m.role, content: m.content.slice(0, 160) })),
+        });
+      }
+      if (req.method === 'DELETE') {
+        SESSIONS.delete(sid);
+        return sendJson(res, 200, { ok: true, cleared: true });
+      }
     }
 
     if (req.method === 'POST' && url.pathname === '/api/chat') {
@@ -181,12 +226,26 @@ const server = http.createServer(async (req, res) => {
       } catch (e) {
         return sendJson(res, 400, { error: 'BAD_JSON' });
       }
-      const { system, prompt } = body;
+      const { system, prompt, sid, style } = body;
       if (typeof prompt !== 'string' || !prompt.trim() || prompt.length > 20_000) {
         return sendJson(res, 400, { error: 'FIELD_INVALID' });
       }
-      const sys = system === 'review' ? SYS_REVIEW : SYS_CHAT;
-      const out = await think(sys, prompt);
+
+      let sysPrompt = system === 'review' ? SYS_REVIEW : SYS_CHAT;
+      if (style && SUM_STYLES[style]) sysPrompt += SUM_STYLES[style];
+
+      /* 멀티턴: 세션 기억 + 이번 발화 */
+      const history = system === 'review' ? [] : sessionHistory(sid);
+      const messages = [
+        { role: 'system', content: sysPrompt },
+        ...history,
+        { role: 'user', content: prompt },
+      ];
+
+      const out = await think(messages);
+      if (system !== 'review' && out.engine !== 'fallback') {
+        sessionRemember(sid, prompt, out.text);
+      }
       return sendJson(res, 200, { reply: out.text, engine: out.engine });
     }
 
@@ -211,5 +270,5 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`[jarvis-service] http://0.0.0.0:${PORT}  (LAN: 172.30.1.22 · Tailscale: 100.77.153.31)`);
+  console.log(`[jarvis-service v2] http://0.0.0.0:${PORT} — 세션 메모리 활성 (세션당 ${MAX_TURNS}턴)`);
 });
