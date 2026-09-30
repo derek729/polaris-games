@@ -19,10 +19,59 @@ const MODEL = process.env.JARVIS_MODEL || 'qwen2.5-coder:7b';
 const OR_KEY = process.env.OPENROUTER_API_KEY || '';
 const OR_MODEL = process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.2-3b-instruct:free';
 
-const SYS_CHAT =
-  '너는 자비스(JARVIS) — 주식회사 폴라리스가 만든 AI 비서다. 담백하고 친절한 한국어 존댓말로 답하며, 4문장을 넘기지 않는다. 대화 기록 속 사용자 정보를 기억하고 활용한다.';
-const SYS_REVIEW =
-  '너는 시니어 코드 리뷰어다. 붙여넣은 코드를 검토해 ①치명적 결함 ②개선점 ③한 줄 총평 순서로 한국어로 간결히 답한다. 코드 전체를 다시 출력하지 않는다.';
+/* ── 스킬 시스템 (OpenClaw 방식 — skills/*.md 넣으면 능력 확장) ── */
+const SKILLS_DIR = path.join(__dirname, 'skills');
+const SKILLS = new Map(); /* id → { id, name, description, tag, body } */
+
+function parseSkillFile(raw, file) {
+  const m = raw.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
+  if (!m) return null;
+  const meta = {};
+  for (const line of m[1].split('\n')) {
+    const kv = line.match(/^(\w[\w-]*):\s*(.+)$/);
+    if (kv) meta[kv[1].trim()] = kv[2].trim();
+  }
+  if (!meta.name) return null;
+  return {
+    id: path.basename(file, '.md'),
+    name: meta.name,
+    description: meta.description || '',
+    tag: meta.system || 'chat',
+    body: m[2].trim(),
+  };
+}
+function loadSkills() {
+  try {
+    for (const f of fs.readdirSync(SKILLS_DIR)) {
+      if (!f.endsWith('.md')) continue;
+      const s = parseSkillFile(fs.readFileSync(path.join(SKILLS_DIR, f), 'utf8'), f);
+      if (s) SKILLS.set(s.id, s);
+    }
+  } catch (e) { /* 폴더 없음 — 기본 프롬프트 폴백 */ }
+}
+loadSkills();
+fs.watch(SKILLS_DIR, () => {
+  SKILLS.clear();
+  loadSkills(); /* 스킬 파일만 바꿔도 능력이 갱신된다 */
+});
+
+const DEFAULT_PROMPTS = {
+  chat:
+    '너는 자비스(JARVIS) — 주식회사 폴라리스가 만든 AI 비서다. 담백하고 친절한 한국어 존댓말로 답하며, 4문장을 넘기지 않는다. 대화 기록 속 사용자 정보를 기억하고 활용한다.',
+  review:
+    '너는 시니어 코드 리뷰어다. 코드를 검토해 ①치명적 결함 ②개선점 ③한 줄 총평 순서로 한국어로 간결히 답한다. 코드 전체를 다시 출력하지 않는다.',
+};
+function systemPromptFor(tag) {
+  /* tag: 'chat'|'review'|'news'|'game'|'briefing'|'skill:<id>' */
+  if (tag && tag.startsWith('skill:')) {
+    const s = SKILLS.get(tag.slice(6));
+    if (s) return s.body;
+    tag = 'chat';
+  }
+  const byTag = [...SKILLS.values()].find(s => s.tag === tag);
+  if (byTag) return byTag.body;
+  return DEFAULT_PROMPTS[tag === 'review' ? 'review' : 'chat'];
+}
 
 /* Particle 방식 요약 스타일 — 뉴스 요약 프롬프트 확장 */
 const SUM_STYLES = {
@@ -93,7 +142,7 @@ function mimeOf(p) {
 }
 
 /* ── 엔진 ─────────────────────────────── */
-async function askOllama(messages) {
+async function askOllama(messages, model) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 60_000);
   try {
@@ -101,13 +150,13 @@ async function askOllama(messages) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       signal: ctrl.signal,
-      body: JSON.stringify({ model: MODEL, messages, stream: false, options: { num_predict: 400 } }),
+      body: JSON.stringify({ model: model || MODEL, messages, stream: false, options: { num_predict: 400 } }),
     });
     if (!r.ok) throw new Error(`ollama ${r.status}`);
     const d = await r.json();
     const out = d?.message?.content?.trim();
     if (!out) throw new Error('empty');
-    return { text: out, engine: 'ollama' };
+    return { text: out, engine: model || MODEL };
   } finally {
     clearTimeout(timer);
   }
@@ -134,8 +183,8 @@ function fallbackReply(user) {
   if (/게임/.test(t)) return '게임 탭에서 가위바위보와 숫자야구가 준비되어 있습니다. 도전해 보시죠!';
   return '로컬 엔진이 잠시 응답하지 않습니다. 곧 복구되니 다시 말씀해 주세요.';
 }
-async function think(messages) {
-  try { return await askOllama(messages); } catch (e) { /* fall through */ }
+async function think(messages, model) {
+  try { return await askOllama(messages, model); } catch (e) { /* fall through */ }
   try { return await askOpenRouter(messages); } catch (e) { /* fall through */ }
   const lastUser = [...messages].reverse().find(m => m.role === 'user');
   return { text: fallbackReply(lastUser?.content), engine: 'fallback' };
@@ -202,6 +251,24 @@ const server = http.createServer(async (req, res) => {
       });
     }
 
+    /* 사용 가능한 로컬 모델 목록 (모델 스위처용) */
+    if (req.method === 'GET' && url.pathname === '/api/models') {
+      let models = [];
+      try {
+        const r = await fetch(`${OLLAMA}/api/tags`, { signal: AbortSignal.timeout(3000) });
+        const d = await r.json();
+        models = (d?.models || []).map(m => ({ name: m.name, sizeGb: +(m.size / 1073741824).toFixed(1) }));
+      } catch (e) { /* 오프라인 */ }
+      return sendJson(res, 200, { models, default: MODEL });
+    }
+
+    /* 보유 스킬 목록 (skills/*.md) */
+    if (req.method === 'GET' && url.pathname === '/api/skills') {
+      return sendJson(res, 200, {
+        skills: [...SKILLS.values()].map(s => ({ id: s.id, name: s.name, description: s.description })),
+      });
+    }
+
     /* 기억 열람·초기화 (Replika Memory 탭 축소판) */
     if (url.pathname === '/api/memory') {
       const sid = url.searchParams.get('sid');
@@ -231,7 +298,7 @@ const server = http.createServer(async (req, res) => {
         return sendJson(res, 400, { error: 'FIELD_INVALID' });
       }
 
-      let sysPrompt = system === 'review' ? SYS_REVIEW : SYS_CHAT;
+      let sysPrompt = systemPromptFor(system);
       if (style && SUM_STYLES[style]) sysPrompt += SUM_STYLES[style];
 
       /* 멀티턴: 세션 기억 + 이번 발화 */
@@ -242,7 +309,7 @@ const server = http.createServer(async (req, res) => {
         { role: 'user', content: prompt },
       ];
 
-      const out = await think(messages);
+      const out = await think(messages, typeof body.model === 'string' ? body.model.slice(0, 80) : '');
       if (system !== 'review' && out.engine !== 'fallback') {
         sessionRemember(sid, prompt, out.text);
       }
