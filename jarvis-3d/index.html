@@ -1,0 +1,624 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<title>JARVIS — 3D 홀로그램 콘솔</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script type="importmap">
+{
+  "imports": {
+    "three": "./three.module.js",
+    "three/addons/controls/OrbitControls.js": "./controls/OrbitControls.js",
+    "three/addons/objects/Reflector.js": "./objects/Reflector.js"
+  }
+}
+</script>
+<style>
+  :root {
+    --bg: #04070c;
+    --cyan: #66d9e8;
+    --cyan-bright: #b8eef7;
+    --text: #d4e4ea;
+    --muted: #7f99a8;
+    --amber: #e8a33d;
+    --red: #ff6b6b;
+    --line: rgba(102, 217, 232, 0.18);
+    --mono: 'SF Mono', 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+    --sans: 'Pretendard', 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: var(--sans); }
+  #stage { position: fixed; inset: 0; }
+  #stage canvas { display: block; }
+
+  /* 헤더 */
+  .hud-top {
+    position: fixed; top: 0; left: 0; right: 0;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 24px; pointer-events: none; z-index: 5;
+  }
+  .brand { font-family: var(--mono); font-size: 13px; letter-spacing: 0.28em; color: var(--cyan); }
+  .brand small { font-family: var(--sans); font-size: 11px; letter-spacing: 0.12em; color: var(--muted); margin-left: 12px; }
+  .sysline { font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; color: var(--muted); display: flex; gap: 18px; align-items: center; }
+  .sysline .st { color: var(--cyan); }
+  .sysline .st.amber { color: var(--amber); }
+  .sysline .st.red { color: var(--red); }
+
+  /* 대화 버블 */
+  #chatlog {
+    position: fixed; left: 24px; top: 72px; width: 320px; z-index: 5;
+    display: flex; flex-direction: column; gap: 10px; pointer-events: none;
+  }
+  .bub {
+    max-width: 100%; padding: 10px 14px; font-size: 13px; line-height: 1.65;
+    border: 1px solid var(--line); background: rgba(6, 14, 22, 0.78);
+    animation: rise 0.3s ease; word-break: break-word;
+  }
+  .bub.me { align-self: flex-end; border-left: 2px solid var(--cyan); background: rgba(102, 217, 232, 0.07); }
+  .bub.ai { align-self: flex-start; border-left: 2px solid var(--amber); }
+  .bub .who { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.14em; color: var(--muted); margin-bottom: 4px; }
+  .bub.ai .who { color: var(--amber); }
+  .bub.me .who { color: var(--cyan); }
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  #chatlog .hint { font-size: 11px; color: var(--muted); line-height: 1.8; text-align: center; padding: 8px; }
+
+  /* 커맨드 바 */
+  .cmdwrap { position: fixed; left: 0; right: 0; bottom: 26px; display: flex; flex-direction: column; align-items: center; gap: 8px; z-index: 6; }
+  .cmdbar {
+    width: min(640px, calc(100vw - 48px));
+    display: flex; align-items: center; gap: 6px; height: 58px; padding: 0 8px 0 20px;
+    border: 1px solid var(--line); background: rgba(6, 14, 22, 0.85);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .cmdbar:focus-within { border-color: rgba(102, 217, 232, 0.55); box-shadow: 0 0 26px rgba(102, 217, 232, 0.1); }
+  .cmdbar .prompt { color: var(--cyan); font-family: var(--mono); font-size: 16px; user-select: none; }
+  .cmdbar input {
+    flex: 1; min-width: 0; background: none; border: none; outline: none;
+    color: var(--text); font-size: 15px; caret-color: var(--cyan);
+  }
+  .cmdbar input::placeholder { color: rgba(127, 153, 168, 0.6); }
+  .mic {
+    position: relative; width: 42px; height: 42px; border-radius: 50%; flex-shrink: 0;
+    border: 1px solid var(--line); background: rgba(13, 25, 36, 0.6); color: var(--muted);
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: color 0.2s, border-color 0.2s;
+  }
+  .mic:hover:not(:disabled) { color: var(--cyan); border-color: rgba(102, 217, 232, 0.5); }
+  .mic:disabled { opacity: 0.35; cursor: not-allowed; }
+  .mic.listening { color: var(--red); border-color: var(--red); }
+  .mic.listening::after {
+    content: ''; position: absolute; inset: -6px; border-radius: 50%;
+    border: 1px solid var(--red); animation: ring 1.4s ease-out infinite;
+  }
+  @keyframes ring { 0% { transform: scale(0.82); opacity: 0.9; } 100% { transform: scale(1.35); opacity: 0; } }
+  .subline {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; color: var(--muted); text-align: center; min-height: 16px;
+  }
+  .subline.listening { color: var(--cyan); }
+  .tips { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  .tip {
+    padding: 7px 14px; background: none; border: 1px solid var(--line);
+    color: #9db4c0; font-size: 11.5px; letter-spacing: 0.02em; cursor: pointer; transition: all 0.15s;
+  }
+  .tip:hover { color: var(--cyan); border-color: rgba(102, 217, 232, 0.5); }
+  .footnote { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.08em; color: rgba(127, 153, 168, 0.55); }
+  #filepick { display: none; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+
+<div class="hud-top">
+  <div class="brand">JARVIS<small>HOLOGRAM CONSOLE · POLARIS</small></div>
+  <div class="sysline">
+    <span id="clock">--:--:--</span>
+    <span class="st" id="modelstat">ENGINE · LOCAL</span>
+  </div>
+</div>
+
+<div id="chatlog">
+  <div class="hint">
+    자비스 홀로그램이 기동되었습니다.<br />
+    아래에서 말을 걸거나 마이크로 말씀하세요.<br />
+    코어를 <b>클릭</b>하면 내 아바타로 교체됩니다.
+  </div>
+</div>
+
+<div class="cmdwrap">
+  <div class="cmdbar">
+    <span class="prompt">›</span>
+    <input id="cmd" placeholder="자비스에게 말 걸기 · Enter 전송" autocomplete="off" />
+    <button id="mic" class="mic" title="음성으로 말하기">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+        <rect x="9" y="2" width="6" height="12" rx="3" />
+        <path d="M5 10a7 7 0 0 0 14 0" />
+        <line x1="12" y1="17" x2="12" y2="21" />
+        <line x1="8" y1="21" x2="16" y2="21" />
+      </svg>
+    </button>
+  </div>
+  <div class="subline" id="sub">ENTER 전송 · 마이크로 말하면 자동 전송 · 드래그로 시점 회전</div>
+  <div class="tips">
+    <button class="tip" data-q="자비스, 상태 보고">상태 보고</button>
+    <button class="tip" data-q="지금 몇 시야?">시간 물어보기</button>
+    <button class="tip" data-q="오늘 할 일 짚어줘">할 일 짚어줘</button>
+    <button class="tip" data-q="넌 누구야?">정체 확인</button>
+  </div>
+  <div class="footnote">VOICE IN · SPEECH SYNTHESIS OUT · OLLAMA LOCAL ENGINE</div>
+</div>
+<input type="file" id="filepick" accept="image/*" />
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { Reflector } from 'three/addons/objects/Reflector.js';
+
+/* ───────────────────────── 3D 씬 ───────────────────────── */
+const stage = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+stage.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x04070c);
+scene.fog = new THREE.Fog(0x04070c, 14, 30);
+
+const camera = new THREE.PerspectiveCamera(46, innerWidth / innerHeight, 0.1, 100);
+camera.position.set(0, 4.8, 10.8);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 1.6, 0);
+controls.enableDamping = true;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.7;
+controls.minDistance = 4;
+controls.maxDistance = 14;
+controls.maxPolarAngle = Math.PI * 0.52;
+let resumeTimer = null;
+controls.addEventListener('start', () => {
+  controls.autoRotate = false;
+  clearTimeout(resumeTimer);
+});
+controls.addEventListener('end', () => {
+  resumeTimer = setTimeout(() => { controls.autoRotate = true; }, 4000);
+});
+
+scene.add(new THREE.AmbientLight(0x28414d, 1.1));
+const keyLight = new THREE.PointLight(0x66d9e8, 30, 30);
+keyLight.position.set(4, 7, 4);
+scene.add(keyLight);
+const rimLight = new THREE.PointLight(0xe8a33d, 8, 24);
+rimLight.position.set(-5, 3, -4);
+scene.add(rimLight);
+
+/* 바닥 — polished concrete (거울 위 콘크리트 오버레이) */
+const mirror = new Reflector(new THREE.CircleGeometry(13, 64), {
+  clipBias: 0.003,
+  textureWidth: 1024,
+  textureHeight: 1024,
+  color: 0x1a2a33,
+});
+mirror.rotation.x = -Math.PI / 2;
+scene.add(mirror);
+const floorSkin = new THREE.Mesh(
+  new THREE.CircleGeometry(13, 64),
+  new THREE.MeshStandardMaterial({ color: 0x070d13, roughness: 0.92, metalness: 0.15, transparent: true, opacity: 0.58 })
+);
+floorSkin.rotation.x = -Math.PI / 2;
+floorSkin.position.y = 0.004;
+scene.add(floorSkin);
+
+/* 애디티브 글로우 스프라이트 — 네온 발광 (포스트프로세싱 없이) */
+function makeGlowTexture(inner, outer) {
+  const c = document.createElement('canvas');
+  c.width = c.height = 256;
+  const g = c.getContext('2d');
+  const grad = g.createRadialGradient(128, 128, 0, 128, 128, 128);
+  grad.addColorStop(0, inner);
+  grad.addColorStop(0.35, outer);
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 256, 256);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+const glowTexCyan = makeGlowTexture('rgba(180,240,250,0.95)', 'rgba(60,170,200,0.32)');
+const glowTexAmber = makeGlowTexture('rgba(255,215,150,0.8)', 'rgba(200,140,50,0.22)');
+
+function addGlow(tex, scale, opacity) {
+  const sp = new THREE.Sprite(
+    new THREE.SpriteMaterial({
+      map: tex, blending: THREE.AdditiveBlending, depthWrite: false,
+      depthTest: false, transparent: true, opacity,
+    })
+  );
+  sp.renderOrder = 10;
+  sp.scale.setScalar(scale);
+  return sp;
+}
+const coreGlowSprite = addGlow(glowTexCyan, 4.2, 0.85);
+const baseGlow = addGlow(glowTexCyan, 5.2, 0.5);
+baseGlow.position.y = 0.62;
+scene.add(baseGlow);
+const rimGlow = addGlow(glowTexAmber, 3.2, 0.35);
+rimGlow.position.set(-2.4, 0.7, -1.6);
+scene.add(rimGlow);
+
+/* 헥스 베이스 — 매트 블랙 */
+const hexBase = new THREE.Mesh(
+  new THREE.CylinderGeometry(2.6, 3.0, 0.55, 6),
+  new THREE.MeshStandardMaterial({
+    color: 0x141c26, roughness: 0.82, metalness: 0.4,
+    emissive: 0x0c2b33, emissiveIntensity: 0.5,
+  })
+);
+hexBase.position.y = 0.28;
+scene.add(hexBase);
+
+const neonMat = new THREE.MeshBasicMaterial({ color: 0x66d9e8, transparent: true, opacity: 0.9 });
+const hexTopEdge = new THREE.LineSegments(
+  new THREE.EdgesGeometry(new THREE.CylinderGeometry(2.61, 2.61, 0.02, 6, 1, false)),
+  new THREE.LineBasicMaterial({ color: 0x66d9e8, transparent: true, opacity: 0.95 })
+);
+hexTopEdge.position.y = 0.56;
+scene.add(hexTopEdge);
+const hexBottomEdge = hexTopEdge.clone();
+hexBottomEdge.position.y = 0.02;
+scene.add(hexBottomEdge);
+
+/* 베이스 상면 네온 링 */
+const baseRing = new THREE.Mesh(
+  new THREE.RingGeometry(2.15, 2.3, 48),
+  new THREE.MeshBasicMaterial({ color: 0x66d9e8, transparent: true, opacity: 0.5, side: THREE.DoubleSide })
+);
+baseRing.rotation.x = -Math.PI / 2;
+baseRing.position.y = 0.562;
+scene.add(baseRing);
+
+/* 부유 유리 프레임 + 네온 엣지 */
+const glassGroup = new THREE.Group();
+glassGroup.position.y = 2.15;
+scene.add(glassGroup);
+const glassBox = new THREE.Mesh(
+  new THREE.BoxGeometry(2.3, 2.3, 2.3),
+  new THREE.MeshBasicMaterial({
+    color: 0x9fd8e2, transparent: true, opacity: 0.05,
+    depthWrite: false, side: THREE.DoubleSide,
+  })
+);
+glassGroup.add(glassBox);
+const glassEdges = new THREE.LineSegments(
+  new THREE.EdgesGeometry(glassBox.geometry),
+  new THREE.LineBasicMaterial({ color: 0x66d9e8, transparent: true, opacity: 0.75 })
+);
+glassGroup.add(glassEdges);
+
+/* 홀로그램 코어 — 자비스 (아바타 or 와이어 코어) */
+const coreGroup = new THREE.Group();
+coreGroup.position.y = 2.15;
+scene.add(coreGroup);
+
+const avatarPlane = new THREE.Mesh(
+  new THREE.PlaneGeometry(1.7, 1.7),
+  new THREE.ShaderMaterial({
+    transparent: true,
+    side: THREE.DoubleSide,
+    uniforms: { map: { value: null }, uTime: { value: 0 }, uGlow: { value: 0 } },
+    vertexShader: /* glsl */ `
+      varying vec2 vUv;
+      void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    fragmentShader: /* glsl */ `
+      uniform sampler2D map; uniform float uTime; uniform float uGlow;
+      varying vec2 vUv;
+      void main() {
+        vec4 c = texture2D(map, vUv);
+        float scan = 0.86 + 0.14 * sin(vUv.y * 200.0 + uTime * 4.0);
+        float edgeFade = smoothstep(0.0, 0.12, vUv.y) * smoothstep(1.0, 0.88, vUv.y);
+        vec3 tint = mix(c.rgb, vec3(0.42, 0.86, 0.95), 0.38);
+        float a = max(c.a, 0.06) * edgeFade * 0.94;
+        gl_FragColor = vec4(tint * (0.95 + uGlow * 0.55) * scan, a);
+      }`,
+  })
+);
+avatarPlane.visible = false;
+coreGroup.add(avatarPlane);
+
+const wireCore = new THREE.Mesh(
+  new THREE.IcosahedronGeometry(0.85, 1),
+  new THREE.MeshBasicMaterial({ color: 0x8ae4f0, wireframe: true, transparent: true, opacity: 0.9 })
+);
+coreGroup.add(wireCore);
+const coreGlow = new THREE.Mesh(
+  new THREE.SphereGeometry(0.55, 24, 24),
+  new THREE.MeshBasicMaterial({ color: 0x2a7f8f, transparent: true, opacity: 0.28 })
+);
+coreGroup.add(coreGlow);
+
+/* 아바타 감싸는 회전 홀로그램 큐브 */
+const holoCube = new THREE.LineSegments(
+  new THREE.EdgesGeometry(new THREE.BoxGeometry(2.05, 2.05, 2.05)),
+  new THREE.LineBasicMaterial({ color: 0x9ff0fa, transparent: true, opacity: 0.55 })
+);
+coreGroup.add(holoCube);
+const holoCubeInner = new THREE.LineSegments(
+  new THREE.EdgesGeometry(new THREE.BoxGeometry(1.35, 1.35, 1.35)),
+  new THREE.LineBasicMaterial({ color: 0xe8a33d, transparent: true, opacity: 0.28 })
+);
+coreGroup.add(holoCubeInner);
+coreGroup.add(coreGlowSprite);
+
+/* 오빗 파티클 */
+const pCount = 240;
+const pPos = new Float32Array(pCount * 3);
+for (let i = 0; i < pCount; i++) {
+  const r = 2.6 + Math.random() * 1.4;
+  const a = Math.random() * Math.PI * 2;
+  pPos[i * 3] = Math.cos(a) * r;
+  pPos[i * 3 + 1] = 0.8 + Math.random() * 3.2;
+  pPos[i * 3 + 2] = Math.sin(a) * r;
+}
+const particleGeo = new THREE.BufferGeometry();
+particleGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+const particles = new THREE.Points(
+  particleGeo,
+  new THREE.PointsMaterial({ color: 0x66d9e8, size: 0.035, transparent: true, opacity: 0.55 })
+);
+scene.add(particles);
+
+/* ───────────────────── 상태·인터랙션 ───────────────────── */
+const S = { mode: 'idle', glow: 0, cubeBoost: 0, micPulse: 0 };
+const MODE_LABEL = { idle: '온라인 · 대기', listening: '청취 중…', thinking: '생각 중…', speaking: '응답 중…' };
+
+function setMode(m) {
+  S.mode = m;
+  const el = document.getElementById('modelstat');
+  el.textContent = `JARVIS · ${MODE_LABEL[m]}`;
+  el.classList.toggle('amber', m === 'thinking');
+  el.classList.toggle('red', m === 'listening');
+}
+
+/* 아바타 */
+const AV_KEY = 'jarvis-3d-avatar';
+function setAvatarFromDataURL(dataUrl) {
+  new THREE.TextureLoader().load(dataUrl, tex => {
+    tex.colorSpace = THREE.SRGBColorSpace;
+    avatarPlane.material.uniforms.map.value = tex;
+    avatarPlane.visible = true;
+    wireCore.visible = false;
+    coreGlow.material.opacity = 0.16;
+  });
+}
+const savedAvatar = localStorage.getItem(AV_KEY);
+if (savedAvatar) setAvatarFromDataURL(savedAvatar);
+
+const filepick = document.getElementById('filepick');
+filepick.addEventListener('change', e => {
+  const f = e.target.files?.[0];
+  if (!f) return;
+  const rd = new FileReader();
+  rd.onload = () => {
+    const url = String(rd.result);
+    localStorage.setItem(AV_KEY, url);
+    setAvatarFromDataURL(url);
+    addBubble('ai', '아바타를 홀로그램에 반영했습니다. 이제 제 얼굴입니다.');
+  };
+  rd.readAsDataURL(f);
+  e.target.value = '';
+});
+
+/* 레이캐스트 호버·클릭 */
+const ray = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+let hoverCore = false;
+function pick(e) {
+  mouse.x = (e.clientX / innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / innerHeight) * 2 + 1;
+  ray.setFromCamera(mouse, camera);
+  return ray.intersectObjects([hexBase, glassBox, coreGroup.children[0], avatarPlane, wireCore], false);
+}
+renderer.domElement.addEventListener('pointermove', e => {
+  hoverCore = pick(e).length > 0;
+  renderer.domElement.style.cursor = hoverCore ? 'pointer' : 'grab';
+});
+renderer.domElement.addEventListener('click', e => {
+  if (pick(e).length > 0) filepick.click();
+});
+
+/* ───────────────────── 대화 ───────────────────── */
+const chatlog = document.getElementById('chatlog');
+const cmdInput = document.getElementById('cmd');
+const subEl = document.getElementById('sub');
+const micBtn = document.getElementById('mic');
+
+function addBubble(role, text) {
+  const hint = chatlog.querySelector('.hint');
+  if (hint) hint.remove();
+  const d = document.createElement('div');
+  d.className = `bub ${role}`;
+  d.innerHTML = `<div class="who">${role === 'me' ? '사장님' : 'JARVIS'}</div>`;
+  d.appendChild(document.createTextNode(text));
+  chatlog.appendChild(d);
+  while (chatlog.children.length > 5) chatlog.firstChild.remove();
+}
+
+const HISTORY = [];
+const SYSTEM_PROMPT = '너는 자비스(JARVIS) — 주식회사 폴라리스의 AI 비서다. 담백하고 간결한 한국어로, 존댓말로 답한다. 3문장을 넘기지 않는다.';
+
+function fallbackReply(text) {
+  const t = text.toLowerCase();
+  const now = new Date();
+  if (/시간|몇 시/.test(t)) return `현재 ${now.getHours()}시 ${String(now.getMinutes()).padStart(2, '0')}분입니다.`;
+  if (/안녕|하이|hello|hi\b/.test(t)) return '기동 완료했습니다. 무엇을 도와드릴까요?';
+  if (/상태|보고/.test(t)) return '홀로그램 콘솔 온라인, 음성 입출력 준비 완료. 폴라리스 전 시스템 정상 가동 중입니다.';
+  if (/누구|정체|넌/.test(t)) return '자비스입니다. 폴라리스 개발본부의 AI 비서 — 이 홀로그램을 통해 사장님과 소통합니다.';
+  if (/할 일|일정|짚어/.test(t)) return '현재 대기 중인 흐름은 제미나이 3단계 에셋 수신 검증과 대시보드 대기열 연동입니다. 먼저 어느 쪽 진행할까요?';
+  return '로컬 언어 엔진이 아직 준비 중입니다. 잠시 후 다시 말씀해 주시면 더 깊이 답변드리겠습니다.';
+}
+
+async function askJarvis(text) {
+  try {
+    const res = await fetch('http://127.0.0.1:11434/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'qwen2.5-coder:7b',
+        messages: [...HISTORY.slice(-6), { role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: text }],
+        stream: false,
+        options: { num_predict: 180 },
+      }),
+    });
+    const d = await res.json();
+    const reply = d?.message?.content?.trim();
+    if (!reply) throw new Error('empty');
+    return reply;
+  } catch {
+    return fallbackReply(text);
+  }
+}
+
+let speakToggle = true;
+function speak(text) {
+  if (!speakToggle || !('speechSynthesis' in window)) { setMode('idle'); return; }
+  const u = new SpeechSynthesisUtterance(text.replace(/[「」"'*#]/g, ''));
+  u.lang = 'ko-KR';
+  u.rate = 1.04;
+  u.pitch = 0.9;
+  const ko = speechSynthesis.getVoices().find(v => v.lang?.toLowerCase().startsWith('ko'));
+  if (ko) u.voice = ko;
+  u.onend = () => setMode('idle');
+  u.onerror = () => setMode('idle');
+  setMode('speaking');
+  speechSynthesis.cancel();
+  speechSynthesis.speak(u);
+}
+
+async function send(text) {
+  text = text.trim();
+  if (!text || S.mode === 'thinking') return;
+  addBubble('me', text);
+  HISTORY.push({ role: 'user', content: text });
+  cmdInput.value = '';
+  setMode('thinking');
+  S.micPulse = 1;
+  const reply = await askJarvis(text);
+  setMode('thinking');
+  S.glow = 1.6;
+  S.cubeBoost = 2.2;
+  addBubble('ai', reply);
+  HISTORY.push({ role: 'assistant', content: reply });
+  speak(reply);
+}
+
+cmdInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') send(cmdInput.value);
+});
+document.querySelectorAll('.tip').forEach(b => b.addEventListener('click', () => send(b.dataset.q)));
+
+/* 음성 인식 */
+const SR = window.webkitSpeechRecognition ?? window.SpeechRecognition;
+let recog = null;
+if (SR) {
+  recog = new SR();
+  recog.lang = 'ko-KR';
+  recog.interimResults = true;
+  let finalText = '';
+  recog.onresult = e => {
+    let tmp = '';
+    finalText = '';
+    for (let i = 0; i < e.results.length; i++) {
+      const r = e.results[i];
+      if (r.isFinal) finalText += r[0].transcript;
+      else tmp += r[0].transcript;
+    }
+    subEl.textContent = finalText || tmp ? `» ${finalText || tmp}` : '청취 중…';
+    subEl.classList.add('listening');
+  };
+  recog.onend = () => {
+    micBtn.classList.remove('listening');
+    subEl.classList.remove('listening');
+    subEl.textContent = 'ENTER 전송 · 마이크로 말하면 자동 전송 · 드래그로 시점 회전';
+    setMode('idle');
+    if (finalText.trim()) send(finalText);
+  };
+  recog.onerror = () => {
+    micBtn.classList.remove('listening');
+    subEl.textContent = '음성 인식 실패 — 마이크 권한을 확인해 주세요';
+    setMode('idle');
+  };
+  micBtn.addEventListener('click', () => {
+    if (micBtn.classList.contains('listening')) { recog.stop(); return; }
+    finalText = '';
+    subEl.textContent = '청취 중… 말씀하세요';
+    subEl.classList.add('listening');
+    micBtn.classList.add('listening');
+    setMode('listening');
+    recog.start();
+  });
+} else {
+  micBtn.disabled = true;
+}
+
+/* 시계 */
+setInterval(() => {
+  const d = new Date();
+  document.getElementById('clock').textContent =
+    [d.getHours(), d.getMinutes(), d.getSeconds()].map(n => String(n).padStart(2, '0')).join(':');
+}, 1000);
+
+/* ───────────────────── 루프 ───────────────────── */
+const clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
+  const dt = Math.min(clock.getDelta ? 0.016 : 0.016, 0.05);
+
+  // 모드별 애니메이션
+  const targetGlow = hoverCore ? 0.9 : S.mode === 'thinking' ? 0.7 : S.mode === 'speaking' ? 0.55 : 0.12;
+  S.glow += (targetGlow - S.glow) * 0.06;
+  S.cubeBoost = Math.max(0, S.cubeBoost - 0.012);
+  const breathe = 1 + Math.sin(t * 2.1) * 0.03 + S.glow * 0.06;
+
+  coreGroup.scale.setScalar(breathe);
+  coreGroup.position.y = 2.15 + Math.sin(t * 1.3) * 0.08;
+  glassGroup.position.y = coreGroup.position.y;
+  glassGroup.rotation.y = t * 0.12;
+  glassGroup.rotation.x = Math.sin(t * 0.4) * 0.06;
+
+  holoCube.rotation.x = t * (0.25 + S.cubeBoost * 0.6);
+  holoCube.rotation.y = t * (0.35 + S.cubeBoost * 0.8);
+  holoCubeInner.rotation.x = -t * 0.4;
+  holoCubeInner.rotation.y = -t * 0.55;
+  holoCube.material.opacity = 0.35 + S.glow * 0.4 + Math.sin(t * 5) * 0.04 * (S.mode !== 'idle' ? 1 : 0);
+
+  wireCore.rotation.y = t * 0.8;
+  wireCore.rotation.z = t * 0.3;
+  coreGlow.scale.setScalar(1 + Math.sin(t * 3) * 0.08 + S.glow * 0.35);
+  avatarPlane.material.uniforms.uTime.value = t;
+  avatarPlane.material.uniforms.uGlow.value = S.glow;
+  avatarPlane.lookAt(camera.position);
+
+  particles.rotation.y = t * 0.08;
+  particleGeo.attributes.position.needsUpdate = false;
+
+  baseRing.material.opacity = 0.35 + S.glow * 0.45 + (S.micPulse > 0 ? S.micPulse * 0.4 : 0);
+  hexTopEdge.material.opacity = 0.65 + S.glow * 0.3;
+  glassEdges.material.opacity = 0.55 + S.glow * 0.35;
+  keyLight.intensity = 26 + S.glow * 22;
+
+  S.micPulse = Math.max(0, S.micPulse - 0.02);
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>
