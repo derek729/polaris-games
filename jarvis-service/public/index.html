@@ -243,6 +243,9 @@
       <div class="gametabs">
         <button class="on" id="g-rps">✊ 가위바위보</button>
         <button id="g-bb">⚾ 숫자야구</button>
+        <button id="g-ud">🔢 업다운</button>
+        <button id="g-rt">⚡ 반응대결</button>
+        <button id="g-quiz">🧠 퀴즈대결</button>
       </div>
 
       <div id="game-rps" class="card">
@@ -258,7 +261,36 @@
         <button class="act" id="bbBtn">던지기</button>
         <div class="game-out" id="bbOut">자비스가 세 자리 숫자를 숨겼습니다. (중복 없음)</div>
         <div class="tries" id="bbTries"></div>
-        <div class="score"><span id="bbCount">0회째</span><span><button id="bbNew" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px">새 게임</button></span></div>
+        <div class="score"><span id="bbCount">0회째</span><span>최고 <b id="bbBest" style="color:var(--cyan)">-</b></span><span><button id="bbNew" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px">새 게임</button></span></div>
+      </div>
+
+      <div id="game-ud" class="card" style="display:none">
+        <div class="numpad"><input id="udIn" maxlength="3" inputmode="numeric" placeholder="1~100" /></div>
+        <button class="act" id="udBtn">말하기</button>
+        <div class="game-out" id="udOut">자비스가 1~100 사이 숫자 하나를 숨겼습니다. 맞춰보세요!</div>
+        <div class="tries" id="udTries"></div>
+        <div class="score"><span id="udCount">0회째</span><span>최고 <b id="udBest" style="color:var(--cyan)">-</b></span><span><button id="udNew" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px">새 게임</button></span></div>
+      </div>
+
+      <div id="game-rt" class="card" style="display:none">
+        <button class="act" id="rtStart" style="margin:0">⚡ 대결 시작 (3판)</button>
+        <div id="rtPad" style="margin-top:12px;padding:26px 0;text-align:center;border:1px solid var(--line);background:rgba(6,14,22,0.8);font-size:14px;color:var(--muted);cursor:pointer;user-select:none">대결 시작을 누르면 대기합니다…</div>
+        <div class="game-out" id="rtOut">신호가 뜨는 즉시 패드를 누르세요. 자비스와 3판 대결입니다.</div>
+        <div class="score"><span id="rtW">승 0</span><span id="rtL">패 0</span><span>전적 <b id="rtRec" style="color:var(--cyan)">0전 0승</b></span></div>
+      </div>
+
+      <div id="game-quiz" class="card" style="display:none">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+          <select id="quizTopic" style="flex:1;min-width:110px;background:rgba(6,14,22,0.8);border:1px solid var(--line);color:var(--text);font-size:12px;padding:8px;outline:none">
+            <option value="상식">상식</option><option value="과학">과학</option>
+            <option value="역사">역사</option><option value="영화·게임">영화·게임</option>
+            <option value="우주">우주</option>
+          </select>
+          <button class="act" id="quizStart" style="margin:0;flex:1;min-width:110px;padding:9px">🧠 퀴즈 생성 (5문제)</button>
+        </div>
+        <div class="game-out" id="quizOut">자비스가 주제를 골라 5문제를 냅니다. AI와 지식 대결!</div>
+        <div id="quizQ" style="display:none;margin-top:12px"></div>
+        <div class="score"><span id="quizScore">0/5</span><span id="quizEngine" style="font-family:var(--mono);font-size:9.5px;color:var(--muted)"></span></div>
       </div>
     </div>
   </section>
@@ -897,19 +929,191 @@ document.querySelectorAll('.rps-row button').forEach(b => b.addEventListener('cl
 }));
 paintRps();
 
-document.getElementById('g-rps').addEventListener('click', () => {
-  document.getElementById('g-rps').classList.add('on');
-  document.getElementById('g-bb').classList.remove('on');
-  document.getElementById('game-rps').style.display = '';
-  document.getElementById('game-bb').style.display = 'none';
-});
-document.getElementById('g-bb').addEventListener('click', () => {
-  document.getElementById('g-bb').classList.add('on');
-  document.getElementById('g-rps').classList.remove('on');
-  document.getElementById('game-bb').style.display = '';
-  document.getElementById('game-rps').style.display = 'none';
+const GAME_TABS = [['g-rps', 'game-rps'], ['g-bb', 'game-bb'], ['g-ud', 'game-ud'], ['g-rt', 'game-rt'], ['g-quiz', 'game-quiz']];
+GAME_TABS.forEach(([btn, pane]) => {
+  document.getElementById(btn).addEventListener('click', () => {
+    GAME_TABS.forEach(([b, p]) => {
+      document.getElementById(b).classList.toggle('on', b === btn);
+      document.getElementById(p).style.display = p === pane ? '' : 'none';
+    });
+  });
 });
 
+/* ── 게임: 업다운 ── */
+let udAnswer = 0, udCount = 0;
+function newUD() {
+  udAnswer = 1 + Math.floor(Math.random() * 100);
+  udCount = 0;
+  document.getElementById('udOut').textContent = '자비스가 새 숫자를 숨겼습니다. 1~100 사이!';
+  document.getElementById('udTries').textContent = '';
+  document.getElementById('udCount').textContent = '0회째';
+  document.getElementById('udIn').value = '';
+}
+document.getElementById('udNew').addEventListener('click', newUD);
+document.getElementById('udBtn').addEventListener('click', playUD);
+document.getElementById('udIn').addEventListener('keydown', e => { if (e.key === 'Enter') playUD(); });
+function playUD() {
+  const v = +document.getElementById('udIn').value;
+  if (!(v >= 1 && v <= 100)) { document.getElementById('udOut').textContent = '1~100 사이 숫자를 입력하세요.'; return; }
+  udCount++;
+  const t = document.getElementById('udTries');
+  const line = document.createElement('div');
+  if (v === udAnswer) {
+    line.innerHTML = `<b>${v}</b> — 정답! ${udCount}회 만에 맞췄습니다.`;
+    const best = +(localStorage.getItem('jarvis-ud-best') || 999);
+    if (udCount < best) {
+      localStorage.setItem('jarvis-ud-best', udCount);
+      document.getElementById('udOut').textContent = `🎉 ${udCount}회 정답 — 최고 기록 갱신!`;
+    } else {
+      document.getElementById('udOut').textContent = `🎉 ${udCount}회 만에 정답! (최고 기록 ${best}회)`;
+    }
+    udAnswer = 0;
+  } else {
+    const hint = v < udAnswer ? 'UP ⬆ 더 큰 숫자입니다' : 'DOWN ⬇ 더 작은 숫자입니다';
+    line.innerHTML = `<b>${v}</b> → ${v < udAnswer ? 'UP' : 'DOWN'}`;
+    document.getElementById('udOut').textContent = `${hint} — 자비스가 미소했습니다.`;
+  }
+  t.prepend(line);
+  document.getElementById('udCount').textContent = `${udCount}회째`;
+  document.getElementById('udIn').value = '';
+  document.getElementById('udIn').focus();
+}
+newUD();
+const udBestEl = document.getElementById('udBest');
+if (localStorage.getItem('jarvis-ud-best')) udBestEl.textContent = localStorage.getItem('jarvis-ud-best') + '회';
+const bbBestEl = document.getElementById('bbBest');
+if (localStorage.getItem('jarvis-bb-best')) bbBestEl.textContent = localStorage.getItem('jarvis-bb-best') + '회';
+
+/* ── 게임: 반응속도 대결 ── */
+const RT_PAD = document.getElementById('rtPad'), RT_OUT = document.getElementById('rtOut');
+let rtState = 'idle', rtT0 = 0, rtRound = 0, rtScore = { w: 0, l: 0 };
+let rtRec = { g: 0, w: 0 };
+try { rtRec = JSON.parse(localStorage.getItem('jarvis-rt') || '') || rtRec; } catch (e) { /* 초기값 */ }
+function paintRT() { document.getElementById('rtRec').textContent = `${rtRec.g}전 ${rtRec.w}승`; }
+paintRT();
+document.getElementById('rtStart').addEventListener('click', () => {
+  rtRound = 0; rtScore = { w: 0, l: 0 };
+  RT_OUT.textContent = '3판 대결 시작!';
+  nextRT();
+});
+function nextRT() {
+  rtState = 'wait';
+  RT_PAD.style.background = 'rgba(6,14,22,0.8)';
+  RT_PAD.style.color = 'var(--muted)';
+  RT_PAD.textContent = `제 ${rtRound + 1}판 — 초록으로 바뀌면 누르세요… (조급하면 반칙!)`;
+  rtGoTimer = setTimeout(() => {
+    if (rtState !== 'wait') return;
+    rtState = 'go';
+    rtT0 = performance.now();
+    RT_PAD.style.background = 'rgba(61,220,151,0.25)';
+    RT_PAD.style.color = 'var(--green)';
+    RT_PAD.textContent = '지금! 누르세요!';
+  }, 1500 + Math.random() * 2500);
+}
+RT_PAD.addEventListener('click', () => {
+  if (rtState === 'wait') {
+    rtState = 'idle';
+    clearTimeout(rtGoTimer);
+    RT_PAD.style.background = 'rgba(6,14,22,0.8)'; RT_PAD.style.color = 'var(--muted)';
+    RT_OUT.textContent = '반칙! 너무 일찍 눌렀습니다. 이 판은 자비스 승.';
+    rtScore.l++; rtRound++; endCheckRT();
+    return;
+  }
+  if (rtState !== 'go') return;
+  rtState = 'idle';
+  const human = Math.round(performance.now() - rtT0);
+  const jarvis = Math.round(230 + Math.random() * 260);
+  const win = human < jarvis;
+  if (win) rtScore.w++; else rtScore.l++;
+  rtRound++;
+  RT_OUT.textContent = `사장님 ${human}ms vs 자비스 ${jarvis}ms — ${win ? '사장님 승!' : '자비스 승!'}`;
+  RT_PAD.style.background = 'rgba(6,14,22,0.8)'; RT_PAD.style.color = 'var(--muted)';
+  document.getElementById('rtW').textContent = `승 ${rtScore.w}`;
+  document.getElementById('rtL').textContent = `패 ${rtScore.l}`;
+  endCheckRT();
+});
+let rtGoTimer = null;
+function endCheckRT() {
+  if (rtRound >= 3) {
+    rtRec.g++;
+    const humanWon = rtScore.w > rtScore.l;
+    if (humanWon) rtRec.w++;
+    localStorage.setItem('jarvis-rt', JSON.stringify(rtRec));
+    paintRT();
+    RT_OUT.textContent += `\n최종 ${rtScore.w}승 ${rtScore.l}패 — ${humanWon ? '사장님 우승! 다음엔 안 봐줍니다.' : '자비스 우승. 복수전 기다립니다.'}`;
+    rtRound = 0;
+  } else {
+    setTimeout(nextRT, 900);
+  }
+}
+
+/* ── 게임: 퀴즈 대결 (LLM 문제 생성 + 폴백) ── */
+const FALLBACK_QUIZ = [
+  { q: '지구에서 가장 큰 대양은?', c: ['태평양', '대서양', '인도양', '북극해'], a: 0 },
+  { q: '빛의 속도는 약 몇 km/s?', c: ['3만', '30만', '300만', '3억'], a: 1 },
+  { q: '다음 중 포유류가 아닌 것은?', c: ['돌고래', '박쥐', '상어', '고래'], a: 2 },
+  { q: '피타고라스 정리는 몇 각형에서 성립?', c: ['삼각형', '사각형', '직각삼각형', '원'], a: 2 },
+  { q: '소금의 화학식은?', c: ['NaCl', 'KCl', 'CaCO3', 'H2O'], a: 0 },
+];
+let quiz = null, quizIdx = 0, quizCorrect = 0;
+document.getElementById('quizStart').addEventListener('click', async function () {
+  const topic = document.getElementById('quizTopic').value;
+  this.disabled = true; this.textContent = '문제 생성 중…';
+  const out = document.getElementById('quizOut');
+  out.textContent = '자비스가 문제를 만들고 있습니다…';
+  quiz = null;
+  try {
+    const r = await fetch('/api/chat', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        system: 'quiz', prompt: topic,
+        lang: UI_LANG === 'auto' ? '' : UI_LANG,
+        provider: getBYOK()?.provider || '', apiKey: getBYOK()?.apiKey || '',
+        model: getBYOK() ? (getBYOK().model || '') : document.getElementById('modelSel').value,
+      }),
+    });
+    const d = await r.json();
+    const raw = d.reply || '';
+    const jm = raw.match(/\[[\s\S]*\]/);
+    if (jm) {
+      const arr = JSON.parse(jm[0]);
+      if (Array.isArray(arr) && arr.length >= 3 && arr.every(q => q.q && Array.isArray(q.c) && q.c.length === 4 && typeof q.a === 'number')) {
+        quiz = arr.slice(0, 5).map(q => ({ q: q.q, c: q.c, a: q.a }));
+        document.getElementById('quizEngine').textContent = 'ENGINE · ' + d.engine.toUpperCase();
+      }
+    }
+  } catch (e) { /* 폴백으로 */ }
+  if (!quiz) {
+    quiz = FALLBACK_QUIZ.slice();
+    document.getElementById('quizEngine').textContent = 'ENGINE · 내장 문제 (LLM 응답 파싱 실패)';
+  }
+  this.disabled = false; this.textContent = '🧠 다시 생성';
+  out.textContent = `주제「${topic}」 — 시작! 문제를 읽고 선택하세요.`;
+  quizIdx = 0; quizCorrect = 0;
+  document.getElementById('quizScore').textContent = `0/${quiz.length}`;
+  showQuizQ();
+});
+function showQuizQ() {
+  const box = document.getElementById('quizQ');
+  box.style.display = '';
+  const q = quiz[quizIdx];
+  box.innerHTML = `<div style="font-size:13.5px;line-height:1.6;margin-bottom:10px"><b>Q${quizIdx + 1}.</b> ${q.q}</div>` +
+    q.c.map((c, i) => `<button class="quizc" data-i="${i}" style="display:block;width:100%;text-align:left;margin-bottom:6px;padding:10px 12px;background:rgba(6,14,22,0.8);border:1px solid var(--line);color:var(--text);font-size:12.5px;cursor:pointer">${String.fromCharCode(65 + i)}. ${c}</button>`).join('');
+  box.querySelectorAll('.quizc').forEach(b => b.addEventListener('click', () => {
+    const i = +b.dataset.i;
+    const ok = i === q.a;
+    if (ok) quizCorrect++;
+    b.style.borderColor = ok ? 'var(--green)' : 'var(--red)';
+    if (!ok) box.querySelector(`[data-i="${q.a}"]`).style.borderColor = 'var(--green)';
+    document.getElementById('quizScore').textContent = `${quizCorrect}/${quiz.length}`;
+    box.querySelectorAll('.quizc').forEach(x => (x.disabled = true));
+    setTimeout(() => {
+      quizIdx++;
+      if (quizIdx < quiz.length) showQuizQ();
+      else box.innerHTML = `<div style="font-size:14px;color:${quizCorrect >= 3 ? 'var(--green)' : 'var(--amber)'}">${quizCorrect}문제 정답 — ${quizCorrect >= 4 ? '사장님 압승! 제가 무릎 꿇습니다.' : quizCorrect >= 3 ? '근소한 사장님 승. 아깝네요.' : '자비스 승! 다음엔 지지 않습니다.'}</div>`;
+    }, 1100);
+  }));
+}
 /* ── 게임: 숫자야구 ── */
 let bbAnswer = [], bbCount = 0;
 function newBB() {
