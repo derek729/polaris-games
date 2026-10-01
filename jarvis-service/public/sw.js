@@ -1,5 +1,5 @@
 /* JARVIS Service Worker — 앱 셸 캐시 (정적만, API는 항상 네트워크) */
-const CACHE = 'jarvis-v4';
+const CACHE = 'jarvis-v5';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon.svg'];
 
 self.addEventListener('install', e => {

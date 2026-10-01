@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#04070c" />
 <title>JARVIS — 폴라리스 AI 서비스</title>
+<script type="importmap">
+{ "imports": { "three": "./three.module.js" } }
+</script>
 <link rel="manifest" href="./manifest.webmanifest" />
 <link rel="icon" href="./icon.svg" type="image/svg+xml" />
 <link rel="apple-touch-icon" href="./icon.svg" />
@@ -173,6 +176,10 @@
 <main>
   <!-- 대화 -->
   <section class="tab on" id="tab-chat">
+    <div id="holo" style="height:172px;flex-shrink:0;position:relative;border-bottom:1px solid var(--line-soft)">
+      <canvas id="holoCanvas" style="display:block;width:100%;height:100%"></canvas>
+      <div id="holoStatus" style="position:absolute;bottom:6px;left:0;right:0;text-align:center;font-family:var(--mono);font-size:9px;letter-spacing:0.22em;color:var(--muted)">JARVIS · <span style="color:var(--cyan)">온라인</span></div>
+    </div>
     <div id="chatlog">
       <div class="hint">자비스 온라인.<br />무엇이든 물어보세요 — 이제 대화 맥락을 기억합니다.</div>
     </div>
@@ -517,6 +524,7 @@ async function send() {
   bub('me', label + text);
   saveChat('me', label + text);
   const th = bub('ai', '생각 중', 'think');
+  dispatchEvent(new CustomEvent('jarvis-state', { detail: 'thinking' }));
   try {
     const r = await fetch('/api/chat', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -529,6 +537,7 @@ async function send() {
     });
     const d = await r.json();
     th.remove();
+    dispatchEvent(new CustomEvent('jarvis-state', { detail: 'idle' }));
     if (d.reply) {
       bub('ai', d.reply);
       saveChat('ai', d.reply);
@@ -536,6 +545,7 @@ async function send() {
     } else bub('ai', '응답을 만들지 못했습니다. 다시 시도해 주세요.');
   } catch (e) {
     th.remove();
+    dispatchEvent(new CustomEvent('jarvis-state', { detail: 'idle' }));
     bub('ai', '서버에 연결할 수 없습니다.');
   }
 }
@@ -561,6 +571,7 @@ if (SR) {
     micBtn.classList.remove('listening');
     subline.classList.remove('listening');
     subline.textContent = 'ENTER 전송 · 마이크로 말하면 음성으로 답합니다';
+    dispatchEvent(new CustomEvent('jarvis-state', { detail: 'idle' }));
     if (fin.trim()) { cmd.value = fin; send(); }
   };
   recog.onerror = () => {
@@ -571,6 +582,7 @@ if (SR) {
     if (micBtn.classList.contains('listening')) { recog.stop(); return; }
     recog.lang = TTS_LANG[UI_LANG === 'auto' ? 'ko' : UI_LANG] || 'ko-KR';
     fin = ''; micBtn.classList.add('listening');
+    dispatchEvent(new CustomEvent('jarvis-state', { detail: 'listening' }));
     subline.textContent = '청취 중…'; subline.classList.add('listening');
     recog.start();
   });
@@ -782,6 +794,118 @@ addEventListener('beforeinstallprompt', e => {
 });
 if ('serviceWorker' in navigator) {
   addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+}
+</script>
+
+<script type="module">
+/* ── 미니 홀로그램 (모바일 최적화 — 대화 탭 상단) ──
+   PC 3D 콘솔(8791)의 코어를 경량화: 반사 바닥·雾 없음, 파티클 축소, pixelRatio 1.5 상한. */
+import * as THREE from 'three';
+
+const holoWrap = document.getElementById('holo');
+const holoCanvas = document.getElementById('holoCanvas');
+const holoStatus = document.getElementById('holoStatus');
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ canvas: holoCanvas, antialias: true, alpha: true });
+} catch (e) {
+  holoStatus.textContent = 'JARVIS · 3D 미지원 — 텍스트 모드';
+  holoCanvas.remove();
+}
+if (renderer) {
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(42, 2, 0.1, 50);
+  camera.position.set(0, 0.9, 5.4);
+  camera.lookAt(0, 0.15, 0);
+
+  function makeGlow(inner, outer) {
+    const c = document.createElement('canvas');
+    c.width = c.height = 256;
+    const g = c.getContext('2d');
+    const grad = g.createRadialGradient(128, 128, 0, 128, 128, 128);
+    grad.addColorStop(0, inner); grad.addColorStop(0.35, outer); grad.addColorStop(1, 'rgba(0,0,0,0)');
+    const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: tex, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, transparent: true,
+    }));
+    sp.renderOrder = 10;
+    return sp;
+  }
+  const coreGlow = makeGlow('rgba(180,240,250,0.95)', 'rgba(60,170,200,0.3)');
+  coreGlow.scale.setScalar(2.1); coreGlow.position.y = 0.15;
+  scene.add(coreGlow);
+  const baseGlow = makeGlow('rgba(150,230,245,0.55)', 'rgba(60,170,200,0.2)');
+  baseGlow.scale.set(3.4, 1.4, 1); baseGlow.position.y = -0.85;
+  scene.add(baseGlow);
+
+  const core = new THREE.LineSegments(
+    new THREE.EdgesGeometry(new THREE.IcosahedronGeometry(0.62, 1)),
+    new THREE.LineBasicMaterial({ color: 0x9ff0fa, transparent: true, opacity: 0.9 })
+  );
+  core.position.y = 0.15;
+  scene.add(core);
+  const cube = new THREE.LineSegments(
+    new THREE.EdgesGeometry(new THREE.BoxGeometry(1.45, 1.45, 1.45)),
+    new THREE.LineBasicMaterial({ color: 0x66d9e8, transparent: true, opacity: 0.5 })
+  );
+  cube.position.y = 0.15;
+  scene.add(cube);
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(1.15, 1.26, 48),
+    new THREE.MeshBasicMaterial({ color: 0x66d9e8, transparent: true, opacity: 0.4, side: THREE.DoubleSide })
+  );
+  ring.rotation.x = -Math.PI / 2; ring.position.y = -0.92;
+  scene.add(ring);
+
+  const pN = 90, pPos = new Float32Array(pN * 3);
+  for (let i = 0; i < pN; i++) {
+    const r = 1.8 + Math.random() * 1.2, a = Math.random() * Math.PI * 2;
+    pPos[i * 3] = Math.cos(a) * r; pPos[i * 3 + 1] = -0.7 + Math.random() * 2; pPos[i * 3 + 2] = Math.sin(a) * r;
+  }
+  const pGeo = new THREE.BufferGeometry();
+  pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+  scene.add(new THREE.Points(pGeo, new THREE.PointsMaterial({ color: 0x66d9e8, size: 0.04, transparent: true, opacity: 0.5 })));
+
+  /* 대화 상태 연동 — 기존 스크립트가 커스텀 이벤트로 알려준다 */
+  let glow = 0.14, spinBoost = 0, mode = 'idle';
+  addEventListener('jarvis-state', e => {
+    mode = e.detail;
+    holoStatus.innerHTML = 'JARVIS · <span style="color:' +
+      (mode === 'thinking' ? 'var(--amber)' : mode === 'listening' ? 'var(--red)' : 'var(--cyan)') + '">' +
+      ({ idle: '온라인', thinking: '생각 중', listening: '청취 중', speaking: '응답 중' }[mode] || mode) + '</span>';
+    if (mode === 'thinking') { glow = 1.4; spinBoost = 2; }
+  });
+
+  function resize() {
+    const w = holoWrap.clientWidth, h = holoWrap.clientHeight;
+    if (!w || !h) return;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h; camera.updateProjectionMatrix();
+  }
+  addEventListener('resize', resize);
+  new ResizeObserver(resize).observe(holoWrap);
+  resize();
+
+  const clock = new THREE.Clock();
+  function animate() {
+    requestAnimationFrame(animate);
+    if (document.getElementById('tab-chat').style.display === 'none') return; /* 다른 탭이면 스킵 */
+    const t = clock.getElapsedTime();
+    glow += ((mode === 'thinking' ? 0.8 : mode === 'speaking' ? 0.6 : mode === 'listening' ? 0.5 : 0.14) - glow) * 0.06;
+    spinBoost = Math.max(0, spinBoost - 0.012);
+    core.rotation.y = t * 0.8; core.rotation.z = t * 0.3;
+    cube.rotation.x = t * (0.25 + spinBoost * 0.6); cube.rotation.y = t * (0.35 + spinBoost * 0.8);
+    const breathe = 1 + Math.sin(t * 2.1) * 0.03 + glow * 0.05;
+    core.scale.setScalar(breathe);
+    core.position.y = 0.15 + Math.sin(t * 1.3) * 0.05;
+    cube.position.y = core.position.y; coreGlow.position.y = core.position.y;
+    coreGlow.material.opacity = 0.55 + glow * 0.45;
+    ring.material.opacity = 0.3 + glow * 0.4;
+    scene.children.forEach(ch => { if (ch.type === 'Points') ch.rotation.y = t * 0.07; });
+    renderer.render(scene, camera);
+  }
+  animate();
 }
 </script>
 </body>
