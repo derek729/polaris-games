@@ -716,9 +716,48 @@ async function loadModels() {
 loadSkills();
 loadModels();
 
+/* ── 번역 자동 감지 — "영어로 번역해줘: 원문" / "원문을 한국어로 번역해줘" ── */
+function trDetect(text) {
+  const m = text.match(/(영어|한국어|중국어|일본어|english|korean|chinese|japanese)\s*(으?로)?\s*(번역|통역)/i);
+  if (!m) return null;
+  const map = { '영어': 'en', english: 'en', '한국어': 'ko', korean: 'ko', '중국어': 'zh', chinese: 'zh', '일본어': 'ja', japanese: 'ja' };
+  const target = map[m[1].toLowerCase()] || '';
+  let src = text.replace(m[0], '').replace(/[:：]\s*/, '').trim();
+  /* 명령 조각 잔여물 제거 — "영어로 번역" 뒤에 남는 해줘/주세요 등 */
+  src = src.replace(/(번역|통역)?\s*(해\s?줘|해\s?주세요|바랍니다|드립니다|부탁합니다|부탁드려요)[.!?]*\s*/g, ' ').trim();
+  src = src.replace(/^(을|를|이|가)\s*/, '').trim();
+  if (!src) src = text;
+  return { lang: target, src };
+}
+
 async function send() {
   const text = cmd.value.trim();
   if (!text) return;
+  const tr = trDetect(text);
+  if (tr && tr.src !== text) {
+    cmd.value = '';
+    bub('me', text);
+    saveChat('me', text);
+    const th = bub('ai', '번역 중', 'think');
+    dispatchEvent(new CustomEvent('jarvis-state', { detail: 'thinking' }));
+    try {
+      const r = await fetch('/api/chat', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ system: 'skill:translator', prompt: tr.src, lang: tr.lang, sid: SID }),
+      });
+      const d = await r.json();
+      th.remove();
+      dispatchEvent(new CustomEvent('jarvis-state', { detail: 'idle' }));
+      const out = d.reply || '번역 실패 — 다시 시도해 주세요.';
+      bub('ai', out);
+      saveChat('ai', out);
+      speak(out);
+    } catch (e) {
+      th.remove();
+      bub('ai', '번역 서버에 연결할 수 없습니다.');
+    }
+    return;
+  }
   const fcmd = fsDetect(text);
   if (fcmd) {
     cmd.value = '';

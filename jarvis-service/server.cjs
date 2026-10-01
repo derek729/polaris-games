@@ -419,9 +419,13 @@ const server = http.createServer(async (req, res) => {
 
       let sysPrompt = systemPromptFor(system);
       if (style && SUM_STYLES[style]) sysPrompt += SUM_STYLES[style];
-      /* 글로벌: 사용자 설정 언어 우선, 없으면 자동 감지 */
+      /* 글로벌: 사용자 설정 언어 우선, 없으면 자동 감지.
+         예외: translator 스킬 + lang 미지정 = 목표 언어를 스킬이 판단(원문 언어 강제 시 충돌) */
+      const isTranslator = system === 'skill:translator';
       const lang = (typeof body.lang === 'string' && LANG_INSTRUCT[body.lang]) ? body.lang : detectLang(prompt);
-      sysPrompt += '\n' + LANG_INSTRUCT[lang];
+      if (!(isTranslator && !(typeof body.lang === 'string' && LANG_INSTRUCT[body.lang]))) {
+        sysPrompt += '\n' + LANG_INSTRUCT[lang];
+      }
 
       /* 멀티턴: 세션 기억 + 이번 발화 */
       const history = system === 'review' ? [] : sessionHistory(sid);
