@@ -264,12 +264,41 @@
   </section>
 </main>
 
-<nav>
-  <button class="on" data-t="chat"><span class="ic">💬</span>대화</button>
-  <button data-t="review"><span class="ic">🔍</span>코드 리뷰</button>
-  <button data-t="news"><span class="ic">📰</span>뉴스</button>
-  <button data-t="game"><span class="ic">🎮</span>게임</button>
-</nav>
+  <!-- 파일 (로컬 접근·수정 — 이중 잠금) -->
+  <section class="tab" id="tab-files">
+    <div class="pane">
+      <h2>파일 — 허용 폴더 읽기·수정</h2>
+      <div id="fsLock" style="display:none" class="empty">🔒 이 기기에서는 파일 접근이 잠겨 있습니다.<br />공개 터널(인터넷) 접속이거나 토큰이 없습니다.<br />로컬(PC·Tailscale)에서 열면 자동 해제됩니다.</div>
+      <div id="fsPanel" style="display:none">
+        <div class="card" style="margin-bottom:10px">
+          <div style="display:flex;align-items:center;gap:6px">
+            <button class="act" id="fsUp" style="margin:0;flex:0 0 auto;width:auto;padding:9px 14px">↑ 상위</button>
+            <input id="fsPath" readonly style="flex:1;font-size:11.5px;color:var(--muted)" />
+          </div>
+          <div id="fsList" style="margin-top:10px;font-size:13px"></div>
+          <div style="display:flex;gap:8px;margin-top:10px">
+            <input id="fsNewName" placeholder="새 파일 이름 (예: 메모.txt)" style="flex:1;background:rgba(6,14,22,0.8);border:1px solid var(--line);color:var(--text);font-size:12px;padding:8px;outline:none" />
+            <button class="act" id="fsNew" style="margin:0;flex:0 0 auto;width:auto;padding:9px 14px">만들기</button>
+          </div>
+        </div>
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <span style="font-family:var(--mono);font-size:10.5px;color:var(--muted)" id="fsEditPath">파일을 선택하세요</span>
+            <button class="act" id="fsSave" style="margin:0;width:auto;padding:7px 16px;display:none">저장</button>
+          </div>
+          <textarea id="fsEdit" rows="12" placeholder="파일 목록에서 항목을 누르면 열립니다 — 수정 후 저장"></textarea>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <nav>
+    <button class="on" data-t="chat"><span class="ic">💬</span>대화</button>
+    <button data-t="review"><span class="ic">🔍</span>코드 리뷰</button>
+    <button data-t="news"><span class="ic">📰</span>뉴스</button>
+    <button data-t="game"><span class="ic">🎮</span>게임</button>
+    <button data-t="files"><span class="ic">📁</span>파일</button>
+  </nav>
 
 <!-- BYOK 설정 모달 — 키는 이 브라우저에만 저장(서버는 호출에만 사용, 기록 없음) -->
 <div id="cfgModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:20;align-items:center;justify-content:center">
@@ -317,16 +346,15 @@ fetch('/api/health').then(r => r.json()).then(d => {
 
 /* ── 글로벌 다국어 (P0) ── */
 const I18N = {
-  ko: { chat: '대화', review: '코드 리뷰', news: '뉴스', game: '게임', ph: '자비스에게 말 걸기', sub: 'ENTER 전송 · 마이크로 말하면 음성으로 답합니다' },
-  en: { chat: 'Chat', review: 'Code Review', news: 'News', game: 'Games', ph: 'Ask JARVIS anything', sub: 'ENTER to send · use mic to talk' },
-  zh: { chat: '对话', review: '代码审查', news: '新闻', game: '游戏', ph: '向贾维斯提问', sub: '回车发送 · 点击麦克风语音提问' },
-  ja: { chat: 'チャット', review: 'コードレビュー', news: 'ニュース', game: 'ゲーム', ph: 'ジャーヴィスに話しかける', sub: 'Enterで送信 · マイクで音声入力' },
+  ko: { chat: '대화', review: '코드 리뷰', news: '뉴스', game: '게임', files: '파일', ph: '자비스에게 말 걸기', sub: 'ENTER 전송 · 마이크로 말하면 음성으로 답합니다' },
+  en: { chat: 'Chat', review: 'Code Review', news: 'News', game: 'Games', files: 'Files', ph: 'Ask JARVIS anything', sub: 'ENTER to send · use mic to talk' },
+  zh: { chat: '对话', review: '代码审查', news: '新闻', game: '游戏', files: '文件', ph: '向贾维斯提问', sub: '回车发送 · 点击麦克风语音提问' },
+  ja: { chat: 'チャット', review: 'コードレビュー', news: 'ニュース', game: 'ゲーム', files: 'ファイル', ph: 'ジャーヴィスに話しかける', sub: 'Enterで送信 · マイクで音声入力' },
 };
 let UI_LANG = localStorage.getItem('jarvis-ui-lang') || 'ko';
 function paintLang() {
   const t = I18N[UI_LANG] || I18N.ko;
-  const map = { chat: '대화', review: '코드 리뷰', news: '뉴스', game: '게임' };
-  const tabOrder = ['chat', 'review', 'news', 'game'];
+  const tabOrder = ['chat', 'review', 'news', 'game', 'files'];
   document.querySelectorAll('nav button').forEach((b, i) => {
     b.innerHTML = b.innerHTML.replace(/(<span class="ic">[^<]+<\/span>).*$/s, `$1${t[tabOrder[i]]}`);
   });
@@ -471,7 +499,78 @@ function paintEngine(label) {
   el.innerHTML = `엔진 <b>${label}</b>`;
 }
 
-/* 스킬·모델 — OpenClaw 방식 능력 확장 */
+/* ── 로컬 파일 (이중 잠금: 터널 차단 + 토큰) ── */
+const FS_TOKEN_KEY = 'jarvis-fs-token';
+let fsToken = localStorage.getItem(FS_TOKEN_KEY) || '';
+let fsCwd = '';
+const fsEl = id => document.getElementById(id);
+function fsHeaders() { return { 'Content-Type': 'application/json', 'X-FS-Token': fsToken }; }
+async function fsInit() {
+  try {
+    if (!fsToken) {
+      const r = await fetch('/api/fs/token');
+      if (!r.ok) throw new Error('locked');
+      const d = await r.json();
+      fsToken = d.token; localStorage.setItem(FS_TOKEN_KEY, fsToken);
+    }
+    const r = await fetch('/api/fs/list?path=', { headers: fsHeaders() });
+    if (!r.ok) throw new Error('locked');
+    fsEl('fsLock').style.display = 'none'; fsEl('fsPanel').style.display = '';
+    await fsList('');
+  } catch (e) {
+    fsEl('fsLock').style.display = ''; fsEl('fsPanel').style.display = 'none';
+  }
+}
+async function fsList(path) {
+  const r = await fetch('/api/fs/list?path=' + encodeURIComponent(path), { headers: fsHeaders() });
+  const d = await r.json();
+  if (!d.entries) return;
+  fsCwd = path;
+  fsEl('fsPath').value = (d.root || '') + '/' + (path || '');
+  fsEl('fsList').innerHTML = d.entries.map(e =>
+    `<div class="fsitem" data-n="${e.name}" data-d="${e.dir ? 1 : 0}" style="padding:7px 4px;cursor:pointer;border-bottom:1px solid var(--line-soft)">${e.dir ? '📁' : '📄'} ${e.name}${e.dir ? '' : ` <span style="color:var(--muted);font-size:10px">${e.size}B</span>`}</div>`).join('');
+  fsEl('fsList').querySelectorAll('.fsitem').forEach(el => el.addEventListener('click', () => {
+    const name = el.dataset.n, isDir = el.dataset.d === '1';
+    if (isDir) fsList(path ? path + '/' + name : name);
+    else fsRead(path ? path + '/' + name : name);
+  }));
+}
+async function fsRead(p) {
+  const r = await fetch('/api/fs/read?path=' + encodeURIComponent(p), { headers: fsHeaders() });
+  const d = await r.json();
+  if (d.content === undefined) { fsEl('fsEdit').value = '읽기 실패: ' + (d.error || ''); return; }
+  fsEl('fsEdit').value = d.content;
+  fsEl('fsEditPath').textContent = p;
+  fsEl('fsEditPath').dataset.path = p;
+  fsEl('fsSave').style.display = '';
+}
+document.getElementById('fsSave').addEventListener('click', async () => {
+  const p = fsEl('fsEditPath').dataset.path;
+  const r = await fetch('/api/fs/write', {
+    method: 'POST', headers: fsHeaders(),
+    body: JSON.stringify({ path: p, content: fsEl('fsEdit').value }),
+  });
+  const d = await r.json();
+  fsEl('fsEditPath').textContent = p + (d.ok ? ' ✓ 저장됨' : ' ✗ ' + (d.error || '실패'));
+});
+document.getElementById('fsUp').addEventListener('click', () => {
+  const parts = fsCwd.split('/').filter(Boolean);
+  parts.pop();
+  fsList(parts.join('/'));
+});
+document.getElementById('fsNew').addEventListener('click', async () => {
+  const name = fsEl('fsNewName').value.trim();
+  if (!name) return;
+  const p = (fsCwd ? fsCwd + '/' : '') + name;
+  const r = await fetch('/api/fs/write', {
+    method: 'POST', headers: fsHeaders(),
+    body: JSON.stringify({ path: p, content: '' }),
+  });
+  const d = await r.json();
+  if (d.ok) { fsEl('fsNewName').value = ''; fsList(fsCwd); }
+  else fsEl('fsNewName').value = '실패: ' + (d.error || '');
+});
+fsInit();
 let activeSkill = ''; /* 선택 스킬 id — 한 번 전송 후 해제 */
 async function loadSkills() {
   try {

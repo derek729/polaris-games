@@ -336,9 +336,15 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(204, {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'GET,POST,DELETE,OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Headers': 'Content-Type,X-FS-Token',
       });
       return res.end();
+    }
+
+    /* 로컬 파일 API — 터널 차단 + 토큰 이중 잠금 */
+    if (url.pathname.startsWith('/api/fs')) {
+      const bodyBuf = req.method === 'POST' ? await readBody(req) : Buffer.alloc(0);
+      return handleFs(req, res, url, bodyBuf);
     }
 
     if (req.method === 'GET' && url.pathname === '/api/health') {
@@ -454,6 +460,92 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`[jarvis-service v3] http://0.0.0.0:${PORT} — 세션 메모리·스킬(${SKILLS.size}종)·브리핑 실데이터 활성`);
+});
+
+/* ── 로컬 파일 접근 (사장님 지시: 접속·수정 권한) — 이중 잠금 설계 ──
+   잠금 ①: 공개 터널(trycloudflare) Host면 전면 차단 — 인터넷 방문자는 파일 API에 도달 불가
+   잠금 ②: X-FS-Token 헤더 필수 — 토큰은 서버 기동 시 랜덤 생성(data/fs-token),
+           사장님 기기는 GET /api/fs/token으로 자동 수령(터널에서는 이것도 차단)
+   범위: 허용 루트(data/fs-root.txt, 기본 workspace/) 이하만 — ../ 이탈 차단, 쓰기 1MB 상한 */
+const FS_TOKEN_PATH = path.join(__dirname, 'data', 'fs-token');
+const FS_ROOT_PATH = path.join(__dirname, 'data', 'fs-root.txt');
+const WS_DIR = path.join(__dirname, 'workspace');
+const FS_TOKEN = fs.existsSync(FS_TOKEN_PATH)
+  ? fs.readFileSync(FS_TOKEN_PATH, 'utf8').trim()
+  : (fs.mkdirSync(path.dirname(FS_TOKEN_PATH), { recursive: true }),
+     (v => { fs.writeFileSync(FS_TOKEN_PATH, v); return v; })(crypto.randomBytes(24).toString('hex')));
+fs.mkdirSync(WS_DIR, { recursive: true });
+
+function fsRoot() {
+  try {
+    const custom = fs.readFileSync(FS_ROOT_PATH, 'utf8').trim();
+    if (custom && fs.existsSync(custom)) return path.resolve(custom);
+  } catch (e) { /* 기본값 */ }
+  return WS_DIR;
+}
+function safeFsPath(rel) {
+  const root = fsRoot();
+  const abs = path.resolve(root, (rel || '').replace(/^[/\\]+/, '').replace(/\.\.+/g, '__'));
+  if (!abs.startsWith(root + path.sep) && abs !== root) return null;
+  return abs;
+}
+function isTunnelReq(req) {
+  const host = (req.headers.host || '').toLowerCase();
+  return host.includes('trycloudflare.com');
+}
+function fsAuth(req) {
+  return !isTunnelReq(req) && req.headers['x-fs-token'] === FS_TOKEN;
+}
+
+async function handleFs(req, res, url, bodyBuf) {
+  if (isTunnelReq(req)) return sendJson(res, 403, { error: '공개 터널에서는 파일 접근이 잠겨 있습니다' });
+  const ep = url.pathname;
+
+  if (ep === '/api/fs/token' && req.method === 'GET') {
+    return sendJson(res, 200, { token: FS_TOKEN, root: fsRoot() });
+  }
+  if (!fsAuth(req)) return sendJson(res, 401, { error: 'UNAUTHORIZED' });
+
+  const rel = url.searchParams.get('path') || '';
+
+  if (req.method === 'GET' && ep === '/api/fs/list') {
+    const dir = safeFsPath(rel);
+    if (!dir || !fs.existsSync(dir)) return sendJson(res, dir ? 404 : 400, { error: dir ? 'NOT_FOUND' : 'BAD_PATH' });
+    const entries = fs.readdirSync(dir, { withFileTypes: true })
+      .filter(e => !e.name.startsWith('.'))
+      .map(e => ({ name: e.name, dir: e.isDirectory(), size: e.isDirectory() ? 0 : fs.statSync(path.join(dir, e.name)).size }))
+      .sort((a, b) => (b.dir - a.dir) || a.name.localeCompare(b.name));
+    return sendJson(res, 200, { path: rel, root: fsRoot(), entries });
+  }
+  if (req.method === 'GET' && ep === '/api/fs/read') {
+    const f = safeFsPath(rel);
+    if (!f) return sendJson(res, 400, { error: 'BAD_PATH' });
+    if (!fs.existsSync(f)) return sendJson(res, 404, { error: 'NOT_FOUND' });
+    const st = fs.statSync(f);
+    if (st.isDirectory()) return sendJson(res, 400, { error: 'IS_DIRECTORY' });
+    if (st.size > 2 * 1024 * 1024) return sendJson(res, 400, { error: 'TOO_LARGE(2MB)' });
+    return sendJson(res, 200, { path: rel, content: fs.readFileSync(f, 'utf8') });
+  }
+  if (req.method === 'POST' && ep === '/api/fs/write') {
+    const p = JSON.parse(bodyBuf.toString('utf8') || '{}');
+    const f = safeFsPath(p.path);
+    if (!f) return sendJson(res, 400, { error: 'BAD_PATH' });
+    if (typeof p.content !== 'string' || Buffer.byteLength(p.content) > 1024 * 1024) {
+      return sendJson(res, 400, { error: 'CONTENT_INVALID(≤1MB)' });
+    }
+    fs.mkdirSync(path.dirname(f), { recursive: true });
+    fs.writeFileSync(f, p.content);
+    return sendJson(res, 200, { ok: true, path: p.path, bytes: Buffer.byteLength(p.content) });
+  }
+  return sendJson(res, 404, { error: 'NOT_FOUND' });
+}
+
+/* 안전망 — 파일 API 예외가 서버 사망으로 이어지지 않게 (DoS 방지) */
+process.on('uncaughtException', e => {
+  console.error('[uncaught]', String(e && e.message || e).slice(0, 200));
+});
+process.on('unhandledRejection', e => {
+  console.error('[unhandledRejection]', String(e && e.message || e).slice(0, 200));
 });
 
 /* ── 텔레그램 채널 (OpenClaw 방식 — TELEGRAM_BOT_TOKEN 있으면 자동 가동) ──
