@@ -537,6 +537,29 @@ async function handleFs(req, res, url, bodyBuf) {
     fs.writeFileSync(f, p.content);
     return sendJson(res, 200, { ok: true, path: p.path, bytes: Buffer.byteLength(p.content) });
   }
+  if (req.method === 'POST' && ep === '/api/fs/rename') {
+    const p = JSON.parse(bodyBuf.toString('utf8') || '{}');
+    const from = safeFsPath(p.from), to = safeFsPath(p.to);
+    if (!from || !to) return sendJson(res, 400, { error: 'BAD_PATH' });
+    if (!fs.existsSync(from)) return sendJson(res, 404, { error: 'NOT_FOUND' });
+    if (fs.existsSync(to)) return sendJson(res, 400, { error: 'ALREADY_EXISTS' });
+    fs.renameSync(from, to);
+    return sendJson(res, 200, { ok: true, from: p.from, to: p.to });
+  }
+  if (req.method === 'DELETE' && ep === '/api/fs/delete') {
+    const f = safeFsPath(url.searchParams.get('path'));
+    if (!f || f === fsRoot()) return sendJson(res, 400, { error: 'BAD_PATH' });
+    if (!fs.existsSync(f)) return sendJson(res, 404, { error: 'NOT_FOUND' });
+    const st = fs.statSync(f);
+    if (st.isDirectory()) {
+      const rest = fs.readdirSync(f);
+      if (rest.length) return sendJson(res, 400, { error: 'NOT_EMPTY — 빈 폴더만 삭제 가능' });
+      fs.rmdirSync(f);
+    } else {
+      fs.unlinkSync(f);
+    }
+    return sendJson(res, 200, { ok: true });
+  }
   return sendJson(res, 404, { error: 'NOT_FOUND' });
 }
 

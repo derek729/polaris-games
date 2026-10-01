@@ -527,12 +527,39 @@ async function fsList(path) {
   if (!d.entries) return;
   fsCwd = path;
   fsEl('fsPath').value = (d.root || '') + '/' + (path || '');
+  const base = path ? path + '/' : '';
   fsEl('fsList').innerHTML = d.entries.map(e =>
-    `<div class="fsitem" data-n="${e.name}" data-d="${e.dir ? 1 : 0}" style="padding:7px 4px;cursor:pointer;border-bottom:1px solid var(--line-soft)">${e.dir ? '📁' : '📄'} ${e.name}${e.dir ? '' : ` <span style="color:var(--muted);font-size:10px">${e.size}B</span>`}</div>`).join('');
-  fsEl('fsList').querySelectorAll('.fsitem').forEach(el => el.addEventListener('click', () => {
+    `<div class="fsitem" data-n="${e.name}" data-d="${e.dir ? 1 : 0}" style="padding:7px 4px;cursor:pointer;border-bottom:1px solid var(--line-soft);display:flex;align-items:center;gap:6px">` +
+    `<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.dir ? '📁' : '📄'} ${e.name}${e.dir ? '' : ` <span style="color:var(--muted);font-size:10px">${e.size}B</span>`}</span>` +
+    (e.dir ? '' : `<button class="fsact" data-a="ren" data-p="${base}${e.name}" title="이름 변경" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px">✏</button>` +
+    `<button class="fsact" data-a="del" data-p="${base}${e.name}" title="삭제" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px">🗑</button>`) +
+    `</div>`).join('');
+  fsEl('fsList').querySelectorAll('.fsitem').forEach(el => el.addEventListener('click', e => {
+    if (e.target.classList?.contains('fsact')) return; /* 액션 버튼은 아래 위임 핸들러가 처리 */
     const name = el.dataset.n, isDir = el.dataset.d === '1';
     if (isDir) fsList(path ? path + '/' + name : name);
     else fsRead(path ? path + '/' + name : name);
+  }));
+  fsEl('fsList').querySelectorAll('.fsact').forEach(b => b.addEventListener('click', async e => {
+    e.stopPropagation();
+    const p = b.dataset.p, a = b.dataset.a;
+    if (a === 'del') {
+      if (!confirm('삭제할까요? — ' + p)) return;
+      const r = await fetch('/api/fs/delete?path=' + encodeURIComponent(p), { method: 'DELETE', headers: fsHeaders() });
+      const d = await r.json();
+      if (!d.ok) alert('삭제 실패: ' + (d.error || ''));
+      fsList(fsCwd);
+    } else {
+      const nn = prompt('새 이름', p.split('/').pop());
+      if (!nn || nn === p.split('/').pop()) return;
+      const r = await fetch('/api/fs/rename', {
+        method: 'POST', headers: fsHeaders(),
+        body: JSON.stringify({ from: p, to: (fsCwd ? fsCwd + '/' : '') + nn }),
+      });
+      const d = await r.json();
+      if (!d.ok) alert('이름 변경 실패: ' + (d.error || ''));
+      fsList(fsCwd);
+    }
   }));
 }
 async function fsRead(p) {
@@ -572,6 +599,55 @@ document.getElementById('fsNew').addEventListener('click', async () => {
 });
 fsInit();
 let activeSkill = ''; /* 선택 스킬 id — 한 번 전송 후 해제 */
+/* ── 대화에서 자연어 파일 조작 — "메모: 내용" / "…저장해줘" / "…읽어줘" / "파일 목록" ── */
+const FS_NOTE_DIR = '메모';
+async function fsApi(ep, opt) { return fetch(ep, { headers: fsHeaders(), ...opt }); }
+function fsDetect(text) {
+  const t = text.trim();
+  if (/^파일\s*(목록|리스트)|폴더\s*목록/.test(t)) return { op: 'list' };
+  if (/(저장|기록|메모)\s*(해\s?줘|해주세요|해봐)|^메모\s*:/.test(t)) return { op: 'save' };
+  const m = t.match(/([\w가-힣.\-]+\.(?:txt|md|json|csv|log|js|py|html|css))\s*(을|를)?\s*(읽어|열어|보여)/);
+  if (m) return { op: 'read', path: (fsCwd ? fsCwd + '/' : '') + m[1] };
+  if (/(읽어|열어)\s*(줘|주세요)/.test(t)) return { op: 'read', path: '' };
+  return null;
+}
+async function runFileCmd(op, text) {
+  const today = new Date().toISOString().slice(0, 10);
+  if (op === 'save') {
+    const body = text.replace(/^메모\s*:?\s*/, '').replace(/(을|를)?\s*(저장|기록|메모)\s*(해\s?줘|해주세요|해봐)[.!?]*\s*$/, '').trim() || '(빈 메모)';
+    const p = `${FS_NOTE_DIR}/${today}.md`;
+    let old = '';
+    try {
+      const r = await fsApi('/api/fs/read?path=' + encodeURIComponent(p));
+      if (r.ok) old = (await r.json()).content + '\n\n';
+    } catch (e) { /* 신규 */ }
+    const w = await fsApi('/api/fs/write', { method: 'POST', body: JSON.stringify({ path: p, content: old + `- ${new Date().toTimeString().slice(0, 5)} ` + body }) });
+    const d = await w.json();
+    return d.ok ? `📁 저장했습니다 — ${p} (${d.bytes}B). 파일 탭에서 확인하실 수 있습니다.` : '저장 실패: ' + (d.error || '');
+  }
+  if (op === 'list') {
+    const r = await fsApi('/api/fs/list?path=' + encodeURIComponent(fsCwd || ''));
+    const d = await r.json();
+    if (!d.entries) return '파일 서버에 연결할 수 없습니다 (🔒 잠김 또는 오프라인).';
+    const lines = d.entries.map(e => `${e.dir ? '📁' : '📄'} ${e.name}`).join('\n');
+    return `허용 폴더 (${fsCwd || '루트'}):\n${lines || '(비어 있음)'}`;
+  }
+  if (op === 'read') {
+    let p = text.match(/([\w가-힣.\-]+\.(?:txt|md|json|csv|log|js|py|html|css))/)?.[1] || '';
+    if (!p) {
+      const r = await fsApi('/api/fs/list?path=' + encodeURIComponent(fsCwd || ''));
+      const d = await r.json();
+      return d.entries ? `어떤 파일을 읽을까요? 파일명을 말씀해 주세요.\n${d.entries.filter(e => !e.dir).map(e => '· ' + e.name).join('\n')}` : '파일 서버 연결 실패';
+    }
+    const full = (fsCwd ? fsCwd + '/' : '') + p;
+    const r = await fsApi('/api/fs/read?path=' + encodeURIComponent(full));
+    const d = await r.json();
+    if (d.content === undefined) return `'${p}' 파일을 찾을 수 없습니다. "파일 목록"이라고 말씀하시면 목록을 보여드립니다.`;
+    return `📄 ${p}:\n${d.content.slice(0, 600)}`;
+  }
+  return null;
+}
+
 async function loadSkills() {
   try {
     const r = await fetch('/api/skills');
@@ -611,6 +687,16 @@ loadModels();
 async function send() {
   const text = cmd.value.trim();
   if (!text) return;
+  const fcmd = fsDetect(text);
+  if (fcmd) {
+    cmd.value = '';
+    bub('me', text);
+    saveChat('me', text);
+    const reply = await runFileCmd(fcmd.op, text);
+    bub('ai', reply);
+    saveChat('ai', reply);
+    return;
+  }
   cmd.value = '';
   const skillTag = activeSkill ? 'skill:' + activeSkill : 'chat';
   const skillName = activeSkill;
