@@ -462,6 +462,26 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
+/* ── 고스톱 웹 서빙 (8793) — 캐시 방지 + 쿼리 버전닝 지원 ──
+   Godot 웹 빌드는 브라우저 캐시(메모리·HTTP)가 pck를 계속 들고 있어 수정이 안 보이는
+   문제가 있음 → 모든 응답 no-store + index.html의 executable에 ?v= 붙여 캐시 우회. */
+const GO_WEB = '/tmp/gostop-web';
+const goServer = http.createServer((req, res) => {
+  const url = new URL(req.url, 'http://x');
+  let p = url.pathname === '/' ? '/index.html' : url.pathname;
+  p = path.normalize(p).replace(/^(\.\.[\/\\])+/, '');
+  const file = path.join(GO_WEB, p);
+  if (!file.startsWith(GO_WEB)) { res.writeHead(403); return res.end(); }
+  fs.readFile(file, (err, data) => {
+    if (err) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); return res.end('404'); }
+    res.writeHead(200, { 'Content-Type': mimeOf(file), 'Cache-Control': 'no-store' });
+    res.end(data);
+  });
+});
+goServer.listen(8793, '0.0.0.0', () => {
+  console.log('[gostop-web] http://0.0.0.0:8793 — no-store 서빙');
+});
+
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`[jarvis-service v3] http://0.0.0.0:${PORT} — 세션 메모리·스킬(${SKILLS.size}종)·브리핑 실데이터 활성`);
 });
