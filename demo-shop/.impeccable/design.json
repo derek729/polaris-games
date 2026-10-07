@@ -1,0 +1,162 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-22T00:00:00Z",
+  "title": "Design System: MONO™ 방출선 셀렉티브 (Emission Line Rail)",
+  "extensions": {
+    "colorMeta": {
+      "continuum-0": { "role": "neutral", "displayName": "Continuum Band 0", "canonical": "#0E0D0B", "tonalRamp": ["#080706", "#0E0D0B", "#12110E", "#161513", "#1C1A17", "#232019", "#2E2B24", "#3B382F"] },
+      "continuum-1": { "role": "neutral", "displayName": "Continuum Band 1", "canonical": "#12110E", "tonalRamp": ["#0A0908", "#12110E", "#181713", "#1F1D19", "#262420", "#2E2B26", "#37342D", "#413D35"] },
+      "continuum-2": { "role": "neutral", "displayName": "Continuum Band 2 — Plate Mat", "canonical": "#161513", "tonalRamp": ["#0C0B0A", "#161513", "#1C1B18", "#232120", "#2A2825", "#322F2B", "#3A3732", "#434039"] },
+      "continuum-3": { "role": "neutral", "displayName": "Continuum Band 3 — Raised", "canonical": "#1C1A17", "tonalRamp": ["#100F0D", "#1C1A17", "#232019", "#2A2721", "#322E27", "#3A352D", "#423D34", "#4B453B"] },
+      "bone": { "role": "neutral", "displayName": "Bone — Primary Ink", "canonical": "#D8D3C7", "tonalRamp": ["#1C1A17", "#3B382F", "#5A554A", "#797366", "#98917F", "#B7B09E", "#D8D3C7", "#EBE7DD"] },
+      "bone-2": { "role": "neutral", "displayName": "Bone Secondary — Dimension Ink", "canonical": "#A39C8F", "tonalRamp": ["#161513", "#332F28", "#4F4A40", "#6B6558", "#877F70", "#A39C8F", "#BFB8AA", "#DBD5C8"] },
+      "bone-3": { "role": "neutral", "displayName": "Bone Tertiary — Faintest Ink", "canonical": "#8D8679", "tonalRamp": ["#141311", "#2C2922", "#454037", "#5D574B", "#756E60", "#8D8679", "#A59E90", "#BDB6A8"] },
+      "hairline": { "role": "neutral", "displayName": "Hairline — Quiet Rule", "canonical": "rgba(216,211,199,.22)", "tonalRamp": ["rgba(216,211,199,.06)", "rgba(216,211,199,.10)", "rgba(216,211,199,.14)", "rgba(216,211,199,.22)", "rgba(216,211,199,.30)", "rgba(216,211,199,.38)", "rgba(216,211,199,.45)", "rgba(216,211,199,.60)"] },
+      "hairline-strong": { "role": "neutral", "displayName": "Hairline Strong — Structural Rule", "canonical": "rgba(216,211,199,.45)", "tonalRamp": ["rgba(216,211,199,.10)", "rgba(216,211,199,.18)", "rgba(216,211,199,.26)", "rgba(216,211,199,.34)", "rgba(216,211,199,.45)", "rgba(216,211,199,.56)", "rgba(216,211,199,.68)", "rgba(216,211,199,.80)"] },
+      "nm-405-violet": { "role": "primary", "displayName": "405nm Violet — Outerwear Line", "canonical": "#7B6BC4", "tonalRamp": ["#2A2347", "#3A315E", "#4A3F76", "#5A4D8D", "#6A5BB0", "#7B6BC4", "#9C90D3", "#BDB5E2"] },
+      "nm-436-blue": { "role": "primary", "displayName": "436nm Blue — Knitwear Line", "canonical": "#5B7BD6", "tonalRamp": ["#16233B", "#1E3050", "#263E66", "#2E4C7C", "#3F63AE", "#5B7BD6", "#8499E1", "#ADBCEB"] },
+      "nm-486-cyan": { "role": "primary", "displayName": "486nm Cyan — Dress Line", "canonical": "#4D9BD1", "tonalRamp": ["#12283A", "#183449", "#1E4159", "#244E6A", "#35719B", "#4D9BD1", "#79B5DF", "#A5D0ED"] },
+      "nm-546-green": { "role": "primary", "displayName": "546nm Green — Lounge Line", "canonical": "#57B374", "tonalRamp": ["#13301E", "#1A3F28", "#214F32", "#285F3C", "#378754", "#57B374", "#82C99A", "#ADDFC1"] },
+      "nm-589-sodium": { "role": "primary", "displayName": "589nm Sodium — The Doubled Line", "canonical": "#E5B84B", "tonalRamp": ["#4A3B13", "#5F4C19", "#755E20", "#8B7027", "#B89139", "#E5B84B", "#ECC873", "#F3DA9B"] },
+      "nm-615-ember": { "role": "primary", "displayName": "615nm Ember — Evening Line", "canonical": "#DE7548", "tonalRamp": ["#47200F", "#5B2A13", "#6F3418", "#833E1D", "#AE5433", "#DE7548", "#E89670", "#F2B999"] },
+      "nm-656-red": { "role": "primary", "displayName": "656nm Red — Jacket Line", "canonical": "#D6574B", "tonalRamp": ["#45120E", "#581913", "#6B2018", "#7E271D", "#A54437", "#D6574B", "#E18079", "#EDA9A4"] },
+      "scrim": { "role": "neutral", "displayName": "Scrim — Sheet Dim", "canonical": "rgba(14,13,11,.78)", "tonalRamp": ["rgba(14,13,11,.30)", "rgba(14,13,11,.40)", "rgba(14,13,11,.50)", "rgba(14,13,11,.60)", "rgba(14,13,11,.68)", "rgba(14,13,11,.78)", "rgba(14,13,11,.86)", "rgba(14,13,11,.94)"] },
+      "instrument-thumb": { "role": "neutral", "displayName": "Instrument Thumb — Scrollbar", "canonical": "#3B382F", "tonalRamp": ["#0E0D0B", "#1C1A17", "#2A2720", "#3B382F", "#4C483C", "#5D5849", "#6E6857", "#7F7864"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display — Wordmark", "purpose": "The house wordmark, once, at the hero. Archivo width axis 72%, ™ as .32em superscript." },
+      "headline": { "displayName": "Headline — Section & Numerals", "purpose": "Section headings and drop-countdown numerals. Archivo width axis 76–80%." },
+      "title": { "displayName": "Title", "purpose": "Look names, sheet title, footer column heads — body font at 550–600." },
+      "body": { "displayName": "Body — The One Size", "purpose": "All Korean/Latin running text at a single 15px; hierarchy is tracking, weight, and ink." },
+      "label": { "displayName": "Label — Micro Ranks", "purpose": "Tracked micro captions, dims, prices, and instrument labels (.10–.3em)." }
+    },
+    "motion": [
+      { "name": "rail-draw", "value": "raildraw 1.1s cubic-bezier(.22,.8,.3,1) 0.15s both (scaleY 0→1)", "purpose": "The master rail draws itself once on load." },
+      { "name": "sodium-landing", "value": "landline 1.35s cubic-bezier(.34,1.45,.5,1) 0.5s both (from translateY(-46vh))", "purpose": "The signature moment: the sodium doubled line lands with one spring overshoot." },
+      { "name": "settle-rise", "value": "rise 0.8s cubic-bezier(.16,1,.3,1) both; delays .25/.4/.55/.7s", "purpose": "Staggered entrance settle for hero blocks." },
+      { "name": "sheet-slide", "value": "transform 0.45s cubic-bezier(.16,1,.3,1)", "purpose": "Product sheet panel slides in over the scrim." },
+      { "name": "tick-response", "value": "transform/background/letter-spacing 0.25s ease", "purpose": "Control response: tick scaleX(1.7), mat band step, tracking breathe." },
+      { "name": "toast-emerge", "value": "transform/opacity 0.4s cubic-bezier(.16,1,.3,1)", "purpose": "Readout toast rises from below and holds 2.4s." },
+      { "name": "reduced-motion", "value": "prefers-reduced-motion: animation/transition none, .rise fully visible", "purpose": "All motion is disabled and end-states shown." }
+    ],
+    "breakpoints": [
+      { "name": "grid-collapse", "value": "1080px" },
+      { "name": "rail-spine", "value": "720px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Tick Button — Line",
+      "kind": "button",
+      "refersTo": "tick-button",
+      "description": "Secondary control the instrument draws: a hairline tick that extends on hover/focus.",
+      "html": "<button class=\"ds-tick-btn\"><span class=\"ds-tick\"></span>드롭 일정</button>",
+      "css": ".ds-tick-btn { display: inline-flex; align-items: center; gap: 14px; background: none; border: none; cursor: pointer; color: var(--bone, #D8D3C7); font-family: 'Pretendard Variable', Pretendard, sans-serif; font-size: 15px; font-weight: 500; letter-spacing: .18em; padding: 12px 2px; transition: letter-spacing .25s ease; } .ds-tick-btn .ds-tick { width: 26px; height: 1px; background: var(--bone, #D8D3C7); transform-origin: left center; transition: transform .25s ease, background .25s ease; } .ds-tick-btn:hover .ds-tick, .ds-tick-btn:focus-visible .ds-tick { transform: scaleX(1.7); } .ds-tick-btn:focus-visible { outline: 1px solid var(--bone, #D8D3C7); outline-offset: 3px; }"
+    },
+    {
+      "name": "Tick Button — Fill",
+      "kind": "button",
+      "refersTo": "tick-button-fill",
+      "description": "Primary action: same grammar inverted — bone border floods to bone on hover, inverting text and tick.",
+      "html": "<button class=\"ds-tick-btn-fill\"><span class=\"ds-tick\">룩 열기</span><span class=\"ds-tick-line\"></span></button>",
+      "css": ".ds-tick-btn-fill { display: inline-flex; align-items: center; justify-content: center; gap: 14px; background: none; border: 1px solid var(--bone, #D8D3C7); cursor: pointer; color: var(--bone, #D8D3C7); font-family: 'Pretendard Variable', Pretendard, sans-serif; font-size: 15px; font-weight: 500; letter-spacing: .18em; padding: 12px 22px; transition: background .25s ease, color .25s ease; } .ds-tick-btn-fill .ds-tick-line { order: 2; width: 26px; height: 1px; background: var(--bone, #D8D3C7); transform-origin: left center; transition: transform .25s ease, background .25s ease; } .ds-tick-btn-fill:hover, .ds-tick-btn-fill:focus-visible { background: var(--bone, #D8D3C7); color: var(--c0, #0E0D0B); } .ds-tick-btn-fill:hover .ds-tick-line, .ds-tick-btn-fill:focus-visible .ds-tick-line { background: var(--c0, #0E0D0B); transform: scaleX(1.7); } .ds-tick-btn-fill:focus-visible { outline: 1px solid var(--bone, #D8D3C7); outline-offset: 3px; }"
+    },
+    {
+      "name": "Look Card",
+      "kind": "card",
+      "refersTo": "look-card",
+      "description": "A registered specimen: graphite plate one band up, inner hairline, wavelength line, tabular price, line-form state.",
+      "html": "<button class=\"ds-look-card\"><div class=\"ds-mat\"><div class=\"ds-photo\"></div></div><div class=\"ds-data\"><span class=\"ds-waveline\"></span><span class=\"ds-no\">LOOK 01 · 405nm 아우터</span><span class=\"ds-price\">₩1,290,000</span><span class=\"ds-name\">캐멀 더블 코트</span><span class=\"ds-state\"><i class=\"ds-stateline\"></i><span>판매 중</span></span></div></button>",
+      "css": ".ds-look-card { display: block; text-align: left; background: none; border: none; cursor: pointer; padding: 0; color: var(--bone, #D8D3C7); font-family: 'Pretendard Variable', Pretendard, sans-serif; font-size: 15px; } .ds-mat { position: relative; background: var(--c2, #161513); padding: 8px; transition: background .25s ease; } .ds-mat::after { content: ''; position: absolute; inset: 8px; border: 1px solid var(--hair, rgba(216,211,199,.22)); pointer-events: none; transition: border-color .25s ease; } .ds-photo { width: 100%; aspect-ratio: 3/4; background: #26241f; } .ds-look-card:hover .ds-mat { background: var(--c3, #1C1A17); } .ds-look-card:hover .ds-mat::after { border-color: var(--hair-strong, rgba(216,211,199,.45)); } .ds-look-card:focus-visible { outline: 1px solid var(--bone, #D8D3C7); outline-offset: 3px; } .ds-data { display: grid; grid-template-columns: auto 1fr auto; column-gap: 12px; padding: 13px 2px 0; } .ds-waveline { height: 22px; width: 1px; background: var(--nm405, #7B6BC4); grid-row: span 2; } .ds-no { font-weight: 340; letter-spacing: .2em; color: var(--bone-2, #A39C8F); } .ds-price { text-align: right; font-weight: 650; letter-spacing: .04em; font-variant-numeric: tabular-nums; } .ds-name { grid-column: 2; font-weight: 550; letter-spacing: .04em; } .ds-state { grid-column: 3; justify-self: end; display: inline-flex; align-items: center; gap: 9px; } .ds-state span { font-weight: 340; letter-spacing: .10em; color: var(--bone-2, #A39C8F); }"
+    },
+    {
+      "name": "State Line Glyphs",
+      "kind": "custom",
+      "refersTo": "line-form-state-rule",
+      "description": "Signature: commerce state as line form, never hue — solid, dashed, half-height, struck.",
+      "html": "<div class=\"ds-states\"><i class=\"ds-stateline\"></i> 판매 중 &nbsp; <i class=\"ds-stateline ds-pending\"></i> 드롭 예정 &nbsp; <i class=\"ds-stateline ds-low\"></i> 품절 임박 &nbsp; <i class=\"ds-stateline ds-out\"></i> 품절</div>",
+      "css": ".ds-states { display: inline-flex; align-items: center; font-family: 'Pretendard Variable', Pretendard, sans-serif; font-size: 15px; letter-spacing: .08em; color: var(--bone-2, #A39C8F); } .ds-stateline { position: relative; display: inline-block; width: 1px; height: 14px; vertical-align: middle; background: var(--bone, #D8D3C7); } .ds-stateline.ds-pending { background: repeating-linear-gradient(to bottom, var(--bone, #D8D3C7) 0 3px, transparent 3px 6px); } .ds-stateline.ds-low { height: 7px; } .ds-stateline.ds-out { background: var(--bone-3, #8D8679); } .ds-stateline.ds-out::after { content: ''; position: absolute; left: -4px; top: 6px; width: 9px; height: 1px; background: var(--bone, #D8D3C7); transform: rotate(-32deg); }"
+    },
+    {
+      "name": "Doubled Sodium Line",
+      "kind": "custom",
+      "refersTo": "nm-589-sodium",
+      "description": "Signature: the 589nm doubled line — two 1px lines 3px apart; sodium is the only wavelength that may ink its own label.",
+      "html": "<div class=\"ds-duo\"><span class=\"ds-spec-doubled\"></span><b class=\"ds-duo-lbl\">589nm</b></div>",
+      "css": ".ds-duo { display: inline-flex; align-items: center; gap: 10px; font-family: 'Pretendard Variable', Pretendard, sans-serif; } .ds-spec-doubled { position: relative; display: inline-block; width: 1px; height: 14px; background: var(--nm589, #E5B84B); } .ds-spec-doubled::after { content: ''; position: absolute; left: 3px; top: 0; bottom: 0; width: 1px; background: var(--nm589, #E5B84B); } .ds-duo-lbl { font-weight: 650; letter-spacing: .04em; color: var(--bone, #D8D3C7); font-variant-numeric: tabular-nums; }"
+    },
+    {
+      "name": "Mast Nav Link",
+      "kind": "nav",
+      "refersTo": "nav-link",
+      "description": "Fixed-masthead link with a 14px hairline tick that extends and brightens on hover and scroll-spy active.",
+      "html": "<nav class=\"ds-mast-nav\"><a class=\"ds-nav-link\" href=\"#collection\"><i></i>컬렉션</a><a class=\"ds-nav-link ds-active\" href=\"#editor\"><span class=\"ds-duo-tick\"><i></i><i></i></span>589</a></nav>",
+      "css": ".ds-mast-nav { display: flex; align-items: center; gap: 28px; background: var(--c0, #0E0D0B); padding: 20px 24px; border-bottom: 1px solid var(--hair, rgba(216,211,199,.22)); } .ds-nav-link { display: inline-flex; align-items: center; gap: 9px; text-decoration: none; font-family: 'Pretendard Variable', Pretendard, sans-serif; font-size: 15px; font-weight: 450; letter-spacing: .16em; color: var(--bone-2, #A39C8F); transition: color .2s ease; } .ds-nav-link i { width: 14px; height: 1px; background: var(--bone-3, #8D8679); transform-origin: left center; transition: transform .2s ease, background .2s ease; font-style: normal; } .ds-nav-link:hover, .ds-nav-link.ds-active { color: var(--bone, #D8D3C7); } .ds-nav-link:hover i, .ds-nav-link.ds-active i { transform: scaleX(1.7); background: var(--bone, #D8D3C7); } .ds-nav-link:focus-visible { outline: 1px solid var(--bone, #D8D3C7); outline-offset: 3px; } .ds-duo-tick { width: 5px; height: 12px; position: relative; display: inline-block; } .ds-duo-tick i { position: absolute; left: 0; top: 0; bottom: 0; width: 1px; background: var(--nm589, #E5B84B); } .ds-duo-tick i:last-child { left: 4px; }"
+    },
+    {
+      "name": "Legend Key",
+      "kind": "chip",
+      "refersTo": "legend-key",
+      "description": "Legend pairing of a wavelength hairline or state line with a tracked label and 650-weight nm value.",
+      "html": "<div class=\"ds-legend-key\"><i class=\"ds-specl\"></i><b>436</b> 니트</div>",
+      "css": ".ds-legend-key { display: inline-flex; align-items: center; gap: 9px; font-family: 'Pretendard Variable', Pretendard, sans-serif; font-size: 15px; font-weight: 400; letter-spacing: .08em; color: var(--bone-2, #A39C8F); } .ds-legend-key b { font-weight: 650; color: var(--bone, #D8D3C7); letter-spacing: .04em; font-variant-numeric: tabular-nums; } .ds-specl { display: inline-block; width: 1px; height: 14px; background: var(--nm436, #5B7BD6); }"
+    },
+    {
+      "name": "Size Chip",
+      "kind": "chip",
+      "refersTo": "size-chip",
+      "description": "Sheet size selector: hairline border, selected state strengthens border and ink — form, not fill.",
+      "html": "<div class=\"ds-sizes\"><button class=\"ds-size\" aria-pressed=\"false\">S</button><button class=\"ds-size ds-selected\" aria-pressed=\"true\">M</button><button class=\"ds-size\" aria-pressed=\"false\">L</button></div>",
+      "css": ".ds-sizes { display: flex; gap: 10px; } .ds-size { flex: 1; padding: 12px 0; background: none; cursor: pointer; border: 1px solid var(--hair, rgba(216,211,199,.22)); font-family: 'Pretendard Variable', Pretendard, sans-serif; font-size: 15px; letter-spacing: .2em; color: var(--bone-2, #A39C8F); transition: border-color .2s ease, color .2s ease; } .ds-size:hover { border-color: var(--hair-strong, rgba(216,211,199,.45)); color: var(--bone, #D8D3C7); } .ds-size.ds-selected, .ds-size[aria-pressed=\"true\"] { border-color: var(--bone, #D8D3C7); color: var(--bone, #D8D3C7); } .ds-size:focus-visible { outline: 1px solid var(--bone, #D8D3C7); outline-offset: 3px; }"
+    },
+    {
+      "name": "Toast",
+      "kind": "custom",
+      "refersTo": "toast",
+      "description": "The instrument's readout: centered-bottom status line on the raised band with a strong hairline border.",
+      "html": "<div class=\"ds-toast\">LOOK 01 캐멀 더블 코트 — 선분에 기록했습니다</div>",
+      "css": ".ds-toast { display: inline-block; background: var(--c3, #1C1A17); border: 1px solid var(--hair-strong, rgba(216,211,199,.45)); padding: 14px 26px; font-family: 'Pretendard Variable', Pretendard, sans-serif; font-size: 15px; font-weight: 450; letter-spacing: .12em; color: var(--bone, #D8D3C7); }"
+    },
+    {
+      "name": "Close Button",
+      "kind": "button",
+      "refersTo": "close-button",
+      "description": "Sheet close control: hairline-strong border on the panel band, floods bone on hover; X drawn as 1px stroke lines.",
+      "html": "<button class=\"ds-close\">닫기<svg width=\"10\" height=\"10\" viewBox=\"0 0 10 10\" aria-hidden=\"true\" style=\"margin-left:2px\"><path d=\"M1 1 L9 9 M9 1 L1 9\" stroke=\"currentColor\" stroke-width=\"1\"/></svg></button>",
+      "css": ".ds-close { display: inline-flex; align-items: center; gap: 10px; background: var(--c1, #12110E); cursor: pointer; border: 1px solid var(--hair-strong, rgba(216,211,199,.45)); color: var(--bone, #D8D3C7); font-family: 'Pretendard Variable', Pretendard, sans-serif; font-size: 15px; font-weight: 500; letter-spacing: .2em; padding: 10px 14px; transition: background .25s ease, color .25s ease; } .ds-close:hover, .ds-close:focus-visible { background: var(--bone, #D8D3C7); color: var(--c0, #0E0D0B); } .ds-close:focus-visible { outline: 1px solid var(--bone, #D8D3C7); outline-offset: 3px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "방출선 레일 — the catalog is a spectrographic measuring instrument (카탈로그는 분광 계측기다)",
+    "overview": "The shop presents itself as a calibrated spectroscope. Every product registers as an emission line on one master rail spanning the visible band (380–700nm); category is wavelength, and the only chroma on the page is the seven physically meaningful spectral hairlines. Everything else is a warm charcoal continuum whose depth comes solely from band steps, written over with bone-toned legends. It rejects both the white-grid selective default and the gold-serif dark-luxury counter-default.\n\nTypography is a single voice: one grotesque for all Korean/Latin running text at one size (15px), where hierarchy is produced by tracking (.02–.3em), weight (340–650), and ink (the bone ladder) — never by size or color. A condensed variable grotesque (Archivo, width axis 72–80%) is reserved for the house wordmark, section headlines, and instrument numerals. All figures are tabular. Photography is desaturated to graphite, matted on plates with a 1px bone inner hairline, under one fixed 5% film-grain overlay that is the plate's own texture. Motion has exactly one authored moment — the rail draws itself and the sodium doubled line lands with a single spring overshoot — after which everything settles and responds in quiet 0.25–0.45s eases.\n\nWhere the build diverged from the direction contract, the build won and is canonized here: the contract confined color strictly to wavelength hairlines, but the shipped page also inks sodium's own vertical rail label, the global caret, and the NOW label's top rule in --nm589 (the Sodium Ink exception below); and the wavelength legend carries an explicit doubled-line entry (589 이중선 — 에디터) alongside the six single-line categories.",
+    "keyCharacteristics": [
+      "Charcoal continuum ground (four bands, no gradients, no shadows) with bone legends and 1px hairlines",
+      "Chroma exists only as seven wavelength emission lines; sodium 589 is doubled and outranks its neighbours",
+      "State is line form, never hue: solid = live, dashed = drop pending, half-height = nearly sold out, struck = sold out",
+      "One text size (15px) for all UI copy; hierarchy by tracking, weight, and ink; tabular numerals everywhere",
+      "The fixed master rail is the page's spine and its only ornament; photography is graphite-matted with provenance recorded"
+    ],
+    "rules": [
+      { "name": "The Emission-Only Chroma Rule", "body": "No color outside the seven wavelengths (plus the bone/charcoal neutrals) may appear anywhere. A wavelength is used only where it names a physical nm position: a category line, a drop tick, the doubled sodium. The Sodium Ink exception: --nm589 may additionally serve as ink for sodium's own label, the caret, and the NOW rule — nothing else, no other wavelength gets ink duty.", "section": "colors" },
+      { "name": "The Line-Form State Rule", "body": "Commerce state is never communicated by hue. Solid 1px line = 판매 중 (live); dashed line (repeating-linear-gradient(to bottom, bone 0 3px, transparent 3px 6px) on a 1px-wide element) = 드롭 예정 (pending); half-height line (7px of 14px) = 품절 임박 (nearly gone); struck line (1px diagonal through it) = 품절 (sold out).", "section": "colors" },
+      { "name": "The Band-Only Depth Rule", "body": "Depth is a continuum band step (c0 → c1 → c2 → c3) or the scrim — never a gradient, never a shadow.", "section": "colors" },
+      { "name": "The One-Size Rule", "body": "15px is the only size for UI and reading text. Hierarchy is tracking (.02–.3em), weight (340–650), and ink (bone ladder). The only other sizes are Archivo display/numerals and the 10–12px engraved instrument labels. Never add a mid-range text size to create emphasis.", "section": "typography" },
+      { "name": "The Tabular-Ink Rule", "body": "Every figure is tabular (tabular-nums is set on body and inherited); emphasis among figures comes from weight (650) and ink, never from a different family or size.", "section": "typography" },
+      { "name": "The No-Shadow Rule", "body": "Never introduce box-shadow, text-shadow, or drop-shadow. If an element needs to sit higher, step its continuum band or open the scrim. The grain overlay is the only permitted global texture and stays at 5% opacity, non-interactive, topmost but under the toast's z-order intent (grain 60, sheet 80, toast 90).", "section": "elevation" }
+    ],
+    "dos": [
+      "Do express every state as line form (solid/dashed/half/struck) with the exact grammar in the Line-Form State Rule — including the repeating-linear-gradient(to bottom, var(--bone) 0 3px, transparent 3px 6px) dash, which is the world's own drafting mark for \"registered, not yet live\".",
+      "Do keep one 15px text size; build hierarchy with tracking (.02–.3em), weight (340–650), and the bone ink ladder, and set all figures tabular.",
+      "Do mount photography as graphite plates: one-band-up mat, 8–10px padding, 1px inner bone hairline, filter: contrast(1.02) on the image; record provenance for every shipped raster (see assets/PROVENANCE.json).",
+      "Do keep the 5% fixed grain overlay as the single global texture, and let hover raise surfaces exactly one continuum band with a hairline strengthen (.22 → .45).",
+      "Do place chroma only at physically meaningful nm positions, and reserve doubled-line sodium outranking for exactly one emphasis per view."
+    ],
+    "donts": [
+      "Don't use gradients, box/text/fit shadows, or border-radius other than 0 — depth is band steps and the scrim; corners are square.",
+      "Don't encode meaning in hue (no red errors, no green confirmations); state, selection, and emphasis are line form, ink, and weight.",
+      "Don't introduce any text color outside the bone ladder and the seven wavelength values (with the sodium-ink exception), or any size between the 15px body rank and the Archivo display scale.",
+      "Don't animate beyond the grammar: one authored rail moment on load, settle rises (.8s cubic-bezier(.16,1,.3,1) with .25–.7s stagger), .25s control response, .45s sheet slide — and always honor prefers-reduced-motion by disabling all of it.",
+      "Don't let the grid's density changes resize type; breakpoints shorten the band, collapse columns, and hide graduation labels — never the type."
+    ]
+  }
+}

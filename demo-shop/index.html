@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MONO™ — 25AW 스펙트럼 드롭 · 방출선 셀렉티브</title>
+<meta name="description" content="디자인 품질 검증용 합성 데모 — 프리미엄 패션 셀렉티브샵. 컬렉션을 방출선으로 등록합니다.">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,300..800&display=swap">
+<style>
+/* ============================================================
+   MONO™ — emission line rail
+   charcoal continuum · bone legends · spectral hairlines
+   state = line form (solid / dashed / half / struck), never hue
+   ============================================================ */
+:root{
+  --c0:#0E0D0B;   /* continuum band 0 — deepest */
+  --c1:#12110E;   /* band 1 */
+  --c2:#161513;   /* band 2 — plate mat */
+  --c3:#1C1A17;   /* band 3 — raised */
+  --ash:#232019;  /* prose plate */
+  --bone:#D8D3C7;
+  --bone-2:#A39C8F;
+  --bone-3:#8D8679;
+  --hair:rgba(216,211,199,.22);
+  --hair-strong:rgba(216,211,199,.45);
+  /* spectral emission lines — the only chroma on the page */
+  --nm405:#7B6BC4;
+  --nm436:#5B7BD6;
+  --nm486:#4D9BD1;
+  --nm546:#57B374;
+  --nm589:#E5B84B;  /* sodium — doubled, outranks its neighbours */
+  --nm615:#DE7548;
+  --nm656:#D6574B;
+  --rail-x:clamp(72px,13vw,200px);
+  --gutter:clamp(20px,3vw,44px);
+  --font-body:"Pretendard Variable",Pretendard,-apple-system,"Malgun Gothic",sans-serif;
+  --font-disp:"Archivo","Pretendard Variable",sans-serif;
+  --size:15px; /* the single text size — hierarchy is tracking and ink */
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+body{
+  background:var(--c0);
+  color:var(--bone);
+  font-family:var(--font-body);
+  font-size:var(--size);
+  font-weight:400;
+  letter-spacing:.01em;
+  line-height:1.75;
+  -webkit-font-smoothing:antialiased;
+  font-variant-numeric:tabular-nums;
+}
+::selection{background:var(--bone);color:var(--c0)}
+*{caret-color:var(--nm589)}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:var(--c0)}
+::-webkit-scrollbar-thumb{background:#3B382F;border:2px solid var(--c0);border-radius:0}
+html{scrollbar-width:thin;scrollbar-color:#3B382F var(--c0)}
+img{display:block;max-width:100%}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+a{color:inherit}
+:focus{outline:none}
+:focus-visible{outline:1px solid var(--bone);outline-offset:3px}
+
+/* film grain — the plate's own texture */
+.grain{
+  position:fixed;inset:0;z-index:60;pointer-events:none;opacity:.05;
+  background-image:url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGAAAABgCAAAAADH8yjkAAAACXBIWXMAAAABAAAAAQBPJcTWAAADmUlEQVR4nGNgYPB4Y6u83q1zSrvIe5PTGqw+VzZMCJWuz2iNqtq4ufivpcjJRXpXd00xmH3n77mnnWpXlryclObq1dXXs+lxmtPX4ENcLg/+NDLkyT13FNX2+CakoxMou829QtnDzCBd9meXFUN3c2zzr2q5iwf4U3N25siJO71YaaeZFumQIs1uMVsv8gLHg4hendJa05Aa8wCeZtdrP5a48K57qv5MWkIoXO9Az+drC/Zd3H1TdO696d6VyvebJ23cqSTSxaaZEn4qKP5p/H4OBrFZKwu9b6WL3jv5bDJv3OTb//Z7tZ7/9unIYc2nRQKP72QvWse3t/j9sivPTt2+KHdvd86XVt53zyONLvAVi86YNT0/YXKbnPqM3wse9q4LZr3bY9RQmKx7PXOhoThnSyond80kKYYlN5mOK+oJhmt/75qr8ODGn023he9MmhN8WXi2gP/TCPnpypoC/I9Ntx+Zcmkq6/cv1syz9eIOFZ+f8tCoKmna1X9p7ALSR1mKsm7HRR40Cd0e3nDlebrKv67Q3EermM2NpFlN3RkU1z79aR0jui/afmeHdN9H+7/VFVM3PiudnqGpe7oxadOHhzKfBXj59LVSH/hkXT9uwrP3Bk/Nyl+9r+5V/sozepkRa/i1/0hSK8/TjiNL3q+WvrLB8YHwXJcIWcup8+8cvf5jwlyGBfONGVv9DN/Mu/p2S8olm8ip986x7FkUp6H/cmGJ8YlduVGh+SW/jD6Y6SVOMGm9+C9nN9vqEjN5jlhNqfpZV7+cf5T7df2h/InPf1S3Sr1ePqm0JTlL0ejDjq57OntPT0279o+T4c68sp+tzAn8B73/nTp0THztpPDicylzJB+kMKQKtWw51PfZ4DVHvrvemuSW4A6hxzu3KCe5J93vdBOOa/lnzRv7Llo9PPa8TInrgX/XncXSVp632fdj0ynbe7MWKd9fyXz8BU8yw2gyHU2mo8l0NJmOJlNqJNN/mmKcN1MlXU6Vd9tKem3sLD3G3PW+MM/gcpjS6yuaryfoZwj+NFv+xLT4NVf5g7C7N5q4t1Wq/OVPW77t14SyvaIHov8yPjj3ztvz/oPly7lPakm9ZHY35UoMC1ijuEr+/taVDqP5YDQfDIV8MJpMR5PpaDIdTaajyXS0VTGaD0bzwWhxPZpMR0wyHS2uR/PBaD4YLa5Hk+loMh1NpqPJdLRVMZoPRvPBaHE9mkxHUDKldXENAFBf1M9KaIkxAAAAAElFTkSuQmCC");
+}
+
+/* ============ micro type ranks (tracking & ink, one size) ============ */
+.t-micro{font-size:var(--size);font-weight:340;letter-spacing:.24em;color:var(--bone-2)}
+.t-label{font-size:var(--size);font-weight:450;letter-spacing:.14em;color:var(--bone)}
+.t-dim{font-size:var(--size);font-weight:340;letter-spacing:.10em;color:var(--bone-2)}
+.t-price{font-size:var(--size);font-weight:650;letter-spacing:.04em;font-variant-numeric:tabular-nums}
+.t-hero-num{font-family:var(--font-disp);font-stretch:78%;font-weight:560;font-variant-numeric:tabular-nums;letter-spacing:.015em}
+
+/* ============ spectral & state lines ============ */
+.specl{display:inline-block;width:1px;vertical-align:middle;background:currentColor}
+.spec-doubled{position:relative;display:inline-block;width:1px;vertical-align:middle;background:var(--nm589)}
+.spec-doubled::after{content:"";position:absolute;left:3px;top:0;bottom:0;width:1px;background:var(--nm589)}
+.stateline{position:relative;display:inline-block;width:1px;height:14px;vertical-align:middle;background:var(--bone)}
+.stateline.pending{background:repeating-linear-gradient(to bottom,var(--bone) 0 3px,transparent 3px 6px)}
+.stateline.low{height:7px}
+.stateline.out{background:var(--bone-3)}
+.stateline.out::after{content:"";position:absolute;left:-4px;top:6px;width:9px;height:1px;background:var(--bone);transform:rotate(-32deg)}
+
+/* ============ tick button — control drawn by the instrument ============ */
+.tickbtn{
+  display:inline-flex;align-items:center;gap:14px;
+  font-size:var(--size);font-weight:500;letter-spacing:.18em;color:var(--bone);
+  padding:12px 2px;position:relative;transition:letter-spacing .25s ease;
+}
+.tickbtn .tick{width:26px;height:1px;background:var(--bone);transform-origin:left center;transition:transform .25s ease,background .25s ease}
+.tickbtn:hover .tick,.tickbtn:focus-visible .tick{transform:scaleX(1.7)}
+.tickbtn--fill:hover{color:var(--c0)}
+.tickbtn--fill{padding:12px 22px;border:1px solid var(--bone)}
+.tickbtn--fill .tick{order:2}
+.tickbtn--fill:hover{background:var(--bone)}
+.tickbtn--fill:hover .tick{background:var(--c0)}
+
+/* ============ master rail ============ */
+.rail{
+  position:fixed;top:0;bottom:0;left:var(--rail-x);z-index:40;
+  width:1px;background:var(--hair-strong);
+  transform-origin:top center;
+}
+.rail.land{animation:raildraw 1.1s cubic-bezier(.22,.8,.3,1) .15s both}
+@keyframes raildraw{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+.rail .grad{
+  position:absolute;left:0;width:7px;height:1px;background:var(--hair);
+}
+.rail .grad.major{width:14px;background:var(--hair-strong)}
+.rail .grad span{
+  position:absolute;right:10px;top:-0.72em;white-space:nowrap;
+  font-size:11px;letter-spacing:.14em;color:var(--bone-2);font-variant-numeric:tabular-nums;
+}
+.rail .cap{position:absolute;left:0;width:22px;height:1px;background:var(--hair-strong)}
+/* sodium landing — the signature: slides to position, damps with one overshoot */
+.rail .sodium{
+  position:absolute;left:-2px;width:5px;height:120px;
+}
+.rail .sodium i{position:absolute;left:0;top:0;bottom:0;width:1px;background:var(--nm589)}
+.rail .sodium i:nth-child(2){left:4px}
+.rail .sodium em{
+  position:absolute;left:12px;top:2px;writing-mode:vertical-rl;font-style:normal;
+  font-size:11px;letter-spacing:.28em;color:var(--nm589);white-space:nowrap;
+}
+.rail.land .sodium{animation:landline 1.35s cubic-bezier(.34,1.45,.5,1) .5s both}
+@keyframes landline{
+  from{transform:translateY(-46vh);opacity:0}
+  60%{opacity:1}
+  to{transform:translateY(0);opacity:1}
+}
+/* user's collected line segments — added by the cart */
+.rail .mine{position:absolute;left:-1px;width:3px;height:22px;background:var(--bone);opacity:.85}
+.rail .mine em{position:absolute;left:8px;top:0;writing-mode:vertical-rl;font-style:normal;font-size:10px;letter-spacing:.22em;color:var(--bone-2);white-space:nowrap}
+
+/* ============ masthead ============ */
+.mast{
+  position:fixed;top:0;left:0;right:0;z-index:50;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 var(--gutter);height:64px;
+  background:var(--c0);border-bottom:1px solid var(--hair);
+}
+.mast nav a .duo-tick{width:5px;height:12px;position:relative;display:inline-block}
+.mast nav a .duo-tick i{position:absolute;left:0;top:0;bottom:0;width:1px;background:var(--nm589)}
+.mast nav a .duo-tick i:last-child{left:4px}
+.mast .brand{display:flex;align-items:baseline;gap:14px;text-decoration:none}
+.mast .brand b{
+  font-family:var(--font-disp);font-stretch:74%;font-weight:640;font-size:22px;
+  letter-spacing:.04em;color:var(--bone);
+}
+.mast .brand span{font-size:12px;letter-spacing:.28em;color:var(--bone-2)}
+.mast nav{display:flex;align-items:center;gap:clamp(14px,2.4vw,34px)}
+.mast nav a{
+  display:inline-flex;align-items:center;gap:9px;text-decoration:none;
+  font-size:var(--size);font-weight:450;letter-spacing:.16em;color:var(--bone-2);
+  transition:color .2s ease;
+}
+.mast nav a i{width:14px;height:1px;background:var(--bone-3);transform-origin:left center;transition:transform .2s ease,background .2s ease;font-style:normal}
+.mast nav a:hover{color:var(--bone)}
+.mast nav a:hover i{transform:scaleX(1.7);background:var(--bone)}
+.mast nav a.active{color:var(--bone)}
+.mast nav a.active i{transform:scaleX(1.7);background:var(--bone)}
+#cartN{font-variant-numeric:tabular-nums;color:var(--bone);font-weight:650}
+
+/* ============ content frame ============ */
+.frame{padding-left:calc(var(--rail-x) + var(--gutter));padding-right:var(--gutter)}
+main>section,footer{position:relative}
+
+/* ============ hero ============ */
+.hero{min-height:100svh;display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,.9fr);gap:var(--gutter);align-items:end;padding-top:120px;padding-bottom:56px}
+.hero-foot{
+  grid-column:1 / -1;display:flex;flex-wrap:wrap;gap:14px 40px;justify-content:space-between;
+  border-top:1px solid var(--hair);padding-top:14px;margin-top:10px;
+}
+.hero-foot span{font-size:var(--size);font-weight:340;letter-spacing:.22em;color:var(--bone-2);font-variant-numeric:tabular-nums}
+.hero-foot .duo{display:inline-flex;align-items:center;gap:9px;color:var(--bone)}
+.hero-copy{padding-bottom:12px}
+.hero-copy .wordmark{
+  font-family:var(--font-disp);font-stretch:72%;font-weight:620;
+  font-size:clamp(3.4rem,7.2vw,6rem);line-height:.94;letter-spacing:.015em;color:var(--bone);
+}
+.hero-copy .wordmark sup{font-size:.32em;font-weight:420;vertical-align:1.9em;letter-spacing:.08em}
+.hero-copy .channel{margin-top:18px}
+.hero-copy .statement{
+  max-width:34em;margin-top:26px;color:var(--bone);
+  font-weight:350;letter-spacing:.02em;
+}
+.hero-copy .readout{
+  display:flex;flex-wrap:wrap;gap:0;margin-top:34px;border-top:1px solid var(--hair);
+}
+.hero-copy .readout div{
+  padding:14px 26px 2px 0;margin-right:26px;border-right:1px solid var(--hair);
+}
+.hero-copy .readout div:last-child{border-right:none;margin-right:0;padding-right:0}
+.hero-copy .readout b{display:block;font-weight:650;letter-spacing:.10em;color:var(--bone)}
+.hero-copy .readout span{font-size:var(--size);font-weight:340;letter-spacing:.2em;color:var(--bone-2)}
+.hero-copy .readout .duo b{color:var(--bone);display:inline-flex;align-items:center;gap:10px}
+.hero-cta{display:flex;align-items:center;gap:30px;margin-top:38px}
+.hero-plate{position:relative}
+.hero-plate figure{position:relative;background:var(--c2);padding:10px}
+.hero-plate img{width:100%;height:auto;aspect-ratio:4/5;object-fit:cover;filter:contrast(1.02)}
+.hero-plate figure::after{content:"";position:absolute;inset:10px;border:1px solid var(--hair);pointer-events:none}
+.hero-plate figcaption{display:flex;justify-content:space-between;gap:16px;padding:12px 2px 0}
+/* entrance — staggered settle, exponential ease-out */
+.rise{opacity:0;transform:translateY(14px)}
+body.land .rise{animation:rise .8s cubic-bezier(.16,1,.3,1) both}
+body.land .rise.d1{animation-delay:.25s}
+body.land .rise.d2{animation-delay:.4s}
+body.land .rise.d3{animation-delay:.55s}
+body.land .rise.d4{animation-delay:.7s}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+
+/* ============ section headings ============ */
+.sect{padding:clamp(84px,11vh,140px) clamp(24px,4vw,56px)}
+.band-1{
+  background:var(--c1); /* continuum steps a tone */
+  margin-left:calc(var(--gutter) * -1);
+  margin-right:calc(var(--gutter) * -1);
+}
+.sect-head{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;flex-wrap:wrap;margin-bottom:14px}
+.sect-head h2{
+  font-family:var(--font-disp);font-stretch:76%;font-weight:580;
+  font-size:clamp(1.9rem,3.4vw,3rem);line-height:1;letter-spacing:.02em;color:var(--bone);
+}
+.sect-head .kr{font-size:var(--size);font-weight:450;letter-spacing:.26em;color:var(--bone-2)}
+.sect-lead{max-width:66ch;color:var(--bone-2);font-weight:350;margin-bottom:44px}
+
+/* ============ legend ============ */
+.legend{
+  display:flex;flex-wrap:wrap;gap:26px 40px;padding:18px 0 26px;
+  border-top:1px solid var(--hair);border-bottom:1px solid var(--hair);margin-bottom:54px;
+}
+.legend .grp{display:flex;flex-wrap:wrap;gap:18px 30px;align-items:center}
+.legend .grp>.t-micro{width:100%;letter-spacing:.3em}
+.legend dl{display:flex;flex-wrap:wrap;gap:18px 30px}
+.legend .key{display:inline-flex;align-items:center;gap:9px;font-size:var(--size);font-weight:400;letter-spacing:.08em;color:var(--bone-2)}
+.legend .key b{font-weight:650;color:var(--bone);letter-spacing:.04em}
+
+/* ============ looks grid ============ */
+.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:clamp(18px,2.4vw,34px)}
+.look{position:relative;text-align:left;padding:0;min-width:0}
+.look .mat{position:relative;background:var(--c2);padding:8px;transition:background .25s ease}
+.look:hover .mat{background:var(--c3)}
+.look img{width:100%;aspect-ratio:3/4;object-fit:cover;filter:contrast(1.02)}
+.look .mat::after{content:"";position:absolute;inset:8px;border:1px solid var(--hair);pointer-events:none;transition:border-color .25s ease}
+.look:hover .mat::after{border-color:var(--hair-strong)}
+.look .data{display:grid;grid-template-columns:auto 1fr auto;align-items:center;column-gap:12px;padding:13px 2px 0}
+.look .waveline{height:22px;width:1px;background:currentColor;grid-row:span 2}
+.look .no{font-size:var(--size);font-weight:340;letter-spacing:.2em;color:var(--bone-2);min-width:0}
+.look .price{text-align:right;letter-spacing:.02em}
+.look h3{font-size:var(--size);font-weight:550;letter-spacing:.04em;color:var(--bone);grid-column:2;min-width:0}
+.look .state{display:inline-flex;align-items:center;gap:9px;grid-column:3;justify-self:end}
+.look .state span{font-size:var(--size);font-weight:340;letter-spacing:.10em;color:var(--bone-2)}
+.look .state.out span{color:var(--bone-3)}
+/* grid rhythm — density varies, one tall anchor per visual row */
+.s3{grid-column:span 3}.s4{grid-column:span 4}.s6{grid-column:span 6}.s8{grid-column:span 8}
+.tall img{aspect-ratio:3/4.6}
+
+/* ============ drop schedule band ============ */
+.band-0{
+  background:var(--c0);
+  margin-left:calc(var(--gutter) * -1);
+  margin-right:calc(var(--gutter) * -1);
+}
+.count{display:flex;align-items:flex-end;justify-content:space-between;gap:30px;flex-wrap:wrap;margin-bottom:66px}
+.count .nums{
+  font-family:var(--font-disp);font-stretch:80%;font-weight:560;
+  font-size:clamp(2.6rem,6vw,4.6rem);line-height:1;letter-spacing:.02em;color:var(--bone);
+  font-variant-numeric:tabular-nums;
+}
+.count .nums small{font-size:.42em;font-weight:420;letter-spacing:.18em;color:var(--bone-2);margin:0 .35em 0 .12em}
+.count .side{max-width:30em;color:var(--bone-2);font-weight:350}
+.specband{position:relative;height:118px;margin:0 2px 8px}
+.specband .axis{position:absolute;left:0;right:0;top:58px;height:1px;background:var(--hair-strong)}
+.specband .axis i{position:absolute;top:0;bottom:0;width:1px;background:var(--hair)}
+.specband .axis i.major{background:var(--hair-strong)}
+.specband .axis i span{
+  position:absolute;top:10px;left:50%;transform:translateX(-50%);
+  font-size:11px;letter-spacing:.12em;color:var(--bone-3);font-style:normal;font-variant-numeric:tabular-nums;
+}
+.drop-tick{position:absolute;top:0;width:1px;height:58px;background:var(--bone)}
+.drop-tick.pending{background:repeating-linear-gradient(to bottom,var(--bone) 0 3px,transparent 3px 6px)}
+.drop-tick.low{height:29px}
+.drop-tick.dbl{height:58px;background:var(--nm589)}
+.drop-tick.dbl::after{content:"";position:absolute;left:3px;top:0;bottom:0;width:1px;background:var(--nm589)}
+.drop-tick .lbl{
+  position:absolute;top:64px;left:0;transform:translateX(-50%);white-space:nowrap;text-align:center;
+}
+.drop-tick.end .lbl{transform:translateX(-100%);text-align:right}
+.drop-tick .lbl b{display:block;font-weight:650;letter-spacing:.12em;color:var(--bone)}
+.drop-tick .lbl span{font-size:var(--size);font-weight:340;letter-spacing:.18em;color:var(--bone-2)}
+.drop-tick.dbl .lbl b{color:var(--bone)}
+.drop-tick.dbl .lbl b{margin-top:2px}
+.drop-tick.dbl .lbl .now{
+  display:block;font-size:var(--size);font-weight:650;letter-spacing:.3em;color:var(--bone);
+  border-top:1px solid var(--nm589);padding-top:5px;margin-bottom:4px;
+}
+.drop-tick.dbl .lbl span{color:var(--bone)}
+
+/* ============ editor 589 ============ */
+.editor-wrap{display:grid;grid-template-columns:minmax(0,.92fr) minmax(0,1fr);gap:var(--gutter);align-items:center}
+.editor-wrap figure{position:relative;background:var(--c2);padding:10px}
+.editor-wrap img{width:100%;aspect-ratio:4/5;object-fit:cover}
+.editor-wrap figure::after{content:"";position:absolute;inset:10px;border:1px solid var(--hair)}
+.editor-copy .duo-big{display:flex;align-items:flex-start;gap:22px;margin-bottom:26px}
+.editor-copy .duo-big .spec-doubled{height:64px;margin-top:6px}
+.editor-copy h3{
+  font-family:var(--font-disp);font-stretch:78%;font-weight:560;
+  font-size:clamp(1.5rem,2.6vw,2.2rem);line-height:1.1;letter-spacing:.02em;color:var(--bone);
+}
+.editor-copy p{max-width:34em;color:var(--bone-2);font-weight:350}
+.editor-copy .meta{display:flex;gap:26px;margin:26px 0 30px;border-top:1px solid var(--hair);padding-top:16px}
+
+/* ============ chassis / footer ============ */
+.chassis{
+  background:var(--c2);border-top:1px solid var(--hair);
+  margin-top:40px;
+  margin-left:calc(var(--gutter) * -1);
+  margin-right:calc(var(--gutter) * -1);
+  padding-left:0;padding-right:0;
+}
+.chassis-in{
+  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--gutter);
+  padding:56px 0 40px;
+}
+.chassis h4{font-size:var(--size);font-weight:600;letter-spacing:.22em;color:var(--bone);margin-bottom:14px}
+.chassis p,.chassis address{font-style:normal;font-weight:340;letter-spacing:.06em;color:var(--bone-2);max-width:34em}
+.chassis .fine{border-top:1px solid var(--hair);padding:18px 0 calc(26px + env(safe-area-inset-bottom,0px));display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
+.chassis .fine span{font-size:var(--size);font-weight:340;letter-spacing:.14em;color:var(--bone-3)}
+
+/* ============ product sheet — the plate that blooms ============ */
+.sheet{position:fixed;inset:0;z-index:80;display:none}
+.sheet.open{display:block}
+.sheet .scrim{position:absolute;inset:0;background:rgba(14,13,11,.78)}
+.sheet .panel{
+  position:absolute;top:0;right:0;bottom:0;width:min(560px,94vw);
+  background:var(--c1);border-left:1px solid var(--hair-strong);
+  transform:translateX(100%);transition:transform .45s cubic-bezier(.16,1,.3,1);
+  overflow-y:auto;
+}
+.sheet.in .panel{transform:translateX(0)}
+.sheet .panel-in{padding:calc(64px + 26px) clamp(24px,3vw,40px) 48px}
+.sheet .close{
+  position:fixed;top:22px;right:clamp(24px,3vw,40px);z-index:2;
+  display:inline-flex;align-items:center;gap:10px;font-size:var(--size);font-weight:500;letter-spacing:.2em;
+  padding:10px 14px;border:1px solid var(--hair-strong);color:var(--bone);background:var(--c1);
+}
+.sheet .close:hover{background:var(--bone);color:var(--c0)}
+.sheet figure{position:relative;background:var(--c2);padding:8px;margin-bottom:20px}
+.sheet figure img{width:100%;aspect-ratio:3/4;object-fit:cover}
+.sheet figure::after{content:"";position:absolute;inset:8px;border:1px solid var(--hair)}
+.sheet .rows{margin:22px 0 8px;border-top:1px solid var(--hair)}
+.sheet .rows div{display:flex;justify-content:space-between;gap:18px;padding:13px 2px;border-bottom:1px solid var(--hair)}
+.sheet .rows span{font-weight:340;letter-spacing:.18em;color:var(--bone-2)}
+.sheet .rows b{font-weight:550;letter-spacing:.06em;color:var(--bone);text-align:right}
+.sheet .sizes{display:flex;gap:10px;margin:22px 0 30px}
+.sheet .sizes button{
+  flex:1;padding:12px 0;border:1px solid var(--hair);font-size:var(--size);letter-spacing:.2em;color:var(--bone-2);
+}
+.sheet .sizes button[aria-pressed="true"]{border-color:var(--bone);color:var(--bone)}
+.sheet .add{width:100%;justify-content:center}
+
+/* ============ toast ============ */
+.toast{
+  position:fixed;left:50%;bottom:28px;transform:translate(-50%,80px);z-index:90;
+  background:var(--c3);border:1px solid var(--hair-strong);
+  padding:14px 26px;font-size:var(--size);font-weight:450;letter-spacing:.12em;color:var(--bone);
+  opacity:0;transition:transform .4s cubic-bezier(.16,1,.3,1),opacity .4s ease;pointer-events:none;
+}
+.toast.show{transform:translate(-50%,0);opacity:1}
+
+/* ============ responsive — the band shortens, never the type ============ */
+@media (max-width:1080px){
+  .s3{grid-column:span 4}.s4{grid-column:span 6}.s6{grid-column:span 6}.s8{grid-column:span 12}
+  .hero{grid-template-columns:1fr;padding-top:96px}
+  .hero-plate{max-width:520px}
+  .editor-wrap{grid-template-columns:1fr}
+}
+@media (max-width:720px){
+  :root{--rail-x:30px;--gutter:18px}
+  .rail .grad span{display:none}
+  .rail .grad{width:5px}.rail .grad.major{width:9px}
+  .rail .sodium{height:76px;bottom:24%}
+  .rail .sodium em{display:none}
+  .mast{height:56px}
+  .mast nav a:not(.cart){display:none}
+  .hero{padding-top:84px}
+  .s3,.s4,.s6,.s8{grid-column:auto}
+  .grid{grid-template-columns:minmax(0,1fr);gap:34px}
+  .look .mat{max-width:420px}
+  .hero-cta{flex-direction:column;align-items:flex-start;gap:6px}
+  .hero-copy .readout div{margin-right:16px;padding:12px 16px 2px 0}
+  .specband{overflow:visible;margin:0 -6px 8px}
+  .specband .axis{left:6px;right:6px}
+  .drop-tick .lbl{transform:translateX(0);text-align:left;max-width:96px;white-space:normal}
+  .drop-tick.end .lbl{transform:translateX(-100%);text-align:right}
+  .drop-tick .lbl span{letter-spacing:.08em}
+  .drop-tick .lbl .now{letter-spacing:.2em}
+  .sheet .panel{width:100vw;border-left:none}
+  .chassis-in{grid-template-columns:1fr;gap:34px}
+  .count .nums{font-size:2.5rem}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+  .rise{opacity:1;transform:none}
+}
+</style>
+</head>
+<body>
+<div class="grain" aria-hidden="true"></div>
+
+<!-- master rail — every destination is a tick on it -->
+<aside class="rail land" id="rail" aria-hidden="true"></aside>
+
+<header class="mast">
+  <a class="brand" href="#top">
+    <b>MONO&trade;</b><span>방출선 셀렉티브 · 서울</span>
+  </a>
+  <nav aria-label="주요 이동">
+    <a href="#collection"><i></i>컬렉션</a>
+    <a href="#drop"><i></i>드롭</a>
+    <a href="#editor"><span class="duo-tick"><i></i><i></i></span>589</a>
+    <a href="#info"><i></i>정보</a>
+    <a class="cart" href="#collection"><i></i>장바구니 <span id="cartN">0</span></a>
+  </nav>
+</header>
+
+<div class="frame" id="top">
+<main>
+
+  <!-- ============ 오프닝 플레이트 ============ -->
+  <section class="hero" aria-label="25AW 컬렉션 오프닝">
+    <div class="hero-copy">
+      <h1 class="wordmark rise">MONO<sup>™</sup></h1>
+      <p class="channel t-micro rise d1">방출선 셀렉티브 — 성수 · 25AW</p>
+      <p class="statement rise d2">컬렉션을 파장으로 등록합니다. 이번 시즌 여덟 개의 룩이 레일 위에 걸려 있고, 판매 상태는 선의 형태로 읽힙니다. 색은 오직 방출선으로만 존재합니다.</p>
+      <div class="readout rise d3" aria-label="드롭 요약">
+        <div><b>25AW</b><span>시즌</span></div>
+        <div><b>08</b><span>룩</span></div>
+        <div class="duo"><b><span class="spec-doubled" style="height:14px"></span>589nm</b><span>이중선 활성</span></div>
+        <div><b id="d-short">—</b><span>본 드롭까지</span></div>
+      </div>
+      <div class="hero-cta rise d4">
+        <a class="tickbtn tickbtn--fill" href="#collection"><span class="tick"></span>룩 열기</a>
+        <a class="tickbtn" href="#drop"><span class="tick"></span>드롭 일정</a>
+      </div>
+    </div>
+    <div class="hero-plate rise d2">
+      <figure>
+        <img src="assets/hero-gown.jpg" alt="LOOK 00 오프닝 룩 — 러플 코르셋 가운, 흑백 에디토리얼">
+      </figure>
+      <figcaption>
+        <span class="t-dim">00 — 오프닝 룩</span>
+        <span class="t-dim">러플 코르셋 가운</span>
+      </figcaption>
+    </div>
+    <div class="hero-foot rise d4">
+      <span>SEASON 25AW — 08 LOOKS</span>
+      <span class="duo"><span class="spec-doubled" style="height:12px"></span>589 SODIUM ACTIVE</span>
+      <span>NEXT DOOR 10.07 20:00 KST</span>
+    </div>
+  </section>
+
+  <!-- ============ 컬렉션 ============ -->
+  <section class="sect band-1" id="collection" aria-label="25AW 컬렉션">
+    <div class="sect-head">
+      <h2>SPECTRUM 25AW</h2>
+      <span class="kr">컬렉션 — 여덟 개의 방출선</span>
+    </div>
+    <p class="sect-lead">룩 단위로 판매합니다. 각 룩은 품목 범주의 파장 선에 등록되고, 재고 상태는 옆의 선 형태가 말합니다 — 실선은 판매 중, 대시는 드롭 예정, 반쪽 선은 품절 임박, 취소선은 품절.</p>
+
+    <div class="legend" aria-label="범례">
+      <div class="grp">
+        <span class="t-micro">파장 범주</span>
+        <dl>
+          <span class="key"><i class="specl" style="color:var(--nm405);height:14px"></i><b>405</b> 아우터</span>
+          <span class="key"><i class="specl" style="color:var(--nm436);height:14px"></i><b>436</b> 니트</span>
+          <span class="key"><i class="specl" style="color:var(--nm486);height:14px"></i><b>486</b> 드레스</span>
+          <span class="key"><i class="specl" style="color:var(--nm546);height:14px"></i><b>546</b> 라운지</span>
+          <span class="key"><i class="specl" style="color:var(--nm615);height:14px"></i><b>615</b> 이브닝</span>
+          <span class="key"><i class="specl" style="color:var(--nm656);height:14px"></i><b>656</b> 재킷</span>
+          <span class="key"><span class="spec-doubled" style="height:14px"></span><b>589</b> 이중선 — 에디터</span>
+        </dl>
+      </div>
+      <div class="grp">
+        <span class="t-micro">판매 상태 — 선의 형태</span>
+        <dl>
+          <span class="key"><i class="stateline"></i>판매 중</span>
+          <span class="key"><i class="stateline pending"></i>드롭 예정</span>
+          <span class="key"><i class="stateline low"></i>품절 임박</span>
+          <span class="key"><i class="stateline out"></i>품절</span>
+        </dl>
+      </div>
+    </div>
+
+    <div class="grid" id="grid"><!-- looks injected --></div>
+  </section>
+
+  <!-- ============ 드롭 스케줄 ============ -->
+  <section class="sect band-0" id="drop" aria-label="드롭 스케줄">
+    <div class="sect-head">
+      <h2>DROP SCHEDULE</h2>
+      <span class="kr">드롭 스케줄 — 시간 축</span>
+    </div>
+    <p class="sect-lead">시즌이 나뉘는 네 시점. 나트륨 이중선(589nm)이 지금의 위치를 표시합니다.</p>
+
+    <div class="count">
+      <div class="nums" id="cd" aria-live="off">—</div>
+      <p class="side">본 드롭 10.07 20:00 KST — 룩 04와 룩 09가 동시에 등록됩니다. 사전등록 손님은 드롭 30분 전 좌석 이동 안내를 받습니다.</p>
+    </div>
+
+    <div class="specband" id="band" aria-label="드롭 시점 축">
+      <div class="axis" id="band-axis"></div>
+    </div>
+  </section>
+
+  <!-- ============ 589 에디터 이중선 ============ -->
+  <section class="sect band-1" id="editor" aria-label="에디터 이중선">
+    <div class="editor-wrap">
+      <figure>
+        <img src="assets/editor-fur.jpg" alt="LOOK 09 예고 — 퍼 블렌드 코트, 흑백 에디토리얼">
+      </figure>
+      <div class="editor-copy">
+        <div class="duo-big">
+          <span class="spec-doubled"></span>
+          <h3>나트륨 D선은<br>이중선으로 선다</h3>
+        </div>
+        <p>589nm — 가로등 아래 온 세상을 누렇게 물들이는 그 선은, 스펙트럼에서 단 한 번 두 줄로 섭니다. 이웃보다 밝게 서는 이번 시즌의 에디터 라인, LOOK 09는 10.14 리스톡과 함께 공개됩니다.</p>
+        <div class="meta">
+          <div><b class="t-label">LOOK 09</b><br><span class="t-dim">퍼 블렌드 코트 외 3종</span></div>
+          <div><b class="t-label">10.14 20:00</b><br><span class="t-dim">리스톡 드롭</span></div>
+          <div><b class="t-price">₩1,980,000</b><br><span class="t-dim">예정가</span></div>
+        </div>
+        <button class="tickbtn" id="notify"><span class="tick"></span>공개 알림 받기</button>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ============ chassis ============ -->
+<footer class="chassis" id="info">
+  <div class="chassis-in frame" style="padding-left:calc(var(--rail-x) + var(--gutter))">
+    <div>
+      <h4>MONO&trade;</h4>
+      <address>서울 특별시 성동구 방출선길 589<br>스펙트럼 하우스 3층 쇼룸<br>화–토 12:00–20:00</address>
+    </div>
+    <div>
+      <h4>측정 안내</h4>
+      <p>모든 룩은 380–700nm 가시 영역 안에서 등록됩니다. 범주 밖 색은 사용하지 않습니다. 사이즈는 S·M·L 세 틱으로 제공되며, 교환은 드롭 후 7일까지 접수합니다.</p>
+    </div>
+    <div>
+      <h4>이 페이지에 관하여</h4>
+      <p>디자인 품질 검증용 <b>합성 데모</b>입니다. MONO™는 실존하지 않는 하우스이며 상품·가격·드롭 일정·주소는 모두 가상입니다. 사진은 이미지 검색으로 수집해 그래파이트로 가공한 것입니다(출처: assets/PROVENANCE.json).</p>
+    </div>
+  </div>
+  <div class="fine frame" style="padding-left:calc(var(--rail-x) + var(--gutter))">
+    <span>MONO SPECTRAL HOUSE — 합성 데모</span>
+    <span>380—700nm · 가시 영역</span>
+    <span>© 2026</span>
+  </div>
+</footer>
+</div>
+
+<!-- ============ product sheet ============ -->
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sh-title">
+  <div class="scrim" data-close></div>
+  <div class="panel">
+    <button class="close" data-close>닫기<svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" style="margin-left:2px"><path d="M1 1 L9 9 M9 1 L1 9" stroke="currentColor" stroke-width="1"/></svg></button>
+    <div class="panel-in">
+      <figure><img id="sh-img" src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt=""></figure>
+      <p class="t-micro" id="sh-no"></p>
+      <h3 class="t-label" id="sh-title" style="font-size:1.35rem;font-weight:600;letter-spacing:.08em;margin-top:10px"></h3>
+      <div class="rows" id="sh-rows"></div>
+      <div class="sizes" role="group" aria-label="사이즈 선택">
+        <button aria-pressed="false">S</button><button aria-pressed="true">M</button><button aria-pressed="false">L</button>
+      </div>
+      <button class="tickbtn tickbtn--fill add" id="sh-add"><span class="tick"></span>장바구니에 담기 — <span id="sh-price"></span></button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+/* ---------- data: the 25AW spectrum ---------- */
+const NM = {405:'#7B6BC4',436:'#5B7BD6',486:'#4D9BD1',546:'#57B374',615:'#DE7548',656:'#D6574B'};
+const LOOKS = [
+  {no:'01',name:'캐멀 더블 코트',img:'assets/look01-camel-coat.jpg',nm:405,cat:'아우터',price:1290000,state:'live',stateLabel:'판매 중',
+   items:'더블 브레스티드 코트 · 울 100%',fit:'넓은 어울림 · 기장 108cm'},
+  {no:'02',name:'헤링본 울 코트',img:'assets/look02-gray-coat.jpg',nm:405,cat:'아우터',price:1450000,state:'live',stateLabel:'판매 중',
+   items:'헤링본 울 코트 · 터틀넥 니트',fit:'스탠다드 핏 · 기장 112cm'},
+  {no:'03',name:'리브 울 니트',img:'assets/look03-ribbed-knit.jpg',nm:436,cat:'니트',price:480000,state:'live',stateLabel:'판매 중',
+   items:'리브 니트 · 울 70 / 카시미어 30',fit:'루즈 핏 · 소매 전개'},
+  {no:'04',name:'러브 니트 드레스',img:'assets/look04-knit-dress.jpg',nm:436,cat:'니트',price:890000,state:'pending',stateLabel:'10.07 드롭',
+   items:'니트 미니 드레스 · 레이스 업',fit:'몸판 슬림 · 기장 88cm'},
+  {no:'05',name:'할터 이브닝 가운',img:'assets/look05-halter-gown.jpg',nm:486,cat:'드레스',price:2400000,state:'low',stateLabel:'품절 임박 — 2개',
+   items:'할터 가운 · 크레이프 실크',fit:'드레이프 핏 · 백 오픈'},
+  {no:'06',name:'울 블렌드 재킷',img:'assets/look06-zip-jacket.jpg',nm:656,cat:'재킷',price:980000,state:'out',stateLabel:'품절',
+   items:'집업 재킷 · 울 블렌드 트윌',fit:'크롭 핏 · 내구 지퍼'},
+  {no:'07',name:'쇼울카라 카디건',img:'assets/look07-cardigan.jpg',nm:546,cat:'라운지',price:720000,state:'live',stateLabel:'판매 중',
+   items:'쇼울 카디건 · 램스울',fit:'오버 핏 · 5단 버튼'},
+  {no:'08',name:'화이트 슬립 드레스',img:'assets/look08-white-dress.jpg',nm:615,cat:'이브닝',price:1180000,state:'live',stateLabel:'판매 중',
+   items:'슬립 드레스 · 면 실크 혼방',fit:'스키미 핏 · 조절 스트랩'},
+];
+const SPANS = ['s6 tall','s3','s3','s3','s3 tall','s3','s6 tall','s3'];
+
+const won = n => '₩' + n.toLocaleString('ko-KR');
+
+/* ---------- build the grid ---------- */
+const grid = document.getElementById('grid');
+LOOKS.forEach((L,i)=>{
+  const b = document.createElement('button');
+  b.className = 'look ' + SPANS[i];
+  b.dataset.i = i;
+  b.innerHTML = `
+    <div class="mat"><img src="${L.img}" alt="LOOK ${L.no} ${L.name} 룩 사진, 흑백"></div>
+    <div class="data">
+      <span class="waveline" style="color:${NM[L.nm]}"></span>
+      <span class="no">LOOK ${L.no} · ${L.nm}nm ${L.cat}</span>
+      <span class="price">${L.state==='out'?'':won(L.price)}</span>
+      <h3>${L.name}</h3>
+      <span class="state ${L.state}"><i class="stateline ${L.state}"></i><span>${L.stateLabel}</span></span>
+    </div>`;
+  grid.appendChild(b);
+});
+
+/* ---------- master rail: nm graduations + sodium + nav ticks ---------- */
+const rail = document.getElementById('rail');
+const vh = () => Math.max(document.documentElement.clientHeight, innerHeight);
+function drawRail(){
+  rail.querySelectorAll('.grad,.cap,.mine').forEach(n=>n.remove());
+  const H = vh(), lo=380, hi=700;
+  for(let nm=380; nm<=700; nm+=10){
+    const g = document.createElement('i');
+    g.className = 'grad' + (nm%50===0?' major':'');
+    g.style.top = ((nm-lo)/(hi-lo)*(H-140)+70) + 'px';
+    if(nm%50===0){const s=document.createElement('span');s.textContent=nm;g.appendChild(s);}
+    rail.appendChild(g);
+  }
+  [70, H-70].forEach(y=>{
+    const c=document.createElement('i');
+    c.className='cap'; c.style.top=y+'px';
+    rail.appendChild(c);
+  });
+}
+drawRail();
+addEventListener('resize', drawRail);
+const sodium = document.createElement('div');
+sodium.className='sodium';
+sodium.innerHTML='<i></i><i></i><em>589 — 이중선</em>';
+function placeSodium(){
+  const H = vh();
+  sodium.style.top = ((589-380)/320*(H-140)+70-120) + 'px'; /* its true nm position */
+}
+placeSodium();
+addEventListener('resize', placeSodium);
+rail.appendChild(sodium);
+let mineN = 0;
+function addMineSegment(){
+  mineN++;
+  const m = document.createElement('i');
+  m.className='mine';
+  m.style.top = (70 + Math.random()*(vh()-220)) + 'px';
+  m.innerHTML = `<em>관심 ${mineN}</em>`;
+  rail.appendChild(m);
+}
+
+/* ---------- sheet ---------- */
+const sheet=document.getElementById('sheet');
+let cur=-1, lastFocus=null;
+const $=id=>document.getElementById(id);
+function openSheet(i){
+  cur=i; const L=LOOKS[i]; lastFocus=document.activeElement;
+  $('sh-img').src=L.img; $('sh-img').alt=`LOOK ${L.no} ${L.name} 룩 사진, 흑백`;
+  $('sh-no').textContent=`LOOK ${L.no} — ${L.nm}nm ${L.cat}`;
+  $('sh-title').textContent=L.name;
+  $('sh-rows').innerHTML=`
+    <div><span>구성</span><b>${L.items}</b></div>
+    <div><span>핏</span><b>${L.fit}</b></div>
+    <div><span>상태</span><b>${L.stateLabel}</b></div>
+    <div><span>가격</span><b>${won(L.price)}</b></div>`;
+  $('sh-price').textContent=won(L.price);
+  sheet.classList.add('open');
+  requestAnimationFrame(()=>requestAnimationFrame(()=>sheet.classList.add('in')));
+  sheet.querySelector('.close').focus();
+}
+function closeSheet(){
+  sheet.classList.remove('in');
+  setTimeout(()=>sheet.classList.remove('open'),450);
+  if(lastFocus) lastFocus.focus();
+  cur=-1;
+}
+grid.addEventListener('click',e=>{const b=e.target.closest('.look');if(b)openSheet(+b.dataset.i)});
+sheet.addEventListener('click',e=>{if(e.target.closest('[data-close]'))closeSheet()});
+addEventListener('keydown',e=>{if(e.key==='Escape'&&sheet.classList.contains('open'))closeSheet()});
+document.querySelectorAll('.sizes button').forEach(btn=>btn.addEventListener('click',()=>{
+  document.querySelectorAll('.sizes button').forEach(x=>x.setAttribute('aria-pressed','false'));
+  btn.setAttribute('aria-pressed','true');
+}));
+
+/* ---------- cart & toast ---------- */
+let cart=0;
+const toast=$('toast'); let toastT;
+function say(msg){
+  toast.textContent=msg; toast.classList.add('show');
+  clearTimeout(toastT); toastT=setTimeout(()=>toast.classList.remove('show'),2400);
+}
+$('sh-add').addEventListener('click',()=>{
+  if(cur<0)return; const L=LOOKS[cur];
+  if(L.state==='out'){say(`LOOK ${L.no} — 품절입니다. 10.14 리스톡을 기다려 주세요.`);return;}
+  if(L.state==='pending'){say(`LOOK ${L.no} — 10.07 드롭까지 레일에 등록만 해 둡니다.`);}
+  else{cart++; $('cartN').textContent=cart; say(`LOOK ${L.no} ${L.name} — 선분에 기록했습니다`); addMineSegment();}
+});
+$('notify').addEventListener('click',()=>say('LOOK 09 공개 알림 — 등록했습니다 (합성 데모)'));
+$('cartN').parentElement.addEventListener('click',e=>{
+  e.preventDefault();
+  say(cart? `장바구니 — 룩 ${cart}건이 레일에 기록되어 있습니다` : '장바구니가 비어 있습니다 — 룩을 열어 담아보세요');
+});
+
+/* ---------- countdown to the drop (10.07 20:00 KST, rolls weekly for the demo) ---------- */
+function nextDrop(){
+  const now=new Date();
+  let t=new Date(now.getFullYear(),9,7,20,0,0);
+  while(t<=now) t=new Date(t.getTime()+7*864e5);
+  return t;
+}
+const TARGET=nextDrop();
+const pad=n=>String(n).padStart(2,'0');
+function tick(){
+  const s=Math.max(0,Math.floor((TARGET-Date.now())/1000));
+  const d=Math.floor(s/86400), h=Math.floor(s%86400/3600), m=Math.floor(s%3600/60), sec=s%60;
+  const str=`${d}<small>일</small>${pad(h)}<small>:</small>${pad(m)}<small>:</small>${pad(sec)}`;
+  document.getElementById('cd').innerHTML=str;
+  document.getElementById('d-short').textContent=`${d}일 ${pad(h)}:${pad(m)}`;
+}
+tick(); setInterval(tick,1000);
+
+/* ---------- drop band: nm axis + four drops ---------- */
+const band=document.getElementById('band'), axis=document.getElementById('band-axis');
+function drawBand(){
+  axis.querySelectorAll('i').forEach(n=>n.remove());
+  band.querySelectorAll('.drop-tick').forEach(n=>n.remove());
+  const W=band.clientWidth, lo=380, hi=700;
+  for(let nm=380;nm<=700;nm+=10){
+    const t=document.createElement('i');
+    if(nm%50===0){t.className='major';const s=document.createElement('span');s.textContent=nm;t.appendChild(s);}
+    t.style.left=((nm-lo)/(hi-lo)*100)+'%';
+    axis.appendChild(t);
+  }
+  const drops=[
+    {nm:436,cls:'pending',date:'10.03',name:'사전등록'},
+    {nm:589,cls:'dbl',date:'10.07 20:00',name:'지금 — 본 드롭'},
+    {nm:656,cls:'low',date:'10.14',name:'리스톡'},
+    {nm:698,cls:'end',date:'11.01',name:'아카이브 오픈'},
+  ];
+  drops.forEach(d=>{
+    const el=document.createElement('div');
+    el.className='drop-tick '+d.cls;
+    el.style.left=((d.nm-lo)/(hi-lo)*100)+'%';
+    el.innerHTML=`<div class="lbl">${d.cls==='dbl'?'<span class="now">NOW</span>':''}<b>${d.name}</b><span>${d.date}</span></div>`;
+    band.appendChild(el);
+  });
+}
+drawBand(); addEventListener('resize',drawBand);
+
+/* ---------- nav active tick ---------- */
+const navLinks=[...document.querySelectorAll('.mast nav a')];
+const io=new IntersectionObserver(es=>{
+  es.forEach(e=>{
+    if(e.isIntersecting){
+      navLinks.forEach(a=>a.classList.toggle('active',a.getAttribute('href')==='#'+e.target.id));
+    }
+  });
+},{rootMargin:'-40% 0px -55% 0px'});
+['collection','drop','editor','info'].forEach(id=>{const s=document.getElementById(id);if(s)io.observe(s)});
+
+/* ---------- entrance ---------- */
+addEventListener('load',()=>document.body.classList.add('land'));
+setTimeout(()=>document.body.classList.add('land'),900); /* font CDN guard */
+</script>
+</body>
+</html>

@@ -1,0 +1,117 @@
+{
+  "title": "시각 세계를 고르세요",
+  "question": "주사위가 '런웨이 초청장 & 좌석 플랜'을 지목했습니다. 이 세계로 빌드할까요, 대안을 가져갈까요, 아니면 다시 굴릴까요?",
+  "options": [
+    {
+      "id": "assigned",
+      "label": "당신의 좌석 — 런웨이 초청장 & 좌석 플랜",
+      "kicker": "THE ROLL",
+      "lineage": "패션하우스 쇼 초대장 · 좌석 배치도 · 티켓 스텁",
+      "thesis": "드롭은 쇼가 되고 고객은 관객이 된다 — 쇼핑몰 첫 화면이 '초대장 확인 + 좌석 배정'이 되는 세계. 화이트 그리드 카탈로그라는 카테고리 디폴트를 거부한다.",
+      "palette": ["#EDE8DD", "#141310", "#A32633", "#6B6558"],
+      "materials": ["블라인드 엠보싱 종이", "티켓 스텁 미싯점", "좌석 플래크", "런웨이 테이프 라인", "좌석 배치도 제도선"],
+      "viewport": "첫 화면은 한 장의 초대장: 블라인드 엠보싱 하우스명, 컬렉션 번호, 방문마다 발급되는 '당신의 좌석번호', 도어타임(드롭 시각), 미싯점으로 찢는 RSVP 액션 '좌석 확인'. 종이 레지스터에서 스크롤과 함께 공연장(석탄색)으로 레지스터가 전환되고, 룩 번호가 붙은 컬렉션이 런웨이를 걸어 내려온다.",
+      "risk": "티켓·좌석 문법이 상품보다 큰 소리를 내면 쇼핑 사용성이 흔들린다 — 상품 목록은 끝까지 완전히 쇼핑 가능해야 한다.",
+      "raised": [
+        { "from": "lowicz 이층 종이접기 (declined)", "raise": "평면 중첩의 법칙 — 깊이는 겹침으로만 만들고 그림자·그라데이션 토닝은 금지" },
+        { "from": "종이 오토마타 (declined)", "raise": "움직이는 것만 색을 가진다 — 좌석색(버밀리온)은 활성·모션 상태에만" },
+        { "from": "드럼머신 스텝로우 (declined)", "raise": "'지금' 표시등 — 드롭 스케줄 위에 현재 위치를 알리는 단 하나의 틱" },
+        { "from": "몬도 2색 잉크 (declined)", "raise": "두 레지스터의 총력 — 종이/공연장 각각의 이미지 처리 규칙이 페이지 전체에 단일하게 적용" },
+        { "from": "크라프트베르크 배선도 (declined)", "raise": "직교 배선과 도달하는 빛 — 제도선은 직교로 만나고, 활성화는 내 좌석에 '빛이 도달하는' 모션" }
+      ]
+    },
+    {
+      "id": "model-pick",
+      "label": "에디토리얼 스프레드 — 패션 매거진",
+      "kicker": "IMPECCABLE'S PICK",
+      "lineage": "AnOther · 032c류 패션 에디토리얼 스프레드",
+      "thesis": "쇼핑몰을 펼치면 매거진이 읽힌다 — 풀블리드 사진, 폴리오 넘버, 섹션 키커의 인쇄 문법.",
+      "palette": ["#F4F1EA", "#1A1815", "#C43D2E"],
+      "materials": ["풀블리드 인쇄", "폴리오 넘버", "핀레귤레이션 그리드"],
+      "viewport": "잡지 표지처럼 열리는 컬렉션 스프레드, 상품이 기사처럼 편집되어 배치됨.",
+      "risk": "프리미엄 패션 콘텐츠에서 가장 익숙한 착지점 — 이 카테고리의 대부분 런이 여기에 내려앉는다."
+    },
+    {
+      "id": "challenger-emission",
+      "label": "방출선 레일 — 스펙트럼 제판대",
+      "verdict": "competitive",
+      "lineage": "분광 스펙트로그램 · 계측 제판",
+      "thesis": "카탈로그가 하나의 캘리브레이션 레일이 된다 — 모든 룩이 레일 위 틱이고, 상태(드롭예정/판매중/품절)는 색이 아니라 선의 높이·대시로 구분된다.",
+      "palette": ["#101418", "#D9D4C9", "#586B7F"],
+      "materials": ["석탄색 연속체", "헤어라인 방출선", "본(bone) 레전드"],
+      "viewport": "중앙에서 벗어난 하나의 레일, 열린 항목이 레일 위에서 거대한 판으로 피어남.",
+      "case": "룩 시퀀스에는 제작 명확성이 가장 강하다 — 다만 프리미엄 관객 '초대받은 느낌'에는 병원 계측기가 이길 수 없어 접점에서 근소히 진다.",
+      "risk": "그리드가 엄격하지 않으면 레트로 오락으로 읽힌다.",
+      "hero": "https://impeccable.style/worlds/cards/operate-c-emission-line-rail-hero.webp",
+      "board": "https://impeccable.style/worlds/cards/operate-c-emission-line-rail.webp"
+    },
+    {
+      "id": "challenger-papercut",
+      "label": "로위치 이층 종이접기",
+      "verdict": "declined",
+      "lineage": "폴란드 로위치 종이공예",
+      "palette": ["#F2E9DA", "#C93A2C", "#2E4A38"],
+      "materials": ["무광 평면색지", "대칭 원형 구성"],
+      "case": "민속 공예 문법이 프리미엄 패션 관객과 만나지 않는다.",
+      "kept": "평면 중첩의 법칙 — 그림자 없이 겹침만으로 깊이.",
+      "hero": "https://impeccable.style/worlds/cards/craft-making-lowicz-layered-papercut-hero.webp"
+    },
+    {
+      "id": "challenger-automata",
+      "label": "종이 오토마타 행렬",
+      "verdict": "declined",
+      "lineage": "핸드 크랭크 종이 장치",
+      "palette": ["#E8DFC9", "#3A3630", "#B03A2E"],
+      "materials": ["크래프트 보드", "탭과 슬롯"],
+      "case": "종이 장난감 온기가 프리미엄 등급과 어긋나고, 크랭크 인터랙션은 쇼핑 사용성을 해친다.",
+      "kept": "움직이는 것만 색을 가진다 — 모션에만 채도.",
+      "hero": "https://impeccable.style/worlds/cards/kinetic-sculpture-automata-crank-paper-menagerie-hero.webp"
+    },
+    {
+      "id": "challenger-drum",
+      "label": "드럼머신 스텝로우",
+      "verdict": "declined",
+      "lineage": "80년대 리듬머신",
+      "palette": ["#1C1C1E", "#E0402C", "#E8C53A"],
+      "materials": ["실크스크린 캡션", "LED 체이스 라이트"],
+      "case": "악기 문법이 패션 관객과 동행하지 않는다.",
+      "kept": "'지금' 표시등 — 스케줄의 현재 위치 틱.",
+      "hero": "https://impeccable.style/worlds/cards/signals-instruments-drum-machine-step-row-hero.webp"
+    },
+    {
+      "id": "challenger-duotone",
+      "label": "몬도 형광 2색 잉크",
+      "verdict": "declined",
+      "lineage": "90년대 초 테크 매거진",
+      "palette": ["#FF5A1F", "#00C2C7"],
+      "materials": ["형광 2색 듀오톤", "사선 헤드라인 슬래브"],
+      "case": "형광 테크 에너지가 프리미엄 레지스터와 충돌하고, 2색이 의류 사진의 사실을 삼킨다.",
+      "kept": "두 잉크의 총력 — 이미지 처리 규칙의 전면 단일성.",
+      "hero": "https://impeccable.style/worlds/cards/digital-design-canon-mondo-tech-utopian-spread-hero.webp"
+    },
+    {
+      "id": "challenger-kraftwerk",
+      "label": "맨머신 배선도",
+      "verdict": "declined",
+      "lineage": "크라프트베르크 아이덴티티",
+      "palette": ["#0D0D0D", "#E23A2E", "#E8B33A"],
+      "materials": ["교통 신호색", "네온 제도 라인"],
+      "case": "블랙+네온 1색은 AI 인터페이스 군집의 중심 착지점이고, 배선도 내비는 쇼핑에 장식이다.",
+      "kept": "직교 배선과 도달하는 빛 — 활성화 모션의 문법.",
+      "hero": "https://impeccable.style/worlds/cards/kraftwerk-man-machine-hero.webp"
+    }
+  ],
+  "reroll": {
+    "registers": ["safer", "bolder"]
+  },
+  "canon": true,
+  "canonCard": {
+    "label": "카테고리 표준 — 화이트 그리드 셀렉티브샵",
+    "thesis": "SSENSE·Mr Porter류 깨끗한 화이트 그리드 프리미엄 셀렉티브샵, 정직하게 최고 품질로.",
+    "palette": ["#FFFFFF", "#111827", "#2563EB"],
+    "materials": ["클린 그리드", "상품 사진"],
+    "viewport": "방문자가 기대하는 그 배치, 풀 크래프트로.",
+    "risk": "설계상 경쟁사와 구분되지 않는다."
+  },
+  "steer": true
+}

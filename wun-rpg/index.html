@@ -3,99 +3,266 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>운(雲) — 무협 RPG 프로토타입</title>
+<title>운(雲) — 무협 RPG v0.16.0</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { height: 100%; overflow: hidden; background: #0b0f0d; }
+  body { font-family: "Noto Serif KR", serif; }
   #stage { position: relative; width: 100vw; height: 100vh; }
-  canvas { display: block; width: 100%; height: 100%; image-rendering: auto; }
-  #hud { position: absolute; inset: 0; pointer-events: none; font-family: "Noto Serif KR", serif; color: #e8e2d0; }
-  /* 기혈·공력 원형 옥패 게이지 */
+  canvas { display: block; width: 100%; height: 100%; }
+  #hud { position: absolute; inset: 0; pointer-events: none; color: #e8e2d0; }
   #gauges { position: absolute; top: 18px; left: 18px; width: 132px; height: 132px; }
   #realm { position: absolute; top: 152px; left: 30px; width: 96px; text-align: center;
     border: 2px solid #b8912f; background: rgba(20,14,8,.85); color: #f0d78c;
     font-size: 20px; letter-spacing: 6px; padding: 6px 0 4px; }
   #realm small { display: block; font-size: 10px; letter-spacing: 2px; color: #9a8b60; margin-top: 2px; }
-  /* 상태 메시지 */
-  #log { position: absolute; left: 18px; bottom: 150px; width: 460px; font-size: 13px; line-height: 1.7;
+  #sect { position: absolute; top: 218px; left: 30px; width: 96px; text-align: center;
+    font-size: 12px; color: #9a8b60; }
+  /* 평판 */
+  #rep { position: absolute; top: 18px; right: 24px; font-size: 12px; line-height: 1.9; text-align: right;
+    color: #c9d3b8; text-shadow: 0 1px 2px #000; }
+  #rep .bar { width: 120px; height: 6px; background: rgba(0,0,0,.5); display: inline-block; vertical-align: middle; }
+  #rep .bar i { display: block; height: 100%; }
+  #rep .ui-bar i { background: #5aa8c7; } #rep .pa-bar i { background: #c95a5a; }
+  /* 로그 */
+  #log { position: absolute; left: 18px; bottom: 150px; width: 480px; font-size: 13px; line-height: 1.7;
     text-shadow: 0 1px 2px #000; }
-  #log .sys { color: #9fd3a8; } #log .warn { color: #e8b26a; } #log .qi { color: #7fc7d9; }
+  #log .sys { color: #9fd3a8; } #log .warn { color: #e8b26a; } #log .qi { color: #7fc7d9; } #log .quest { color: #f0d78c; }
   /* 퀵슬롯 */
   #slots { position: absolute; right: 24px; bottom: 24px; display: flex; gap: 12px; }
   .slot { width: 74px; height: 74px; border: 1px solid #6b5a33; background: rgba(15,11,7,.82);
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     font-family: serif; position: relative; overflow: hidden; }
   .slot .key { font-size: 11px; color: #9a8b60; }
-  .slot .nm { font-size: 15px; color: #e8e2d0; margin: 2px 0; }
-  .slot .cd { position: absolute; inset: 0; background: rgba(0,0,0,.65); display: flex; align-items: center;
-    justify-content: center; color: #f0d78c; font-size: 16px; }
+  .slot .nm { font-size: 14px; color: #e8e2d0; margin: 2px 0; }
+  .slot .cd { position: absolute; inset: 0; background: rgba(0,0,0,.65); display: none;
+    align-items: center; justify-content: center; color: #f0d78c; font-size: 16px; }
   .slot.flash { border-color: #f0d78c; box-shadow: 0 0 14px rgba(240,215,140,.5); }
-  /* 도움말 */
-  #help { position: absolute; right: 24px; top: 18px; text-align: right; font-size: 12px; color: #8f9a8a; line-height: 1.8; }
+  #help { position: absolute; right: 24px; top: 76px; text-align: right; font-size: 11.5px; color: #8f9a8a; line-height: 1.8; }
   #help b { color: #c9d3b8; }
+  /* 퀘스트 패널 */
+  #questPanel { position: absolute; left: 18px; top: 218px; width: 280px; font-size: 12px;
+    background: rgba(10,14,10,.75); border: 1px solid #3a4a3a; padding: 10px; display: none; }
+  #questPanel.on { display: block; pointer-events: auto; }
+  #questPanel h4 { color: #f0d78c; font-size: 13px; margin-bottom: 6px; }
+  #questPanel .q { margin-bottom: 8px; line-height: 1.6; }
+  #questPanel .q b { color: #c9d3b8; }
+  #questPanel .q .prog { color: #9fd3a8; font-size: 11px; }
+  #questPanel .q.done .prog { color: #7fc7d9; }
+  /* 상점 */
+  #shop { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); width: 420px;
+    background: rgba(12,16,12,.95); border: 2px solid #b8912f; padding: 20px; display: none;
+    pointer-events: auto; color: #e8e2d0; }
+  #shop.on { display: block; }
+  #shop h3 { color: #f0d78c; margin-bottom: 12px; font-size: 16px; }
+  #shop .item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0;
+    border-bottom: 1px solid rgba(184,145,47,.2); }
+  #shop .item button { background: #b8912f; color: #0b0f0d; border: none; padding: 5px 14px;
+    cursor: pointer; font-family: inherit; font-size: 12px; }
+  #shop .item button:disabled { opacity: .4; }
+  #shop .close { margin-top: 12px; width: 100%; padding: 8px; background: none;
+    border: 1px solid #6b5a33; color: #9a8b60; cursor: pointer; }
+  /* 문파 선택 화면 */
+  #sectSel { position: fixed; inset: 0; background: #0b0f0d; z-index: 50; display: flex;
+    flex-direction: column; align-items: center; justify-content: center; color: #e8e2d0; }
+  #sectSel h1 { font-size: 42px; color: #f0d78c; letter-spacing: 12px; margin-bottom: 8px; font-family: serif; }
+  #sectSel .sub { font-size: 13px; color: #9a8b60; margin-bottom: 32px; letter-spacing: 2px; }
+  #sectSel .grid { display: grid; grid-template-columns: repeat(3, 220px); gap: 14px; }
+  .sectCard { border: 1px solid #4a4030; padding: 16px; cursor: pointer; transition: all .2s;
+    background: rgba(20,16,10,.6); }
+  .sectCard:hover { border-color: #f0d78c; background: rgba(40,32,16,.7); transform: translateY(-3px); }
+  .sectCard .nm { font-size: 18px; color: #f0d78c; margin-bottom: 6px; font-family: serif; }
+  .sectCard .al { font-size: 10px; color: #9a8b60; margin-bottom: 8px; }
+  .sectCard .ds { font-size: 11px; color: #c9d3b8; line-height: 1.6; }
+  .sectCard .wp { font-size: 11px; color: #7fc7d9; margin-top: 8px; }
+  /* 토스트 */
+  #toast { position: fixed; top: 76px; left: 50%; transform: translateX(-50%); background: rgba(20,14,8,.92);
+    border: 1px solid #b8912f; color: #f0d78c; padding: 10px 24px; font-size: 14px; display: none; z-index: 60; }
 </style>
 </head>
 <body>
 <div id="stage"><canvas id="cv"></canvas></div>
 <div id="hud">
   <div id="gauges"><canvas id="gz" width="264" height="264" style="width:132px;height:132px"></canvas></div>
-  <div id="realm">一流<small>境 2 / 6</small></div>
-  <div id="help"><b>이동</b> A D · <b>기공</b> J 쾌검식 / K 초식흘리기<br><b>무공</b> 1 매화검무 · 2 운무일검<br><b>운기조식</b> Q (비전투 내공 축적)</div>
+  <div id="realm">一流<small id="realmSub">境 2 / 6</small></div>
+  <div id="sect">—</div>
+  <div id="rep">
+    <div>의협심 <span id="repUiVal">50</span><br><span class="bar ui-bar"><i id="repUiBar" style="width:50%"></i></span></div>
+    <div>패도 <span id="repPaVal">50</span><br><span class="bar pa-bar"><i id="repPaBar" style="width:50%"></i></span></div>
+    <div id="coin">동전 0전</div>
+  </div>
+  <div id="help"><b>이동</b> A D · <b>기공</b> J 쾌검식 / K 초식흘리기<br><b>무공</b> 1 · 2 · <b>운기조식</b> Q<br><b>퀘스트</b> T · <b>상점</b> B · <b>저장</b> F5</div>
+  <div id="questPanel"></div>
   <div id="log"></div>
   <div id="slots">
     <div class="slot" id="s-j"><span class="key">J</span><span class="nm">쾌검식</span></div>
     <div class="slot" id="s-k"><span class="key">K</span><span class="nm">흘리기</span></div>
-    <div class="slot" id="s-1"><span class="key">1</span><span class="nm">매화검무</span><div class="cd" id="cd1" style="display:none"></div></div>
-    <div class="slot" id="s-2"><span class="key">2</span><span class="nm">운무일검</span><div class="cd" id="cd2" style="display:none"></div></div>
+    <div class="slot" id="s-1"><span class="key">1</span><span class="nm">무공1</span><div class="cd" id="cd1" style="display:none"></div></div>
+    <div class="slot" id="s-2"><span class="key">2</span><span class="nm">무공2</span><div class="cd" id="cd2" style="display:none"></div></div>
+  </div>
+  <div id="shop">
+    <h3>낙양성 무계(武階) 상점</h3>
+    <div class="item"><span>금창환(기혈 +300)</span><button data-buy="hp">30전</button></div>
+    <div class="item"><span>옥정단(공력 +200)</span><button data-buy="qi">25전</button></div>
+    <div class="item"><span>내공 단련서(내공 +60)</span><button data-buy="ng">50전</button></div>
+    <button class="close" onclick="document.getElementById('shop').classList.remove('on')">닫기 (B)</button>
   </div>
 </div>
-<input type="file" id="filepick" accept="image/*" hidden>
+<div id="sectSel">
+  <h1>雲</h1>
+  <div class="sub">Re: Cloud Online — 정통 무협 RPG · 문파를 선택하십시오</div>
+  <div class="grid" id="sectGrid"></div>
+</div>
+<div id="toast"></div>
 
-<script type="module">
+<script>
 /* ============================================================
-   운(雲) — 무협 RPG 프로토타입 (gdrive2 기획 사양서 기반)
-   핵심: 기혈/공력 · 경지 · 초식흘리기(패링 윈도우) · 무공 쿨다운 · 기연
+   운(雲) v0.16.0 — 무협 RPG (gdrive2 사양서 5종 기반)
    ============================================================ */
+window.__m1 = "S1";
 const cv = document.getElementById("cv"), ctx = cv.getContext("2d");
 cv.width = innerWidth; cv.height = innerHeight;
 addEventListener("resize", () => { cv.width = innerWidth; cv.height = innerHeight; });
+const $ = id => document.getElementById(id);
+const keys = {};  // 키 상태 — 이동·전투 입력용
+function toast(msg) {
+  const t = $("toast"); t.textContent = msg; t.style.display = "block";
+  clearTimeout(t._t); t._t = setTimeout(() => t.style.display = "none", 2200);
+}
+function log(msg, cls = "") {
+  const el = $("log"), d = document.createElement("div");
+  if (cls) d.className = cls; d.textContent = "· " + msg;
+  el.appendChild(d);
+  while (el.children.length > 7) el.firstChild.remove();
+  setTimeout(() => { if (d.parentNode) d.remove(); }, 8000);
+}
 
-const keys = {};
-addEventListener("keydown", e => {
-  keys[e.key.toLowerCase()] = true;
-  if (e.key === "j") basicAttack();
-  if (e.key === "k") parry();
-  if (e.key === "1") skill("매화검무");
-  if (e.key === "2") skill("운무일검");
-  if (e.key.toLowerCase() === "q") ongiJosik();
-});
+/* ── 문파 데이터 (사양서 1.2) ── */
+const SECTS = {
+  화산파: { align: "정", desc: "쾌검과 매화검기 — 대의와 협의", w1: "매화검무", w2: "운무일검",
+    colors: ["#f2a6c0", "#b9c8f5"], base: { hp: 1000, qi: 500, dmg: 1.0 } },
+  소림사: { align: "정", desc: "금강불괴·권법 — 자비와 절제", w1: "항마복호장", w2: "금강불동신",
+    colors: ["#e8c86a", "#f0f0e0"], base: { hp: 1300, qi: 380, dmg: 0.9 } },
+  무당파: { align: "정", desc: "태극혜검 — 유능제강", w1: "태극검무", w2: "태극권진",
+    colors: ["#a8d8e8", "#d0e8f0"], base: { hp: 900, qi: 650, dmg: 0.95 } },
+  흑호채: { align: "사", desc: "도법·암기 — 실리와 생존", w1: "흑호참마도", w2: "암기연발",
+    colors: ["#8a7a5a", "#6a5a3a"], base: { hp: 1150, qi: 450, dmg: 1.1 } },
+  만독문: { align: "사", desc: "독공·점혈 — 치명적 일격", w1: "만독신장", w2: "점혈수",
+    colors: ["#8ac77a", "#5a8a4a"], base: { hp: 850, qi: 700, dmg: 1.15 } },
+  운상각: { align: "은둔", desc: "경공·은신·환술 — 운의 수호자", w1: "운상검영", w2: "환영신법",
+    colors: ["#d0c8f0", "#b8a8e8"], base: { hp: 950, qi: 600, dmg: 1.05 } },
+};
+
+/* ── 음양오행 상성 (사양서 2.2) ── */
+const ELEMENTS = ["화", "수", "뇌", "풍", "토"];
+const COUNTER = { 화: "수", 수: "뇌", 뇌: "풍", 풍: "토", 토: "화" }; // 카운터 관계
+function elementMultiplier(att, def) {
+  if (!att || !def) return 1.0;
+  if (COUNTER[att] === def) return 1.5;      // 카운터 성공
+  if (COUNTER[def] === att) return 0.6;      // 카운터 당함
+  return 1.0;
+}
 
 /* ── 상태 ── */
 const S = {
+  started: false,
+  sect: null,
   x: 640, y: 400, dir: 1,
-  hp: 1000, hpMax: 1000,
-  qi: 500, qiMax: 500,
+  hp: 1000, hpMax: 1000, qi: 500, qiMax: 500,
+  dmgMult: 1.0,
   realm: 2, realmNames: ["삼류","이류","일류","절정","초절정","화경"],
-  naegong: 0,           // 내공 누적 (경지 진행도)
+  naegong: 0,
+  coin: 50,
+  rep_ui: 50, rep_pa: 50,  // 의협심·패도 (0~100)
   parryUntil: 0,
-  cd: { 매화검무: 0, 운무일검: 0 },
-  enemies: [], particles: [],
-  won: false,
+  cd: { w1: 0, w2: 0 },
+  element: "풍",
+  enemies: [], particles: [], quests: {}, repHistory: [],
+  questsDone: 0, kills: 0,
 };
 
-const SKILLS = {
-  "쾌검식":  { dmg: 40,  cost: 0,   cd: 350,  color: "#cfe3ff" },
-  "매화검무": { dmg: 120, cost: 80,  cd: 4000, color: "#f2a6c0", petals: 26 },
-  "운무일검": { dmg: 210, cost: 150, cd: 7000, color: "#b9c8f5", dash: true },
-};
+const QUESTS = [
+  { id: "토벌", title: "흑호채 산적 토벌", desc: "흑호채 산적 5명 토벌", need: 5, key: "kill",
+    reward: { coin: 40, rep_ui: 8 }, done: false, progress: 0 },
+  { id: "수련", title: "운기조식 수련", desc: "운기조식 3회 완행", need: 3, key: "ongi",
+    reward: { naegong: 60 }, done: false, progress: 0 },
+  { id: "기연", title: "기연 1회 발견", desc: "기연 이벤트 발견", need: 1, key: "qiyuan",
+    reward: { coin: 30, rep_ui: 5 }, done: false, progress: 0 },
+];
 
-/* ── 적(흑호채 산적) ── */
+/* ── 문파 선택 ── */
+function buildSectGrid() {
+  const grid = $("sectGrid");
+  Object.entries(SECTS).forEach(([name, s]) => {
+    const c = document.createElement("div");
+    c.className = "sectCard";
+    c.innerHTML = `<div class="nm">${name}</div><div class="al">${s.align}계열</div>` +
+      `<div class="ds">${s.desc}</div><div class="wp">무공: ${s.w1} · ${s.w2}<br>기혈 ${s.base.hp} · 공력 ${s.base.qi}</div>`;
+    c.addEventListener("click", () => startGame(name));
+    grid.appendChild(c);
+  });
+}
+function startGame(name) {
+  S.sect = name;
+  const s = SECTS[name];
+  S.hpMax = s.base.hp; S.hp = s.base.hp;
+  S.qiMax = s.base.qi; S.qi = s.base.qi;
+  S.dmgMult = s.base.dmg;
+  $("sectSel").style.display = "none";
+  $("sect").textContent = name + " (" + s.align + ")";
+  $("s-1").querySelector(".nm").textContent = s.w1;
+  $("s-2").querySelector(".nm").textContent = s.w2;
+  // 퀘스트 패널 표시
+  $("questPanel").classList.add("on");
+  renderQuests();
+  log(`${name}에 입문했습니다. 무공 ${s.w1}·${s.w2} 습득!`, "sys");
+  // 기본 무공 매핑
+  S.skills = { w1: name === "소림사" ? "항마복호장" : s.w1, w2: s.w2 };
+  S.element = ELEMENTS[Math.floor(Math.random() * ELEMENTS.length)];
+  log(`본命 오행: ${S.element} — 적의 오행을 뚫으면 피해 1.5배!`, "qi");
+}
+window.__m2 = "S2";
+buildSectGrid();
+
+/* ── 평판 ── */
+function shiftRep(ui, pa) {
+  S.rep_ui = Math.max(0, Math.min(100, S.rep_ui + ui));
+  S.rep_pa = Math.max(0, Math.min(100, S.rep_pa + pa));
+  $("repUiVal").textContent = S.rep_ui; $("repPaVal").textContent = S.rep_pa;
+  $("repUiBar").style.width = S.rep_ui + "%"; $("repPaBar").style.width = S.rep_pa + "%";
+}
+shiftRep(0, 0);
+
+/* ── 퀘스트 ── */
+function renderQuests() {
+  const p = $("questPanel");
+  p.innerHTML = "<h4>협객행 (俠客行)</h4>" + QUESTS.map(q =>
+    `<div class="q ${q.done ? "done" : ""}"><b>${q.title}</b><br>${q.desc}` +
+    `<br><span class="prog">${q.done ? "✓ 완료" : q.progress + " / " + q.need}</span></div>`).join("");
+}
+function questProgress(key, amount = 1) {
+  let changed = false;
+  QUESTS.forEach(q => {
+    if (!q.done && q.key === key) {
+      q.progress += amount;
+      if (q.progress >= q.need) { q.done = true; toastUI("퀘스트 완료: " + q.title); changed = true; }
+    }
+  });
+  if (changed) renderQuests();
+}
+function toastUI(msg) {
+  const t = $("toast"); t.textContent = msg; t.style.display = "block";
+  clearTimeout(t._t); t._t = setTimeout(() => t.style.display = "none", 2500);
+}
+
+/* ── 적 스폰 — 오행 속성 부여 ── */
 function spawnEnemy() {
   const side = Math.random() < .5 ? -1 : 1;
+  const el = ELEMENTS[Math.floor(Math.random() * ELEMENTS.length)];
   S.enemies.push({
     x: S.x + side * (420 + Math.random() * 260), y: 400 + (Math.random() - .5) * 120,
-    hp: 260, hpMax: 260, dir: -side, speed: 0.9 + Math.random() * .5,
-    hitT: 0, dead: false,
+    hp: 260, hpMax: 260, dir: -side, speed: .9 + Math.random() * .5,
+    hitT: 0, dead: false, element: el,
   });
 }
 for (let i = 0; i < 3; i++) spawnEnemy();
@@ -108,18 +275,35 @@ function doDamage(dmg, kind, x, y) {
   alive.sort((a, b) => Math.abs(a.x - S.x) - Math.abs(b.x - S.x));
   const t = alive[0];
   if (Math.abs(t.x - S.x) > 340) return;
-  t.hp -= dmg; t.hitT = performance.now();
+  // 음양오행 상성
+  const mult = elementMultiplier(S.element, t.element);
+  const final = Math.round(dmg * S.dmgMult * mult);
+  t.hp -= final; t.hitT = now();
   burst(x ?? t.x, y ?? t.y, SKILLS[kind]?.color || "#cfe3ff", kind === "매화검무" ? 20 : 8);
+  if (mult > 1) floatText(x ?? t.x, y ?? t.y - 40, "오행 카운터! x1.5", "#f0d78c");
+  if (mult < 1) floatText(x ?? t.x, y ?? t.y - 40, "상성 불리 x0.6", "#8a9a8a");
   if (t.hp <= 0) {
-    t.dead = true;
+    t.dead = true; S.kills++;
+    S.coin += 8 + Math.floor(Math.random() * 6);
+    $("coin").textContent = `동전 ${S.coin}전`;
     gain(t);
+    questProgress("kill");
     S.enemies = S.enemies.filter(e => !e.dead);
     setTimeout(spawnEnemy, 2500);
   }
 }
+function floatText(x, y, text, color) {
+  const d = document.createElement("div");
+  d.textContent = text;
+  d.style.cssText = `position:fixed;left:${x}px;top:${y}px;color:${color};font-family:serif;` +
+    `font-size:15px;text-shadow:0 1px 3px #000;pointer-events:none;z-index:30;transition:all 1s`;
+  document.body.appendChild(d);
+  setTimeout(() => { d.style.opacity = 0; d.style.transform = "translateY(-30px)"; }, 30);
+  setTimeout(() => d.remove(), 1100);
+}
 function gain(t) {
   S.naegong += 34;
-  log(`흑호채 산적을 토벌했다. 내공 +34`, "sys");
+  log(`흑호채 산적을 토벌했다. 내공 +34, 동전 획득`, "sys");
   while (S.naegong >= realmNeed()) breakthrough();
 }
 function realmNeed() { return 100 * S.realm; }
@@ -133,28 +317,27 @@ function breakthrough() {
     burst(S.x, S.y - 60, "#f0d78c", 40);
   }
 }
+
+/* ── 무공 ── */
+const SFX = {
+  w1: { dmg: 90, cost: 0, cd: 900, color: "#cfe3ff" },
+  w2: { dmg: 190, cost: 140, cd: 6500, color: "#b9c8f5", petals: 26 },
+};
 function basicAttack() { if (now() < S.cd.쾌검식) return; S.cd.쾌검식 = now() + 350; doDamage(40, "쾌검식", S.x + S.dir * 60, S.y - 20); swingArc("#cfe3ff"); }
-function parry() {
-  S.parryUntil = now() + 260;
-  log("초식흘리기 — 반격 자세", "warn");
-}
-function skill(name) {
-  if (now() < S.cd[name]) return;
-  const sk = SKILLS[name];
-  if (S.qi < sk.cost) { log("공력이 부족합니다 — 운기조식(Q)으로 회복", "warn"); return; }
-  S.qi -= sk.cost;
-  S.cd[name] = now() + sk.cd;
+function parry() { S.parryUntil = now() + 260; log("초식흘리기 — 반격 자세", "warn"); }
+function skillW(which) {
+  const name = which === "w1" ? (SECTS[S.sect]?.w1 || "무공1") : (SECTS[S.sect]?.w2 || "무공2");
+  if (now() < S.cd[which]) return;
+  const cost = which === "w2" ? 140 : 0;
+  if (S.qi < cost) { log("공력이 부족합니다 — 운기조식(Q)으로 회복", "warn"); return; }
+  S.qi -= cost;
+  S.cd[which] = now() + (which === "w2" ? 6500 : 900);
   const alive = S.enemies.filter(e => !e.dead && Math.abs(e.x - S.x) < 520);
   if (!alive.length) { log("사거리에 적이 없습니다.", "warn"); return; }
-  if (name === "운무일검") S.x += (alive[0].x > S.x ? 150 : -150);
-  alive.forEach(e => doDamage(sk.dmg, name, e.x, e.y - 20));
-  swingArc(sk.color);
-}
-function ongiJosik() {
-  S.qi = Math.min(S.qiMax, S.qi + 90);
-  S.naegong += 12;
-  log("운기조식 — 공력 회복 (+90), 내공 +12", "qi");
-  while (S.naegong >= realmNeed()) breakthrough();
+  if (which === "w2") S.x += (alive[0].x > S.x ? 150 : -150);
+  const color = SECTS[S.sect]?.colors?.[which === "w1" ? 0 : 1] || "#cfe3ff";
+  alive.forEach(e => doDamage(90, which === "w2" ? "w2" : "w1", e.x, e.y - 20));
+  swingArc(color);
 }
 function swingArc(color) {
   for (let i = 0; i < 10; i++) S.particles.push({
@@ -171,16 +354,14 @@ function burst(x, y, color, n) {
 }
 function now() { return performance.now(); }
 function log(msg, cls = "") {
-  const el = document.getElementById("log");
-  const d = document.createElement("div");
-  if (cls) d.className = cls;
-  d.textContent = "· " + msg;
+  const el = $("log"), d = document.createElement("div");
+  if (cls) d.className = cls; d.textContent = "· " + msg;
   el.appendChild(d);
   while (el.children.length > 6) el.firstChild.remove();
-  setTimeout(() => d.remove(), 6000);
+  setTimeout(() => { if (d.parentNode) d.remove(); }, 6000);
 }
 
-/* ── 기연(奇緣) — 확률적 발견 이벤트 ── */
+/* ── 기연 (사양서: 환경 조건 만족 시 발동) ── */
 let lastQiyuan = 0;
 setInterval(() => {
   if (Date.now() - lastQiyuan < 45000 || S.enemies.some(e => !e.dead)) return;
@@ -199,6 +380,7 @@ setInterval(() => {
       S.qiMax += 40; S.qi = S.qiMax;
       log("【기연】바위 틈의 영검(靈劍) 조각을 손에 넣었다! 공력 최대치 +40", "qi");
     }
+    questProgress("qiyuan");
   }
 }, 10000);
 
@@ -208,14 +390,13 @@ setInterval(() => {
     if (e.dead) return;
     e.dir = S.x > e.x ? 1 : -1;
     if (Math.abs(e.x - S.x) > 120) e.x += e.dir * e.speed * 3;
-    else if (now() - e.hitT > 900 && Math.random() < .5) {
+    else if (now() - (e.hitT || 0) > 900 && Math.random() < .5) {
       if (now() < S.parryUntil) {
         S.qi = Math.min(S.qiMax, S.qi + 18);
         log("초식흘리기 성공! 적의 공세를 흘렸다. 공력 +18", "qi");
         burst(e.x, e.y - 30, "#f0d78c", 10);
       } else {
-        S.hp -= 25;
-        flashRed();
+        S.hp -= 25; flashRed();
       }
     }
   });
@@ -227,13 +408,67 @@ setInterval(() => {
     setTimeout(spawnEnemy, 2000);
   }
 }, 900);
-
 function flashRed() {
   const d = document.createElement("div");
   d.style.cssText = "position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at center, transparent 55%, rgba(160,20,20,.45));z-index:9;transition:opacity .3s";
   document.body.appendChild(d);
   setTimeout(() => d.remove(), 280);
 }
+
+/* ── 상점 ── */
+document.querySelectorAll("[data-buy]").forEach(b => b.addEventListener("click", () => {
+  const kind = b.dataset.buy;
+  const cost = { hp: 30, qi: 25, ng: 50 }[kind];
+  if (S.coin < cost) { toastUI("동전이 부족합니다"); return; }
+  S.coin -= cost; $("coin").textContent = `동전 ${S.coin}전`;
+  if (kind === "hp") { S.hpMax += 300; S.hp = S.hpMax; toastUI("기혈 최대치 +300!"); }
+  if (kind === "qi") { S.qiMax += 200; S.qi = S.qiMax; toastUI("공력 최대치 +200!"); }
+  if (kind === "ng") { S.naegong += 60; while (S.naegong >= realmNeed()) breakthrough(); toastUI("내공 +60 단련!"); }
+  $("shop").classList.add("hidden");
+}));
+$("shop").classList.remove("hidden"); $("shop").classList.add("hidden");
+document.getElementById("shop").querySelector(".close").addEventListener("click", () => {
+  document.getElementById("shop").classList.remove("on");
+});
+
+/* ── 퀘스트 패널 토글 ── */
+addEventListener("keydown", e => {
+  if (e.key.toLowerCase() === "t") { $("questPanel").classList.toggle("on"); }
+  if (e.key.toLowerCase() === "b") { $("shop").classList.toggle("on"); }
+});
+
+/* ── 세이브/로드 (localStorage) ── */
+function saveGame() {
+  const d = { sect: S.sect, hp: S.hp, hpMax: S.hpMax, qi: S.qi, qiMax: S.qiMax, realm: S.realm,
+    naegong: S.naegong, coin: S.coin, rep_ui: S.rep_ui, rep_pa: S.rep_pa,
+    element: S.element, questsDone: S.questsDone,
+    quests: QUESTS.map(q => ({ id: q.id, progress: q.progress, done: q.done })),
+    dmgMult: S.dmgMult };
+  localStorage.setItem("wun-save", JSON.stringify(d));
+  toastUI("저장 완료 (F5 새로고침 후 계속)");
+}
+function loadGame() {
+  const raw = localStorage.getItem("wun-save");
+  if (!raw) { toastUI("저장된 게임이 없습니다"); return; }
+  const d = JSON.parse(raw);
+  if (d.sect && !S.sect) startGame(d.sect);
+  S.hp = d.hp; S.hpMax = d.hpMax; S.qi = d.qi; S.qiMax = d.qiMax;
+  S.realm = d.realm; S.naegong = d.naegong; S.coin = d.coin;
+  S.rep_ui = d.rep_ui; S.rep_pa = d.rep_pa; S.element = d.element;
+  S.dmgMult = d.dmgMult || 1;
+  shiftRep(0, 0);
+  $("coin").textContent = `동전 ${S.coin}전`;
+  if (d.quests) d.quests.forEach(q => {
+    const target = QUESTS.find(x => x.id === q.id);
+    if (target) { target.progress = q.progress; target.done = q.done; }
+  });
+  renderQuests();
+  toastUI("불러오기 완료");
+}
+addEventListener("keydown", e => {
+  if (e.key === "F5") { e.preventDefault(); saveGame(); }
+  if (e.key === "F9") { e.preventDefault(); loadGame(); }
+});
 
 /* ── 렌더 ── */
 const mist = [];
@@ -242,70 +477,60 @@ for (let i = 0; i < 26; i++) mist.push({ x: Math.random() * 1280, y: 120 + Math.
 function draw(t) {
   requestAnimationFrame(() => draw(t));
   const w = cv.width, h = cv.height;
-  // 이동
   if (keys["a"]) { S.x -= 6.5; S.dir = -1; }
   if (keys["d"]) { S.x += 6.5; S.dir = 1; }
   S.x = Math.max(60, Math.min(w - 60, S.x));
 
-  // 배경 — 운무령 안개 협곡
   const sky = ctx.createLinearGradient(0, 0, 0, h);
   sky.addColorStop(0, "#1a2420"); sky.addColorStop(.55, "#243329"); sky.addColorStop(1, "#18221b");
   ctx.fillStyle = sky; ctx.fillRect(0, 0, w, h);
-  // 먹산 능선
   ctx.fillStyle = "rgba(10,16,12,.8)";
   ctx.beginPath(); ctx.moveTo(0, h * .52);
   for (let x = 0; x <= w; x += 40) ctx.lineTo(x, h * .42 + Math.sin(x * .006 + 2) * 46 + Math.sin(x * .013) * 24);
   ctx.lineTo(w, h); ctx.lineTo(0, h); ctx.fill();
-  // 안개
   mist.forEach(m => {
     m.x += m.sp; if (m.x - m.r > w) m.x = -m.r;
     const g = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, m.r);
     g.addColorStop(0, "rgba(150,170,158,.05)"); g.addColorStop(1, "rgba(150,170,158,0)");
     ctx.fillStyle = g; ctx.fillRect(m.x - m.r, m.y - m.r, m.r * 2, m.r * 2);
   });
-  // 지면
   ctx.fillStyle = "rgba(8,12,9,.9)"; ctx.fillRect(0, h - 90, w, 90);
 
-  // 바닥패… 아니, 적
   S.enemies.forEach(e => {
     if (e.dead) return;
     ctx.save();
     ctx.translate(e.x, e.y);
     const sc = 1.05;
-    ctx.scale(-sc, sc); // 좌우 반전(플레이어 향함)
+    ctx.scale(-sc, sc);
     ctx.fillStyle = "#141414";
     ctx.fillRect(-26, -96, 52, 106);
     ctx.fillStyle = "#2a1f16"; ctx.fillRect(-26, 10, 52, 14);
     ctx.fillStyle = e.hitT && performance.now() - e.hitT < 120 ? "#ff6b6b" : "#3d3225";
     ctx.fillRect(-18, -88, 36, 40);
     ctx.restore();
-    // 체력바
     ctx.fillStyle = "rgba(0,0,0,.6)"; ctx.fillRect(e.x - 30, e.y - 116, 60, 6);
     ctx.fillStyle = "#c94f4f"; ctx.fillRect(e.x - 30, e.y - 116, 60 * Math.max(0, e.hp / e.hpMax), 6);
+    // 오행 표기
+    ctx.fillStyle = "rgba(200,220,255,.8)"; ctx.font = "12px serif"; ctx.textAlign = "center";
+    ctx.fillText(e.element, e.x, e.y - 122);
   });
 
-  // 플레이어 — 수묵 무사
   ctx.save();
   ctx.translate(S.x, S.y);
   ctx.scale(S.dir, 1);
-  // 도포
   ctx.fillStyle = "#20262b";
   ctx.beginPath(); ctx.moveTo(-30, 6); ctx.quadraticCurveTo(-8, -88, 22, -96);
   ctx.lineTo(30, 4); ctx.quadraticCurveTo(0, 16, -30, 6); ctx.fill();
-  // 머리 · 두건
   ctx.fillStyle = "#c9a97a"; ctx.beginPath(); ctx.arc(4, -96, 15, 0, 7); ctx.fill();
   ctx.fillStyle = "#1a1d20"; ctx.fillRect(-11, -114, 30, 14);
-  // 검
   ctx.strokeStyle = "#dfe6ea"; ctx.lineWidth = 3.5;
   ctx.beginPath(); ctx.moveTo(10, -30); ctx.lineTo(64 + Math.sin(t * .004) * 4, -58); ctx.stroke();
-  // 흘리기 자세 표시
   if (now() < S.parryUntil) {
     ctx.strokeStyle = "rgba(240,215,140,.9)"; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.arc(0, -20, 52, -1.4, 1.0); ctx.stroke();
   }
   ctx.restore();
 
-  // 파티클
   S.particles = S.particles.filter(p => p.life > 0);
   S.particles.forEach(p => {
     p.life -= 16; p.x += p.vx; p.y += p.vy; p.vy += .12;
@@ -315,33 +540,28 @@ function draw(t) {
     ctx.globalAlpha = 1;
   });
 
-  // 게이지 그리기
   drawGauges();
 }
 function drawGauges() {
   const gz = document.getElementById("gz").getContext("2d");
+  gz.setTransform(1, 0, 0, 1, 0, 0);
   gz.clearRect(0, 0, 264, 264);
   gz.translate(132, 132);
-  // 외곽 옥 패
   gz.strokeStyle = "#b8912f"; gz.lineWidth = 5;
   gz.beginPath(); gz.arc(0, 0, 118, 0, 7); gz.stroke();
-  // 기혈 (바깥 링)
   const hpR = Math.max(0, S.hp / S.hpMax);
   gz.lineWidth = 22; gz.strokeStyle = "rgba(60,10,10,.7)";
   gz.beginPath(); gz.arc(0, 0, 96, -Math.PI / 2, Math.PI * 1.5); gz.stroke();
   gz.strokeStyle = "#c94f4f";
   gz.beginPath(); gz.arc(0, 0, 96, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * hpR); gz.stroke();
-  // 공력 (안쪽 링)
   const qiR = Math.max(0, S.qi / S.qiMax);
   gz.lineWidth = 16; gz.strokeStyle = "rgba(10,20,40,.7)";
   gz.beginPath(); gz.arc(0, 0, 66, -Math.PI / 2, Math.PI * 1.5); gz.stroke();
   gz.strokeStyle = "#5aa8c7";
   gz.beginPath(); gz.arc(0, 0, 66, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * qiR); gz.stroke();
-  // 태극 문양 중앙
   gz.fillStyle = "#efe6cf";
   gz.font = "44px serif"; gz.textAlign = "center"; gz.textBaseline = "middle";
   gz.fillText("雲", 0, 2);
-  // 수치
   gz.font = "22px serif"; gz.fillStyle = "#e8e2d0";
   gz.fillText(`${S.hp}`, 0, 46);
   gz.font = "14px serif"; gz.fillStyle = "#9fb6c7";
@@ -349,9 +569,8 @@ function drawGauges() {
   gz.setTransform(1, 0, 0, 1, 0, 0);
 }
 
-/* 쿨다운 표시 */
 setInterval(() => {
-  [["매화검무", "cd1", "s-1"], ["운무일검", "cd2", "s-2"]].forEach(([k, cdId, slotId]) => {
+  [["w1", "cd1", "s-1"], ["w2", "cd2", "s-2"]].forEach(([k, cdId, slotId]) => {
     const left = S.cd[k] - now();
     const el = document.getElementById(cdId);
     const slot = document.getElementById(slotId);
@@ -360,9 +579,22 @@ setInterval(() => {
   });
 }, 120);
 
-log("【시스템】천하삼분의 난세 — 강호에 발을 디뎠습니다.", "sys");
-log("운무신결의 단서가 강호에 흩어졌다. 운무령에서 수련을 시작하세요.", "warn");
-requestAnimationFrame(draw);
+/* ── 세이브/로드 UI ── */
+addEventListener("keydown", e => {
+  if (e.key === "F5") { e.preventDefault(); saveGame(); }
+  if (e.key === "F9") { e.preventDefault(); loadGame(); }
+  if (e.key === "j") { basicAttack(); }
+  if (e.key === "k") { parry(); }
+  if (e.key === "1") { skillW("w1"); }
+  if (e.key === "2") { skillW("w2"); }
+  if (e.key.toLowerCase() === "q") { ongiJosik(); }
+  keys[e.key.toLowerCase()] = true;
+});
+addEventListener("keyup", e => {
+  keys[e.key.toLowerCase()] = false;
+});
+log("문파를 선택해 강호에 입문하세요.", "sys");
+window.__m3 = "S3";
 </script>
 </body>
 </html>

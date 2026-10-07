@@ -1,0 +1,16 @@
+{
+  "note": "디자인 품질 검증용 합성 데모의 이미지 출처 기록. 모든 이미지는 이미지 검색으로 수집한 실존 사진이며, 그래파이트(흑백+콘트라스트) 처리 후 사용. 상업적 재사용 불가 — 로컬 검증 데모 전용.",
+  "base": "https://image-search-mcp-cn-beijing.oss-cn-beijing.aliyuncs.com/image-search-mcp/images-ppt/",
+  "items": {
+    "hero-gown.jpg":   { "id": "7f8c044da210.jpg", "source": "PAP Magazine",   "desc": "흑색 러플 코르셋 가운, 흑백 에디토리얼" },
+    "editor-fur.jpg":  { "id": "bd57afeb9a4a.jpeg", "source": "Vanity Fair",   "desc": "퍼 코트 차림의 남성 모델, 거울 옆" },
+    "look01-camel-coat.jpg": { "id": "5640ee9f2870.jpg", "source": "캐럿",      "desc": "캐멀 더블 브레스티드 코트" },
+    "look02-gray-coat.jpg":  { "id": "25a3fce14d13.webp", "source": "MeraPrompt", "desc": "그레이 울 코트 + 터틀넥" },
+    "look03-ribbed-knit.jpg": { "id": "28857202371f.jpg", "source": "Ape to Gentleman", "desc": "그레이 리브 니트" },
+    "look04-knit-dress.jpg":  { "id": "b9730b1d30d5.jpg", "source": "The Korea Herald", "desc": "러웨이 니트 미니 드레스" },
+    "look05-halter-gown.jpg": { "id": "68d01898fb64.jpg", "source": "Who What Wear", "desc": "블랙 할터 가운" },
+    "look06-zip-jacket.jpg":  { "id": "06ba97543b08.jpg", "source": "Neighbour", "desc": "다크 집업 재킷, 스튜디오" },
+    "look07-cardigan.jpg":    { "id": "30410e8a7454.jpg", "source": "chinasquad", "desc": "올리브 쇼울카라 카디건" },
+    "look08-white-dress.jpg": { "id": "10ba508fd6d0.jpg", "source": "PAP Magazine", "desc": "화이트 드레스, 야간 에디토리얼" }
+  }
+}

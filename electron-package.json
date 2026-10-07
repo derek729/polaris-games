@@ -1,0 +1,36 @@
+{
+  "name": "dumadang-desktop",
+  "version": "1.0.0",
+  "description": "두마당 — 바둑 · 오목 · 알까기 · 기보 데스크톱 앱",
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron main.cjs",
+    "dist:linux": "electron-builder --linux AppImage --config electron-builder.yml",
+    "dist:win": "electron-builder --win portable --config electron-builder.yml"
+  },
+  "build": {
+    "appId": "com.dumadang.app",
+    "productName": "두마당",
+    "directories": { "output": "dist-electron" },
+    "files": [
+      "main.cjs",
+      "suiji-index.html",
+      "suiji-go.html",
+      "suiji-omok.html",
+      "suiji-alkkagi.html",
+      "suiji-kifu.html",
+      "suiji-theme.css",
+      "suiji-common.js",
+      "suiji-engine.js",
+      "suiji-net.js",
+      "suiji-3d.js",
+      "manifest.webmanifest",
+      "icons/**",
+      "game-assets/**"
+    ]
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^26.0.0"
+  }
+}

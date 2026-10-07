@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Anbu - 버튼 하나로 전하는 가족의 안부. 부모님은 쉽게, 자녀는 안심하게.">
+    <meta name="keywords" content="안부, 가족, 시니어, 노인, 앱, 무전기, 체크인">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="Anbu - 가족 안부 앱">
+    <meta property="og:description" content="버튼 하나로 전하는 가족의 안부">
+    <meta property="og:image" content="https://anbu.app/assets/images/og-image.png">
+    <meta property="og:url" content="https://anbu.app">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Black+Han+Sans&family=Noto+Sans+KR:wght@400;500;700&family=Noto+Sans+JP:wght@400;500;700&family=Noto+Sans+SC:wght@400;500;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="icon" href="favicon.ico">
+    <title>Anbu - 가족 안부 앱</title>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="#" class="logo">
+                <span class="logo-icon" aria-hidden="true"></span>
+                <span class="logo-text">Anbu</span>
+            </a>
+
+            <ul class="nav-links">
+                <li><a href="#features" data-i18n="nav_features">기능</a></li>
+                <li><a href="#pricing" data-i18n="nav_pricing">가격</a></li>
+                <li><a href="#download" data-i18n="nav_download">다운로드</a></li>
+                <li><a href="#faq" data-i18n="nav_faq">FAQ</a></li>
+            </ul>
+
+            <div class="nav-right">
+                <select id="language-selector" class="lang-select">
+                    <option value="ko">🇰🇷 한국어</option>
+                    <option value="en">🇺🇸 English</option>
+                    <option value="ja">🇯🇵 日本語</option>
+                    <option value="zh-CN">🇨🇳 简体中文</option>
+                    <option value="zh-TW">🇹🇼 繁體中文</option>
+                </select>
+                <a href="#signup" class="btn btn-primary btn-nav" data-i18n="btn_get_started">시작하기</a>
+            </div>
+
+            <button class="mobile-menu-btn" aria-label="메뉴">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-container">
+            <div class="hero-content">
+                <h1 class="hero-title" data-i18n="hero_title">부모님의 안부,<br>버튼 하나로 전해요</h1>
+                <p class="hero-subtitle" data-i18n="hero_subtitle">복잡한 메신저는 그만. 어르신도 3초면 안부를 보낼 수 있어요.<br>자녀는 실시간으로 부모님의 안부를 확인하세요.</p>
+
+                <div class="hero-buttons">
+                    <a href="#signup" class="btn btn-primary btn-lg" data-i18n="btn_notify_launch">출시 알림 받기</a>
+                    <a href="#demo" class="btn btn-outline btn-lg" data-i18n="btn_watch_demo">데모 보기</a>
+                </div>
+
+                <div class="hero-stats">
+                    <div class="stat">
+                        <span class="stat-number">3</span>
+                        <span class="stat-label" data-i18n="stat_seconds">초 만에 안부 전송</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-number">4</span>
+                        <span class="stat-label" data-i18n="stat_buttons">개의 큰 버튼</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-number">0</span>
+                        <span class="stat-label" data-i18n="stat_cost">원 (부모님 앱)</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="hero-image">
+                <div class="phone-mockup parent-phone">
+                    <div class="phone-screen">
+                        <div class="app-header">
+                            <span class="app-emblem" aria-hidden="true"></span>
+                            <span class="app-greeting-col">
+                                <span class="app-greeting" data-i18n="app_greeting">안녕하세요, 어머니</span>
+                                <span class="app-name">안부함</span>
+                            </span>
+                            <span class="app-time">오후 2:30</span>
+                        </div>
+                        <div class="week-strip" aria-hidden="true">
+                            <span class="week-day"><span class="week-label">월</span><span class="week-slot sent"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span></span>
+                            <span class="week-day"><span class="week-label">화</span><span class="week-slot sent"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span></span>
+                            <span class="week-day"><span class="week-label">수</span><span class="week-slot sent"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span></span>
+                            <span class="week-day"><span class="week-label">목</span><span class="week-slot sent"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span></span>
+                            <span class="week-day today"><span class="week-label">금</span><span class="week-slot today-dot"></span></span>
+                            <span class="week-day"><span class="week-label">토</span><span class="week-slot"></span></span>
+                            <span class="week-day"><span class="week-label">일</span><span class="week-slot"></span></span>
+                        </div>
+                        <div class="anbu-buttons-grid">
+                            <button class="anbu-btn anbu-ate">
+                                <span class="anbu-stamp"><svg viewBox="0 0 24 24"><path d="M11 9H9V2H7v7H5V2H3v7c0 2.12 1.66 3.84 3.75 3.97V22h2.5v-9.03C11.34 12.84 13 11.12 13 9V2h-2v7zm5-3v8h2.5v8H21V2c-2.76 0-5 2.24-5 4z"/></svg></span>
+                                <span class="anbu-text" data-i18n="anbu_btn_ate">밥 먹었어요</span>
+                            </button>
+                            <button class="anbu-btn anbu-fine">
+                                <span class="anbu-stamp"><svg viewBox="0 0 24 24"><path d="M15.5 9.5C14.67 9.5 14 8.83 14 8s.67-1.5 1.5-1.5S17 7.17 17 8s-.67 1.5-1.5 1.5zM8.5 9.5C7.67 9.5 7 8.83 7 8s.67-1.5 1.5-1.5S10 7.17 10 8s-.67 1.5-1.5 1.5zm3.5 6.5c-1.77 0-3.33-1-4.12-2.5h8.24c-.79 1.5-2.35 2.5-4.12 2.5zM12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg></span>
+                                <span class="anbu-text" data-i18n="anbu_btn_fine">잘 지내요</span>
+                            </button>
+                            <button class="anbu-btn anbu-home">
+                                <span class="anbu-stamp"><svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg></span>
+                                <span class="anbu-text" data-i18n="anbu_btn_home">집에 왔어요</span>
+                            </button>
+                            <button class="anbu-btn anbu-love">
+                                <span class="anbu-stamp"><svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg></span>
+                                <span class="anbu-text" data-i18n="anbu_btn_love">사랑해요</span>
+                            </button>
+                        </div>
+                        <button class="walkie-btn">
+                            <span class="walkie-disc"><svg viewBox="0 0 24 24"><path d="M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/></svg></span>
+                            <span class="walkie-text" data-i18n="btn_walkie">무전기</span>
+                        </button>
+                        <button class="sos-latch" aria-label="긴급 SOS">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
+                            긴급 SOS
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="hero-wave">
+            <svg viewBox="0 0 1440 120" preserveAspectRatio="none">
+                <path d="M0,64 C480,150 960,-20 1440,64 L1440,120 L0,120 Z" fill="#f8f9fa"/>
+            </svg>
+        </div>
+    </section>
+
+    <!-- Problem Section -->
+    <section class="problem" id="problem">
+        <div class="container">
+            <h2 class="section-title" data-i18n="problem_title">매일 수백만 가족이 겪는 고민</h2>
+
+            <div class="problem-cards">
+                <div class="problem-card">
+                    <div class="problem-icon">😟</div>
+                    <div class="problem-quote">"엄마, 밥은 드셨어요?"</div>
+                    <p class="problem-desc" data-i18n="problem_1_desc">하루에도 몇 번씩 걱정되지만, 매번 전화하기는 부담스러워요.</p>
+                </div>
+
+                <div class="problem-card">
+                    <div class="problem-icon">📱</div>
+                    <div class="problem-quote">"카톡이 너무 복잡해..."</div>
+                    <p class="problem-desc" data-i18n="problem_2_desc">어르신들에게 기존 메신저는 버튼도 많고 글씨도 작아요.</p>
+                </div>
+
+                <div class="problem-card">
+                    <div class="problem-icon">😰</div>
+                    <div class="problem-quote">"읽씹당하면 더 걱정돼요"</div>
+                    <p class="problem-desc" data-i18n="problem_3_desc">읽었는데 답이 없으면 오히려 불안해져요.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Solution Section -->
+    <section class="solution" id="solution">
+        <div class="container">
+            <h2 class="section-title" data-i18n="solution_title">Anbu가 해결해요</h2>
+            <p class="section-subtitle" data-i18n="solution_subtitle">부모님은 버튼만 누르면 끝. 자녀는 실시간으로 확인.</p>
+
+            <div class="solution-flow">
+                <div class="flow-step">
+                    <div class="flow-phone parent">
+                        <div class="flow-label" data-i18n="flow_parent">부모님</div>
+                        <div class="flow-action">
+                            <span class="flow-emoji">👆</span>
+                            <span data-i18n="flow_action_tap">"밥 먹었어요" 터치</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flow-arrow">→</div>
+
+                <div class="flow-step">
+                    <div class="flow-icon">☁️</div>
+                    <div class="flow-label" data-i18n="flow_instant">즉시 전송</div>
+                </div>
+
+                <div class="flow-arrow">→</div>
+
+                <div class="flow-step">
+                    <div class="flow-phone child">
+                        <div class="flow-label" data-i18n="flow_child">자녀</div>
+                        <div class="flow-action">
+                            <span class="flow-emoji">🔔</span>
+                            <span data-i18n="flow_action_receive">"어머니가 밥을 드셨어요"</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features" id="features">
+        <div class="container">
+            <h2 class="section-title" data-i18n="features_title">주요 기능</h2>
+
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">🔘</div>
+                    <h3 class="feature-title" data-i18n="feature_1_title">큰 버튼 4개</h3>
+                    <p class="feature-desc" data-i18n="feature_1_desc">손가락 두 배 크기의 버튼. 어르신도 쉽게 터치할 수 있어요.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">🎙️</div>
+                    <h3 class="feature-title" data-i18n="feature_2_title">WiFi 무전기</h3>
+                    <p class="feature-desc" data-i18n="feature_2_desc">버튼을 누르고 말하면 끝. 인터넷만 있으면 무료 음성 통화.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">📊</div>
+                    <h3 class="feature-title" data-i18n="feature_3_title">활동 타임라인</h3>
+                    <p class="feature-desc" data-i18n="feature_3_desc">자녀 앱에서 부모님의 하루 안부를 한눈에 확인하세요.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">🔔</div>
+                    <h3 class="feature-title" data-i18n="feature_4_title">스마트 알림</h3>
+                    <p class="feature-desc" data-i18n="feature_4_desc">평소와 다른 패턴이 감지되면 자녀에게 알려드려요.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">👨‍👩‍👧‍👦</div>
+                    <h3 class="feature-title" data-i18n="feature_5_title">가족 그룹</h3>
+                    <p class="feature-desc" data-i18n="feature_5_desc">형제자매 모두 함께 부모님 안부를 확인할 수 있어요.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">🌏</div>
+                    <h3 class="feature-title" data-i18n="feature_6_title">다국어 지원</h3>
+                    <p class="feature-desc" data-i18n="feature_6_desc">한국어, 영어, 일본어, 중국어 지원. 해외 거주 가족도 OK.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- App Comparison Section -->
+    <section class="comparison" id="apps">
+        <div class="container">
+            <h2 class="section-title" data-i18n="comparison_title">두 가지 앱, 하나의 연결</h2>
+
+            <div class="comparison-grid">
+                <div class="comparison-card parent-card">
+                    <div class="comparison-badge" data-i18n="badge_free">무료</div>
+                    <div class="comparison-icon">👴👵</div>
+                    <h3 class="comparison-name" data-i18n="app_parent_name">부모님 앱</h3>
+                    <p class="comparison-tagline" data-i18n="app_parent_tagline">3초면 충분해요</p>
+
+                    <ul class="comparison-features">
+                        <li data-i18n="parent_feature_1">✓ 큰 안부 버튼 4개</li>
+                        <li data-i18n="parent_feature_2">✓ 무전기 기능</li>
+                        <li data-i18n="parent_feature_3">✓ 24pt 이상 큰 글씨</li>
+                        <li data-i18n="parent_feature_4">✓ 고대비 색상</li>
+                        <li data-i18n="parent_feature_5">✓ 영원히 무료</li>
+                    </ul>
+
+                    <div class="comparison-price">
+                        <span class="price-amount">₩0</span>
+                        <span class="price-period" data-i18n="price_forever">/영원히</span>
+                    </div>
+                </div>
+
+                <div class="comparison-card child-card">
+                    <div class="comparison-badge premium" data-i18n="badge_premium">프리미엄</div>
+                    <div class="comparison-icon">👨👩</div>
+                    <h3 class="comparison-name" data-i18n="app_child_name">자녀 앱</h3>
+                    <p class="comparison-tagline" data-i18n="app_child_tagline">안심이 됩니다</p>
+
+                    <ul class="comparison-features">
+                        <li data-i18n="child_feature_1">✓ 실시간 안부 알림</li>
+                        <li data-i18n="child_feature_2">✓ 활동 타임라인</li>
+                        <li data-i18n="child_feature_3">✓ 스마트 알림 설정</li>
+                        <li data-i18n="child_feature_4">✓ 가족 그룹 관리</li>
+                        <li data-i18n="child_feature_5">✓ 주간/월간 리포트</li>
+                    </ul>
+
+                    <div class="comparison-price">
+                        <span class="price-amount">₩4,900</span>
+                        <span class="price-period" data-i18n="price_monthly">/월</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Pricing Section -->
+    <section class="pricing" id="pricing">
+        <div class="container">
+            <h2 class="section-title" data-i18n="pricing_title">자녀 앱 요금제</h2>
+            <p class="section-subtitle" data-i18n="pricing_subtitle">부모님 앱은 영원히 무료입니다</p>
+
+            <div class="pricing-toggle">
+                <span data-i18n="toggle_monthly">월간</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="pricing-toggle">
+                    <span class="toggle-slider"></span>
+                </label>
+                <span data-i18n="toggle_yearly">연간</span>
+                <span class="discount-badge" data-i18n="discount_badge">2개월 무료</span>
+            </div>
+
+            <div class="pricing-grid">
+                <div class="pricing-card">
+                    <h3 class="pricing-name" data-i18n="plan_free">무료</h3>
+                    <div class="pricing-price">
+                        <span class="price-currency">₩</span>
+                        <span class="price-amount">0</span>
+                    </div>
+                    <p class="pricing-desc" data-i18n="plan_free_desc">기본 기능으로 시작하세요</p>
+
+                    <ul class="pricing-features">
+                        <li data-i18n="free_feature_1">✓ 안부 알림 수신</li>
+                        <li data-i18n="free_feature_2">✓ 기본 타임라인</li>
+                        <li data-i18n="free_feature_3">✓ 1:1 무전기 통화</li>
+                        <li class="disabled" data-i18n="free_feature_4">✗ 스마트 알림</li>
+                        <li class="disabled" data-i18n="free_feature_5">✗ 상세 리포트</li>
+                    </ul>
+
+                    <a href="#signup" class="btn btn-outline btn-block" data-i18n="btn_start_free">무료로 시작</a>
+                </div>
+
+                <div class="pricing-card featured">
+                    <div class="pricing-popular" data-i18n="most_popular">가장 인기</div>
+                    <h3 class="pricing-name" data-i18n="plan_premium">프리미엄</h3>
+                    <div class="pricing-price">
+                        <span class="price-currency">₩</span>
+                        <span class="price-amount monthly-price">4,900</span>
+                        <span class="price-amount yearly-price" style="display:none;">4,083</span>
+                        <span class="price-period" data-i18n="price_monthly">/월</span>
+                    </div>
+                    <p class="pricing-desc" data-i18n="plan_premium_desc">대부분의 가족에게 추천</p>
+
+                    <ul class="pricing-features">
+                        <li data-i18n="premium_feature_1">✓ 무료 기능 전부 포함</li>
+                        <li data-i18n="premium_feature_2">✓ 스마트 알림 설정</li>
+                        <li data-i18n="premium_feature_3">✓ 상세 활동 리포트</li>
+                        <li data-i18n="premium_feature_4">✓ 가족 5명까지 관리</li>
+                        <li data-i18n="premium_feature_5">✓ 우선 고객 지원</li>
+                    </ul>
+
+                    <a href="#signup" class="btn btn-primary btn-block" data-i18n="btn_get_premium">프리미엄 시작</a>
+                </div>
+
+                <div class="pricing-card">
+                    <h3 class="pricing-name" data-i18n="plan_premium_plus">프리미엄+</h3>
+                    <div class="pricing-price">
+                        <span class="price-currency">₩</span>
+                        <span class="price-amount monthly-price">9,900</span>
+                        <span class="price-amount yearly-price" style="display:none;">8,250</span>
+                        <span class="price-period" data-i18n="price_monthly">/월</span>
+                    </div>
+                    <p class="pricing-desc" data-i18n="plan_premium_plus_desc">더 많은 안심이 필요할 때</p>
+
+                    <ul class="pricing-features">
+                        <li data-i18n="plus_feature_1">✓ 프리미엄 기능 전부 포함</li>
+                        <li data-i18n="plus_feature_2">✓ 위치 공유 (동의 시)</li>
+                        <li data-i18n="plus_feature_3">✓ 건강 데이터 연동</li>
+                        <li data-i18n="plus_feature_4">✓ 긴급 SOS 기능</li>
+                        <li data-i18n="plus_feature_5">✓ 가족 무제한 관리</li>
+                    </ul>
+
+                    <a href="#signup" class="btn btn-outline btn-block" data-i18n="btn_get_plus">프리미엄+ 시작</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Testimonials Section -->
+    <section class="testimonials" id="testimonials">
+        <div class="container">
+            <h2 class="section-title" data-i18n="testimonials_title">사용자 후기</h2>
+
+            <div class="testimonials-grid">
+                <div class="testimonial-card">
+                    <div class="testimonial-stars">⭐⭐⭐⭐⭐</div>
+                    <p class="testimonial-text" data-i18n="testimonial_1">"아버지가 스마트폰을 어려워하셨는데, 이 앱은 바로 사용하시더라고요. 매일 '밥 먹었어요' 알림이 오면 너무 안심돼요."</p>
+                    <div class="testimonial-author">
+                        <div class="author-avatar">👩</div>
+                        <div class="author-info">
+                            <span class="author-name" data-i18n="testimonial_1_author">김지영</span>
+                            <span class="author-location" data-i18n="testimonial_1_location">서울, 딸</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="testimonial-card">
+                    <div class="testimonial-stars">⭐⭐⭐⭐⭐</div>
+                    <p class="testimonial-text" data-i18n="testimonial_2">"해외에 살아서 부모님 걱정이 많았는데, 이제 실시간으로 안부를 확인할 수 있어서 좋아요."</p>
+                    <div class="testimonial-author">
+                        <div class="author-avatar">👨</div>
+                        <div class="author-info">
+                            <span class="author-name" data-i18n="testimonial_2_author">박준호</span>
+                            <span class="author-location" data-i18n="testimonial_2_location">미국, 아들</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="testimonial-card">
+                    <div class="testimonial-stars">⭐⭐⭐⭐⭐</div>
+                    <p class="testimonial-text" data-i18n="testimonial_3">"무전기 기능이 정말 좋아요. 어머니가 손주 목소리 듣고 싶을 때 바로 연결돼요."</p>
+                    <div class="testimonial-author">
+                        <div class="author-avatar">👩</div>
+                        <div class="author-info">
+                            <span class="author-name" data-i18n="testimonial_3_author">이수진</span>
+                            <span class="author-location" data-i18n="testimonial_3_location">부산, 딸</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA / Signup Section -->
+    <section class="cta" id="signup">
+        <div class="container">
+            <div class="cta-content">
+                <h2 class="cta-title" data-i18n="cta_title">출시 알림을 받아보세요</h2>
+                <p class="cta-subtitle" data-i18n="cta_subtitle">2026년 상반기 출시 예정. 가장 먼저 소식을 전해드릴게요.</p>
+
+                <form class="signup-form" id="signup-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="email" data-i18n="form_email">이메일</label>
+                            <input type="email" id="email" name="email" required placeholder="example@email.com">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="country" data-i18n="form_country">국가</label>
+                            <select id="country" name="country" required>
+                                <option value="">선택하세요</option>
+                                <option value="KR">🇰🇷 한국</option>
+                                <option value="JP">🇯🇵 일본</option>
+                                <option value="US">🇺🇸 미국</option>
+                                <option value="CN">🇨🇳 중국</option>
+                                <option value="TW">🇹🇼 대만</option>
+                                <option value="HK">🇭🇰 홍콩</option>
+                                <option value="DE">🇩🇪 독일</option>
+                                <option value="IT">🇮🇹 이탈리아</option>
+                                <option value="GB">🇬🇧 영국</option>
+                                <option value="FR">🇫🇷 프랑스</option>
+                                <option value="OTHER">기타</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label data-i18n="form_role">역할</label>
+                            <div class="role-options">
+                                <label class="role-option">
+                                    <input type="radio" name="role" value="child" checked>
+                                    <span class="role-label">
+                                        <span class="role-icon">👨</span>
+                                        <span data-i18n="form_role_child">자녀</span>
+                                    </span>
+                                </label>
+                                <label class="role-option">
+                                    <input type="radio" name="role" value="parent">
+                                    <span class="role-label">
+                                        <span class="role-icon">👴</span>
+                                        <span data-i18n="form_role_parent">부모님</span>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group checkbox-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="agree" required>
+                            <span data-i18n="form_agree">개인정보 수집 및 이용에 동의합니다</span>
+                        </label>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-lg btn-block" data-i18n="btn_subscribe">출시 알림 받기</button>
+                </form>
+
+                <div class="signup-success" id="signup-success" style="display:none;">
+                    <div class="success-icon">🎉</div>
+                    <h3 data-i18n="success_title">감사합니다!</h3>
+                    <p data-i18n="success_message">출시되면 가장 먼저 알려드릴게요.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- FAQ Section -->
+    <section class="faq" id="faq">
+        <div class="container">
+            <h2 class="section-title" data-i18n="faq_title">자주 묻는 질문</h2>
+
+            <div class="faq-list">
+                <div class="faq-item">
+                    <button class="faq-question" data-i18n="faq_1_q">부모님이 스마트폰을 잘 못 쓰셔도 괜찮나요?</button>
+                    <div class="faq-answer">
+                        <p data-i18n="faq_1_a">네, 걱정 마세요! Anbu 부모님 앱은 큰 버튼 4개만 있어요. 화면을 켜고 원하는 버튼을 누르면 끝입니다. 글씨도 크고, 색상도 선명해서 어르신들도 쉽게 사용하실 수 있어요.</p>
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <button class="faq-question" data-i18n="faq_2_q">인터넷이 없어도 되나요?</button>
+                    <div class="faq-answer">
+                        <p data-i18n="faq_2_a">WiFi나 모바일 데이터 연결이 필요합니다. 하지만 아주 적은 데이터만 사용하기 때문에 기본 요금제로도 충분해요.</p>
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <button class="faq-question" data-i18n="faq_3_q">부모님 앱은 정말 무료인가요?</button>
+                    <div class="faq-answer">
+                        <p data-i18n="faq_3_a">네, 부모님 앱은 영원히 무료입니다. 광고도 없어요. 자녀 앱의 프리미엄 기능만 유료이고, 기본 기능은 자녀 앱도 무료로 사용할 수 있어요.</p>
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <button class="faq-question" data-i18n="faq_4_q">형제자매가 여러 명이면 어떻게 하나요?</button>
+                    <div class="faq-answer">
+                        <p data-i18n="faq_4_a">가족 그룹 기능으로 형제자매 모두 함께 부모님 안부를 확인할 수 있어요. 프리미엄은 5명, 프리미엄+는 무제한 가족을 관리할 수 있습니다.</p>
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <button class="faq-question" data-i18n="faq_5_q">해외에서도 사용할 수 있나요?</button>
+                    <div class="faq-answer">
+                        <p data-i18n="faq_5_a">네! 인터넷만 연결되어 있으면 전 세계 어디서든 사용 가능합니다. 한국어, 영어, 일본어, 중국어(간체/번체)를 지원해요.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-grid">
+                <div class="footer-brand">
+                    <a href="#" class="logo">
+                        <span class="logo-icon">💝</span>
+                        <span class="logo-text">Anbu</span>
+                    </a>
+                    <p class="footer-tagline" data-i18n="tagline">버튼 하나로 전하는 가족의 안부</p>
+                    <div class="footer-social">
+                        <a href="#" aria-label="Instagram">📷</a>
+                        <a href="#" aria-label="Twitter">🐦</a>
+                        <a href="#" aria-label="Facebook">📘</a>
+                    </div>
+                </div>
+
+                <div class="footer-links">
+                    <h4 data-i18n="footer_product">제품</h4>
+                    <ul>
+                        <li><a href="#features" data-i18n="nav_features">기능</a></li>
+                        <li><a href="#pricing" data-i18n="nav_pricing">가격</a></li>
+                        <li><a href="#faq" data-i18n="nav_faq">FAQ</a></li>
+                    </ul>
+                </div>
+
+                <div class="footer-links">
+                    <h4 data-i18n="footer_company">회사</h4>
+                    <ul>
+                        <li><a href="#" data-i18n="footer_about">소개</a></li>
+                        <li><a href="#" data-i18n="footer_blog">블로그</a></li>
+                        <li><a href="#" data-i18n="footer_careers">채용</a></li>
+                    </ul>
+                </div>
+
+                <div class="footer-links">
+                    <h4 data-i18n="footer_legal">법적 고지</h4>
+                    <ul>
+                        <li><a href="#" data-i18n="footer_privacy">개인정보처리방침</a></li>
+                        <li><a href="#" data-i18n="footer_terms">이용약관</a></li>
+                        <li><a href="#" data-i18n="footer_contact">문의하기</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="footer-bottom">
+                <p data-i18n="footer_copyright">© 2026 Anbu. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="js/i18n.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
