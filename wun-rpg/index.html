@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>운(雲) — 무협 RPG 프로토타입</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; overflow: hidden; background: #0b0f0d; }
+  #stage { position: relative; width: 100vw; height: 100vh; }
+  canvas { display: block; width: 100%; height: 100%; image-rendering: auto; }
+  #hud { position: absolute; inset: 0; pointer-events: none; font-family: "Noto Serif KR", serif; color: #e8e2d0; }
+  /* 기혈·공력 원형 옥패 게이지 */
+  #gauges { position: absolute; top: 18px; left: 18px; width: 132px; height: 132px; }
+  #realm { position: absolute; top: 152px; left: 30px; width: 96px; text-align: center;
+    border: 2px solid #b8912f; background: rgba(20,14,8,.85); color: #f0d78c;
+    font-size: 20px; letter-spacing: 6px; padding: 6px 0 4px; }
+  #realm small { display: block; font-size: 10px; letter-spacing: 2px; color: #9a8b60; margin-top: 2px; }
+  /* 상태 메시지 */
+  #log { position: absolute; left: 18px; bottom: 150px; width: 460px; font-size: 13px; line-height: 1.7;
+    text-shadow: 0 1px 2px #000; }
+  #log .sys { color: #9fd3a8; } #log .warn { color: #e8b26a; } #log .qi { color: #7fc7d9; }
+  /* 퀵슬롯 */
+  #slots { position: absolute; right: 24px; bottom: 24px; display: flex; gap: 12px; }
+  .slot { width: 74px; height: 74px; border: 1px solid #6b5a33; background: rgba(15,11,7,.82);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-family: serif; position: relative; overflow: hidden; }
+  .slot .key { font-size: 11px; color: #9a8b60; }
+  .slot .nm { font-size: 15px; color: #e8e2d0; margin: 2px 0; }
+  .slot .cd { position: absolute; inset: 0; background: rgba(0,0,0,.65); display: flex; align-items: center;
+    justify-content: center; color: #f0d78c; font-size: 16px; }
+  .slot.flash { border-color: #f0d78c; box-shadow: 0 0 14px rgba(240,215,140,.5); }
+  /* 도움말 */
+  #help { position: absolute; right: 24px; top: 18px; text-align: right; font-size: 12px; color: #8f9a8a; line-height: 1.8; }
+  #help b { color: #c9d3b8; }
+</style>
+</head>
+<body>
+<div id="stage"><canvas id="cv"></canvas></div>
+<div id="hud">
+  <div id="gauges"><canvas id="gz" width="264" height="264" style="width:132px;height:132px"></canvas></div>
+  <div id="realm">一流<small>境 2 / 6</small></div>
+  <div id="help"><b>이동</b> A D · <b>기공</b> J 쾌검식 / K 초식흘리기<br><b>무공</b> 1 매화검무 · 2 운무일검<br><b>운기조식</b> Q (비전투 내공 축적)</div>
+  <div id="log"></div>
+  <div id="slots">
+    <div class="slot" id="s-j"><span class="key">J</span><span class="nm">쾌검식</span></div>
+    <div class="slot" id="s-k"><span class="key">K</span><span class="nm">흘리기</span></div>
+    <div class="slot" id="s-1"><span class="key">1</span><span class="nm">매화검무</span><div class="cd" id="cd1" style="display:none"></div></div>
+    <div class="slot" id="s-2"><span class="key">2</span><span class="nm">운무일검</span><div class="cd" id="cd2" style="display:none"></div></div>
+  </div>
+</div>
+<input type="file" id="filepick" accept="image/*" hidden>
+
+<script type="module">
+/* ============================================================
+   운(雲) — 무협 RPG 프로토타입 (gdrive2 기획 사양서 기반)
+   핵심: 기혈/공력 · 경지 · 초식흘리기(패링 윈도우) · 무공 쿨다운 · 기연
+   ============================================================ */
+const cv = document.getElementById("cv"), ctx = cv.getContext("2d");
+cv.width = innerWidth; cv.height = innerHeight;
+addEventListener("resize", () => { cv.width = innerWidth; cv.height = innerHeight; });
+
+const keys = {};
+addEventListener("keydown", e => {
+  keys[e.key.toLowerCase()] = true;
+  if (e.key === "j") basicAttack();
+  if (e.key === "k") parry();
+  if (e.key === "1") skill("매화검무");
+  if (e.key === "2") skill("운무일검");
+  if (e.key.toLowerCase() === "q") ongiJosik();
+});
+
+/* ── 상태 ── */
+const S = {
+  x: 640, y: 400, dir: 1,
+  hp: 1000, hpMax: 1000,
+  qi: 500, qiMax: 500,
+  realm: 2, realmNames: ["삼류","이류","일류","절정","초절정","화경"],
+  naegong: 0,           // 내공 누적 (경지 진행도)
+  parryUntil: 0,
+  cd: { 매화검무: 0, 운무일검: 0 },
+  enemies: [], particles: [],
+  won: false,
+};
+
+const SKILLS = {
+  "쾌검식":  { dmg: 40,  cost: 0,   cd: 350,  color: "#cfe3ff" },
+  "매화검무": { dmg: 120, cost: 80,  cd: 4000, color: "#f2a6c0", petals: 26 },
+  "운무일검": { dmg: 210, cost: 150, cd: 7000, color: "#b9c8f5", dash: true },
+};
+
+/* ── 적(흑호채 산적) ── */
+function spawnEnemy() {
+  const side = Math.random() < .5 ? -1 : 1;
+  S.enemies.push({
+    x: S.x + side * (420 + Math.random() * 260), y: 400 + (Math.random() - .5) * 120,
+    hp: 260, hpMax: 260, dir: -side, speed: 0.9 + Math.random() * .5,
+    hitT: 0, dead: false,
+  });
+}
+for (let i = 0; i < 3; i++) spawnEnemy();
+setInterval(() => { if (S.enemies.filter(e => !e.dead).length < 4) spawnEnemy(); }, 6000);
+
+/* ── 전투 ── */
+function doDamage(dmg, kind, x, y) {
+  const alive = S.enemies.filter(e => !e.dead);
+  if (!alive.length) return;
+  alive.sort((a, b) => Math.abs(a.x - S.x) - Math.abs(b.x - S.x));
+  const t = alive[0];
+  if (Math.abs(t.x - S.x) > 340) return;
+  t.hp -= dmg; t.hitT = performance.now();
+  burst(x ?? t.x, y ?? t.y, SKILLS[kind]?.color || "#cfe3ff", kind === "매화검무" ? 20 : 8);
+  if (t.hp <= 0) {
+    t.dead = true;
+    gain(t);
+    S.enemies = S.enemies.filter(e => !e.dead);
+    setTimeout(spawnEnemy, 2500);
+  }
+}
+function gain(t) {
+  S.naegong += 34;
+  log(`흑호채 산적을 토벌했다. 내공 +34`, "sys");
+  while (S.naegong >= realmNeed()) breakthrough();
+}
+function realmNeed() { return 100 * S.realm; }
+function breakthrough() {
+  S.naegong -= realmNeed();
+  if (S.realm < 5) {
+    S.realm++;
+    S.hpMax += 220; S.hp = S.hpMax;
+    S.qiMax += 110; S.qi = S.qiMax;
+    log(`【경지 돌파】${S.realmNames[S.realm]} (境 ${S.realm + 1} / 6) — 기혈·공력 상승!`, "qi");
+    burst(S.x, S.y - 60, "#f0d78c", 40);
+  }
+}
+function basicAttack() { if (now() < S.cd.쾌검식) return; S.cd.쾌검식 = now() + 350; doDamage(40, "쾌검식", S.x + S.dir * 60, S.y - 20); swingArc("#cfe3ff"); }
+function parry() {
+  S.parryUntil = now() + 260;
+  log("초식흘리기 — 반격 자세", "warn");
+}
+function skill(name) {
+  if (now() < S.cd[name]) return;
+  const sk = SKILLS[name];
+  if (S.qi < sk.cost) { log("공력이 부족합니다 — 운기조식(Q)으로 회복", "warn"); return; }
+  S.qi -= sk.cost;
+  S.cd[name] = now() + sk.cd;
+  const alive = S.enemies.filter(e => !e.dead && Math.abs(e.x - S.x) < 520);
+  if (!alive.length) { log("사거리에 적이 없습니다.", "warn"); return; }
+  if (name === "운무일검") S.x += (alive[0].x > S.x ? 150 : -150);
+  alive.forEach(e => doDamage(sk.dmg, name, e.x, e.y - 20));
+  swingArc(sk.color);
+}
+function ongiJosik() {
+  S.qi = Math.min(S.qiMax, S.qi + 90);
+  S.naegong += 12;
+  log("운기조식 — 공력 회복 (+90), 내공 +12", "qi");
+  while (S.naegong >= realmNeed()) breakthrough();
+}
+function swingArc(color) {
+  for (let i = 0; i < 10; i++) S.particles.push({
+    x: S.x + S.dir * 50, y: S.y - 20,
+    vx: S.dir * (2 + Math.random() * 4), vy: (Math.random() - .5) * 5,
+    life: 300, color, size: 2 + Math.random() * 3,
+  });
+}
+function burst(x, y, color, n) {
+  for (let i = 0; i < n; i++) S.particles.push({
+    x, y, vx: (Math.random() - .5) * 9, vy: (Math.random() - .7) * 9,
+    life: 500 + Math.random() * 300, color, size: 2 + Math.random() * 4,
+  });
+}
+function now() { return performance.now(); }
+function log(msg, cls = "") {
+  const el = document.getElementById("log");
+  const d = document.createElement("div");
+  if (cls) d.className = cls;
+  d.textContent = "· " + msg;
+  el.appendChild(d);
+  while (el.children.length > 6) el.firstChild.remove();
+  setTimeout(() => d.remove(), 6000);
+}
+
+/* ── 기연(奇緣) — 확률적 발견 이벤트 ── */
+let lastQiyuan = 0;
+setInterval(() => {
+  if (Date.now() - lastQiyuan < 45000 || S.enemies.some(e => !e.dead)) return;
+  if (Math.random() < 0.22) {
+    lastQiyuan = Date.now();
+    const r = Math.random();
+    if (r < .5) {
+      S.hp = S.hpMax; S.qi = S.qiMax;
+      log("【기연】절벽의 신약을 발견했다! 기혈·공력 완전 회복", "qi");
+      burst(S.x, S.y - 50, "#8fe0b0", 30);
+    } else if (r < .8) {
+      S.naegong += 120;
+      log("【기연】낡은 석굴에서 고수의 수련 흔적을 발견! 내공 +120", "qi");
+      while (S.naegong >= realmNeed()) breakthrough();
+    } else {
+      S.qiMax += 40; S.qi = S.qiMax;
+      log("【기연】바위 틈의 영검(靈劍) 조각을 손에 넣었다! 공력 최대치 +40", "qi");
+    }
+  }
+}, 10000);
+
+/* ── 적 AI ── */
+setInterval(() => {
+  S.enemies.forEach(e => {
+    if (e.dead) return;
+    e.dir = S.x > e.x ? 1 : -1;
+    if (Math.abs(e.x - S.x) > 120) e.x += e.dir * e.speed * 3;
+    else if (now() - e.hitT > 900 && Math.random() < .5) {
+      if (now() < S.parryUntil) {
+        S.qi = Math.min(S.qiMax, S.qi + 18);
+        log("초식흘리기 성공! 적의 공세를 흘렸다. 공력 +18", "qi");
+        burst(e.x, e.y - 30, "#f0d78c", 10);
+      } else {
+        S.hp -= 25;
+        flashRed();
+      }
+    }
+  });
+  if (S.hp <= 0) {
+    S.hp = S.hpMax; S.qi = S.qiMax;
+    log("주화입마… 기가 역류해 쓰러졌습니다. 운기조식으로 되살아났습니다.", "warn");
+    S.x = 640;
+    S.enemies.forEach(e => { e.dead = true; });
+    setTimeout(spawnEnemy, 2000);
+  }
+}, 900);
+
+function flashRed() {
+  const d = document.createElement("div");
+  d.style.cssText = "position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at center, transparent 55%, rgba(160,20,20,.45));z-index:9;transition:opacity .3s";
+  document.body.appendChild(d);
+  setTimeout(() => d.remove(), 280);
+}
+
+/* ── 렌더 ── */
+const mist = [];
+for (let i = 0; i < 26; i++) mist.push({ x: Math.random() * 1280, y: 120 + Math.random() * 480, r: 60 + Math.random() * 140, sp: .1 + Math.random() * .25 });
+
+function draw(t) {
+  requestAnimationFrame(() => draw(t));
+  const w = cv.width, h = cv.height;
+  // 이동
+  if (keys["a"]) { S.x -= 6.5; S.dir = -1; }
+  if (keys["d"]) { S.x += 6.5; S.dir = 1; }
+  S.x = Math.max(60, Math.min(w - 60, S.x));
+
+  // 배경 — 운무령 안개 협곡
+  const sky = ctx.createLinearGradient(0, 0, 0, h);
+  sky.addColorStop(0, "#1a2420"); sky.addColorStop(.55, "#243329"); sky.addColorStop(1, "#18221b");
+  ctx.fillStyle = sky; ctx.fillRect(0, 0, w, h);
+  // 먹산 능선
+  ctx.fillStyle = "rgba(10,16,12,.8)";
+  ctx.beginPath(); ctx.moveTo(0, h * .52);
+  for (let x = 0; x <= w; x += 40) ctx.lineTo(x, h * .42 + Math.sin(x * .006 + 2) * 46 + Math.sin(x * .013) * 24);
+  ctx.lineTo(w, h); ctx.lineTo(0, h); ctx.fill();
+  // 안개
+  mist.forEach(m => {
+    m.x += m.sp; if (m.x - m.r > w) m.x = -m.r;
+    const g = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, m.r);
+    g.addColorStop(0, "rgba(150,170,158,.05)"); g.addColorStop(1, "rgba(150,170,158,0)");
+    ctx.fillStyle = g; ctx.fillRect(m.x - m.r, m.y - m.r, m.r * 2, m.r * 2);
+  });
+  // 지면
+  ctx.fillStyle = "rgba(8,12,9,.9)"; ctx.fillRect(0, h - 90, w, 90);
+
+  // 바닥패… 아니, 적
+  S.enemies.forEach(e => {
+    if (e.dead) return;
+    ctx.save();
+    ctx.translate(e.x, e.y);
+    const sc = 1.05;
+    ctx.scale(-sc, sc); // 좌우 반전(플레이어 향함)
+    ctx.fillStyle = "#141414";
+    ctx.fillRect(-26, -96, 52, 106);
+    ctx.fillStyle = "#2a1f16"; ctx.fillRect(-26, 10, 52, 14);
+    ctx.fillStyle = e.hitT && performance.now() - e.hitT < 120 ? "#ff6b6b" : "#3d3225";
+    ctx.fillRect(-18, -88, 36, 40);
+    ctx.restore();
+    // 체력바
+    ctx.fillStyle = "rgba(0,0,0,.6)"; ctx.fillRect(e.x - 30, e.y - 116, 60, 6);
+    ctx.fillStyle = "#c94f4f"; ctx.fillRect(e.x - 30, e.y - 116, 60 * Math.max(0, e.hp / e.hpMax), 6);
+  });
+
+  // 플레이어 — 수묵 무사
+  ctx.save();
+  ctx.translate(S.x, S.y);
+  ctx.scale(S.dir, 1);
+  // 도포
+  ctx.fillStyle = "#20262b";
+  ctx.beginPath(); ctx.moveTo(-30, 6); ctx.quadraticCurveTo(-8, -88, 22, -96);
+  ctx.lineTo(30, 4); ctx.quadraticCurveTo(0, 16, -30, 6); ctx.fill();
+  // 머리 · 두건
+  ctx.fillStyle = "#c9a97a"; ctx.beginPath(); ctx.arc(4, -96, 15, 0, 7); ctx.fill();
+  ctx.fillStyle = "#1a1d20"; ctx.fillRect(-11, -114, 30, 14);
+  // 검
+  ctx.strokeStyle = "#dfe6ea"; ctx.lineWidth = 3.5;
+  ctx.beginPath(); ctx.moveTo(10, -30); ctx.lineTo(64 + Math.sin(t * .004) * 4, -58); ctx.stroke();
+  // 흘리기 자세 표시
+  if (now() < S.parryUntil) {
+    ctx.strokeStyle = "rgba(240,215,140,.9)"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0, -20, 52, -1.4, 1.0); ctx.stroke();
+  }
+  ctx.restore();
+
+  // 파티클
+  S.particles = S.particles.filter(p => p.life > 0);
+  S.particles.forEach(p => {
+    p.life -= 16; p.x += p.vx; p.y += p.vy; p.vy += .12;
+    ctx.globalAlpha = Math.max(0, p.life / 600);
+    ctx.fillStyle = p.color;
+    ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size * 1.6);
+    ctx.globalAlpha = 1;
+  });
+
+  // 게이지 그리기
+  drawGauges();
+}
+function drawGauges() {
+  const gz = document.getElementById("gz").getContext("2d");
+  gz.clearRect(0, 0, 264, 264);
+  gz.translate(132, 132);
+  // 외곽 옥 패
+  gz.strokeStyle = "#b8912f"; gz.lineWidth = 5;
+  gz.beginPath(); gz.arc(0, 0, 118, 0, 7); gz.stroke();
+  // 기혈 (바깥 링)
+  const hpR = Math.max(0, S.hp / S.hpMax);
+  gz.lineWidth = 22; gz.strokeStyle = "rgba(60,10,10,.7)";
+  gz.beginPath(); gz.arc(0, 0, 96, -Math.PI / 2, Math.PI * 1.5); gz.stroke();
+  gz.strokeStyle = "#c94f4f";
+  gz.beginPath(); gz.arc(0, 0, 96, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * hpR); gz.stroke();
+  // 공력 (안쪽 링)
+  const qiR = Math.max(0, S.qi / S.qiMax);
+  gz.lineWidth = 16; gz.strokeStyle = "rgba(10,20,40,.7)";
+  gz.beginPath(); gz.arc(0, 0, 66, -Math.PI / 2, Math.PI * 1.5); gz.stroke();
+  gz.strokeStyle = "#5aa8c7";
+  gz.beginPath(); gz.arc(0, 0, 66, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * qiR); gz.stroke();
+  // 태극 문양 중앙
+  gz.fillStyle = "#efe6cf";
+  gz.font = "44px serif"; gz.textAlign = "center"; gz.textBaseline = "middle";
+  gz.fillText("雲", 0, 2);
+  // 수치
+  gz.font = "22px serif"; gz.fillStyle = "#e8e2d0";
+  gz.fillText(`${S.hp}`, 0, 46);
+  gz.font = "14px serif"; gz.fillStyle = "#9fb6c7";
+  gz.fillText(`${S.qi} / ${S.qiMax}`, 0, 72);
+  gz.setTransform(1, 0, 0, 1, 0, 0);
+}
+
+/* 쿨다운 표시 */
+setInterval(() => {
+  [["매화검무", "cd1", "s-1"], ["운무일검", "cd2", "s-2"]].forEach(([k, cdId, slotId]) => {
+    const left = S.cd[k] - now();
+    const el = document.getElementById(cdId);
+    const slot = document.getElementById(slotId);
+    if (left > 0) { el.style.display = "flex"; el.textContent = Math.ceil(left / 1000); }
+    else { el.style.display = "none"; slot.classList.add("flash"); setTimeout(() => slot.classList.remove("flash"), 400); }
+  });
+}, 120);
+
+log("【시스템】천하삼분의 난세 — 강호에 발을 디뎠습니다.", "sys");
+log("운무신결의 단서가 강호에 흩어졌다. 운무령에서 수련을 시작하세요.", "warn");
+requestAnimationFrame(draw);
+</script>
+</body>
+</html>
