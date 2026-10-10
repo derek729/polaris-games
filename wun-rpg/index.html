@@ -600,6 +600,8 @@ function drawGauges() {
 }
 
 setInterval(() => {
+  const nb = document.getElementById("naegongBar");
+  if (nb) nb.style.width = Math.min(100, S.naegong / (100 * S.realm) * 100) + "%";
   [["w1", "cd1", "s-1"], ["w2", "cd2", "s-2"]].forEach(([k, cdId, slotId]) => {
     const left = S.cd[k] - now();
     const el = document.getElementById(cdId);
