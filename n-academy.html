@@ -178,6 +178,61 @@ main { max-width: 1200px; width: 100%; margin: 0 auto; padding: 22px 20px 60px; 
 .eq span.hot { background: #38bdf8; }
 .presenter .hint { font-size: 11px; color: #94a3b8; margin-top: 8px; text-align: center; }
 .audio-box { background: #1c222e; border: 1px solid #1e293b; border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+/* ── 아나운서 스튜디오 (현실감 강화) ── */
+.tv-frame {
+  position: relative; width: 100%; max-width: 232px; border-radius: 14px; overflow: hidden;
+  border: 2px solid #0b1524; box-shadow: 0 10px 30px rgba(2,8,20,.55), inset 0 0 0 1px rgba(148,183,255,.12);
+}
+.live-badge {
+  position: absolute; top: 8px; left: 8px; z-index: 3;
+  background: #dc2626; color: #fff; font-size: 9px; font-weight: 800; letter-spacing: .06em;
+  padding: 3px 8px; border-radius: 4px; box-shadow: 0 2px 8px rgba(220,38,38,.5);
+  animation: livePulse 1.6s ease-in-out infinite;
+}
+@keyframes livePulse { 0%,100% { opacity: 1; } 50% { opacity: .55; } }
+.anchor-stage {
+  position: relative; width: 100%; aspect-ratio: 1/1; overflow: hidden;
+  background: #081726; display: flex; align-items: flex-end; justify-content: center;
+}
+.anchor-svg { width: 100%; height: 100%; display: block; }
+.anchor-stage.speaking .anchor-body { animation: anchorSway 3.4s ease-in-out infinite; transform-origin: 100px 200px; }
+.anchor-stage:not(.speaking) .anchor-body { animation: anchorIdle 6s ease-in-out infinite; transform-origin: 100px 200px; }
+@keyframes anchorSway {
+  0%,100% { transform: rotate(-1.3deg) translateY(0); }
+  25% { transform: rotate(.6deg) translateY(-1.2px); }
+  50% { transform: rotate(1.1deg) translateY(0); }
+  75% { transform: rotate(-.5deg) translateY(-1px); }
+}
+@keyframes anchorIdle {
+  0%,100% { transform: rotate(0deg); }
+  50% { transform: rotate(-.5deg); }
+}
+.eyes .blink { transform-origin: center 84px; animation: eyeBlink 4.2s infinite; }
+.eyes .blink:nth-of-type(2) { animation-delay: .05s; }
+@keyframes eyeBlink {
+  0%, 94%, 100% { transform: scaleY(1); }
+  96%, 98% { transform: scaleY(.08); }
+}
+.news-ticker {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 3;
+  display: flex; align-items: center; background: rgba(6,14,26,.88);
+  border-top: 1px solid rgba(56,132,220,.35); height: 22px;
+}
+.ticker-live {
+  flex-shrink: 0; background: #0e4c8a; color: #fff; font-size: 8.5px; font-weight: 800;
+  padding: 0 7px; height: 100%; display: flex; align-items: center; letter-spacing: .04em;
+}
+.ticker-track { overflow: hidden; flex: 1; white-space: nowrap; }
+.ticker-track span {
+  display: inline-block; padding-left: 100%;
+  animation: tickerMove 14s linear infinite;
+  color: #cfe3ff; font-size: 9.5px; font-weight: 700; line-height: 22px;
+}
+@keyframes tickerMove { from { transform: translateX(0); } to { transform: translateX(-100%); } }
+.voice-select {
+  background: #1e293b; color: #e2e8f0; border: 1px solid #334155; border-radius: 6px;
+  font-size: 10.5px; font-weight: 700; padding: 5px 8px; max-width: 150px; font-family: inherit;
+}
 .arow { display: flex; justify-content: space-between; align-items: center; }
 .arow .lab { font-size: 11px; color: #cbd5e1; font-weight: 600; }
 .speed-set { display: flex; gap: 4px; }
@@ -273,7 +328,7 @@ main { max-width: 1200px; width: 100%; margin: 0 auto; padding: 22px 20px 60px; 
       </div>
       <nav>
         <button data-tab="lect" class="on">이론 강의실 (13강)</button>
-        <button data-tab="exam">기출 모의고사 (CBT)</button>
+        <button data-tab="exam">기출 모의고사 (27문항)</button>
         <button data-tab="schedule">시험 일정·접수</button>
         <button data-tab="results">수강·합격 현황</button>
       </nav>
@@ -332,13 +387,81 @@ main { max-width: 1200px; width: 100%; margin: 0 auto; padding: 22px 20px 60px; 
                 <span class="state-chip" id="state-chip">일시정지</span>
               </div>
               <div class="avatar-wrap">
-                <div class="avatar-ring" id="avatar-ring">
-                  <svg viewBox="0 0 120 120">
-                    <circle cx="60" cy="42" r="20" fill="#cbd5e1"/>
-                    <path d="M22 112 C22 82, 40 70, 60 70 C80 70, 98 82, 98 112 Z" fill="#334155"/>
-                    <polygon points="52,70 68,70 60,96" fill="#f8fafc"/>
-                    <polygon points="57,76 63,76 64,106 60,112 56,106" fill="#0284c7"/>
-                  </svg>
+                <div class="tv-frame">
+                  <div class="live-badge">● LIVE</div>
+                  <div class="anchor-stage" id="avatar-ring">
+                    <!-- 스튜디오 배경 -->
+                    <svg viewBox="0 0 200 200" class="anchor-svg" aria-label="아나운서 강사">
+                      <defs>
+                        <linearGradient id="studioBg" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0" stop-color="#12335c"/>
+                          <stop offset=".55" stop-color="#0d2440"/>
+                          <stop offset="1" stop-color="#081726"/>
+                        </linearGradient>
+                        <linearGradient id="deskGlow" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0" stop-color="#1d4f86"/>
+                          <stop offset="1" stop-color="#0f2c4c"/>
+                        </linearGradient>
+                        <linearGradient id="suitG" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0" stop-color="#22314a"/>
+                          <stop offset="1" stop-color="#131c2c"/>
+                        </linearGradient>
+                      </defs>
+                      <rect width="200" height="200" fill="url(#studioBg)"/>
+                      <!-- 스튜디오 패널 조명 -->
+                      <rect x="14" y="18" width="52" height="66" rx="4" fill="#16406e" opacity=".55"/>
+                      <rect x="134" y="18" width="52" height="66" rx="4" fill="#16406e" opacity=".55"/>
+                      <rect x="22" y="26" width="36" height="50" rx="3" fill="#0f3054" opacity=".8"/>
+                      <rect x="142" y="26" width="36" height="50" rx="3" fill="#0f3054" opacity=".8"/>
+                      <circle cx="40" cy="51" r="9" fill="#2f6fb2" opacity=".5"/>
+                      <circle cx="160" cy="51" r="9" fill="#2f6fb2" opacity=".5"/>
+                      <!-- 아나운서 본체 -->
+                      <g class="anchor-body">
+                        <!-- 어깨·정장 -->
+                        <path d="M38 200 C40 156, 58 142, 100 142 C142 142, 160 156, 162 200 Z" fill="url(#suitG)"/>
+                        <path d="M88 146 L100 162 L112 146 L106 143 L100 150 L94 143 Z" fill="#f1f5f9"/>
+                        <path d="M97 158 L100 154 L103 158 L101 178 L100 180 L99 178 Z" fill="#0e4c8a"/>
+                        <!-- 목 -->
+                        <rect x="90" y="126" width="20" height="20" rx="7" fill="#e8b98f"/>
+                        <path d="M90 128 C92 138, 108 138, 110 128 L110 124 L90 124 Z" fill="#d9a276" opacity=".65"/>
+                        <!-- 머리 -->
+                        <ellipse cx="100" cy="86" rx="34" ry="38" fill="#f2c29b"/>
+                        <path d="M66 82 C64 52, 84 40, 100 40 C116 40, 136 52, 134 82 C134 70, 124 60, 100 60 C76 60, 66 70, 66 82 Z" fill="#2b2b33"/>
+                        <path d="M64 84 C60 60, 76 42, 100 42 C124 42, 140 60, 136 84 C138 66, 124 48, 100 48 C76 48, 62 66, 64 84 Z" fill="#3a3a44"/>
+                        <!-- 귀 -->
+                        <ellipse cx="65" cy="88" rx="5" ry="8" fill="#e8b98f"/>
+                        <ellipse cx="135" cy="88" rx="5" ry="8" fill="#e8b98f"/>
+                        <!-- 눈 (깜빡임: .blink 축소) -->
+                        <g class="eyes">
+                          <g class="blink">
+                            <ellipse cx="87" cy="84" rx="4.6" ry="3.2" fill="#fff"/>
+                            <circle cx="88" cy="84.6" r="2.2" fill="#22304a"/>
+                            <circle cx="88.8" cy="83.8" r=".8" fill="#fff"/>
+                          </g>
+                          <g class="blink">
+                            <ellipse cx="113" cy="84" rx="4.6" ry="3.2" fill="#fff"/>
+                            <circle cx="112" cy="84.6" r="2.2" fill="#22304a"/>
+                            <circle cx="112.8" cy="83.8" r=".8" fill="#fff"/>
+                          </g>
+                        </g>
+                        <!-- 눈썹 -->
+                        <path d="M80 76 C84 73.5, 90 73.5, 93 75.5" stroke="#2b2b33" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+                        <path d="M107 75.5 C110 73.5, 116 73.5, 120 76" stroke="#2b2b33" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+                        <!-- 코 -->
+                        <path d="M100 88 C98.4 94, 97 97, 100 98.5 C103 97, 101.6 94, 100 88 Z" fill="#d9a276"/>
+                        <!-- 입 (립싱크: JS가 ry 제어) -->
+                        <ellipse id="anchor-mouth" cx="100" cy="110" rx="9" ry="1.6" fill="#7a3b35"/>
+                        <path id="anchor-teeth" d="M92.5 109.2 L107.5 109.2 L106.5 111 L93.5 111 Z" fill="#fff" opacity="0"/>
+                      </g>
+                      <!-- 앵커 데스크 -->
+                      <rect x="0" y="172" width="200" height="28" fill="url(#deskGlow)"/>
+                      <rect x="0" y="170" width="200" height="4" fill="#2f6fb2" opacity=".9"/>
+                    </svg>
+                  </div>
+                  <div class="news-ticker">
+                    <span class="ticker-live">N-FINANCE</span>
+                    <div class="ticker-track"><span id="ticker-text"></span></div>
+                  </div>
                 </div>
                 <div class="eq" id="eq"></div>
                 <div class="hint" id="pres-hint"></div>
@@ -347,6 +470,10 @@ main { max-width: 1200px; width: 100%; margin: 0 auto; padding: 22px 20px 60px; 
                 <div class="arow">
                   <span class="lab">오디오 출력 상태</span>
                   <button id="mute-btn" class="mute-btn">🔊 음성 켜짐</button>
+                </div>
+                <div class="arow" style="border-top:1px solid #1e293b;padding-top:12px">
+                  <span class="lab">🎙 강사 보이스</span>
+                  <select id="voice-select" class="voice-select"><option value="">기본 보이스</option></select>
                 </div>
                 <div class="arow" style="border-top:1px solid #1e293b;padding-top:12px">
                   <span class="lab">🎚 강의 배속</span>
@@ -1321,13 +1448,281 @@ const ACADEMY_QUESTIONS = [
   }
 ];
 
+/* ── 문항 확장 (13강 강의 대본 연계 — 사장님 지시 "다음 후보 진행") ── */
+ACADEMY_QUESTIONS.push(
+  {
+    id: 103, category: 'life', subject: '모집질서·금소법',
+    question: '보험설계사와 보험대리점의 법적 권한 차이에 대한 설명으로 옳은 것은?',
+    options: [
+      '보험대리점은 회사를 대리하므로 대리점에 고지하면 보험회사에 고지한 것과 동일한 효력이 있다.',
+      '보험설계사도 청약서 질문표 없이 구두로 고지를 접수할 수 있다.',
+      '교차모집은 생명보험 2개사까지 허용된다.',
+      '미성년자는 친권자 동의만 있으면 설계사로 등록할 수 있다.'
+    ],
+    correctAnswer: 0,
+    explanation: '대리점은 상법상 대리인이라 고지수령권·계약체결권·보험료수령권을 모두 가집니다. 설계사는 중개인이라 구두 고지 접수가 불가하며, 교차모집은 생보 1사+손보 1사, 미성년자는 등록 결격입니다.'
+  },
+  {
+    id: 104, category: 'life', subject: '모집질서·금소법',
+    question: '특별이익 제공 금지 및 부당승환계약 제한에 대한 설명으로 옳지 않은 것은?',
+    options: [
+      '사은품 제공 한도는 연간 납입보험료의 10%와 3만원 중 적은 금액이다.',
+      '보험료 대납은 금액과 관계없이 금지된다.',
+      '부당승환으로 등록이 취소되면 2년간 재등록이 제한된다.',
+      '기존 계약 소멸 전후 6개월 이내 신계약 청약 시 비교안내 확인서를 징구해야 한다.'
+    ],
+    correctAnswer: 2,
+    explanation: '부당승환계약으로 등록이 취소되면 3년간 재등록이 제한됩니다(일반 위반 취소는 2년). 사은품 한도는 10%와 3만원 중 적은 금액, 보험료 대납은 금액 불문 금지, 승환 기준 기간은 전후 6개월입니다.'
+  },
+  {
+    id: 105, category: 'life', subject: '금소법 청약철회·위법계약해지',
+    question: '금융소비자보호법상 청약철회와 위법계약해지의 비교로 옳은 것은?',
+    options: [
+      '청약철회는 증권 수령일부터 15일, 청약일부터 30일 이내에 행사할 수 있다.',
+      '위법계약해지 시 계약은 소급하여 무효가 된다.',
+      '청약철회 시 이미 보장받은 기간의 위험보험료를 공제 후 환급한다.',
+      '위법계약해지권은 위법 사실을 안 날부터 6개월 이내에만 행사할 수 있다.'
+    ],
+    correctAnswer: 0,
+    explanation: '청약철회는 증권 수령 15일·청약일 30일 이내, 3영업일 내 전액 반환·소급 소멸입니다. 위법계약해지는 안 날 1년·계약일 5년 이내, 장래를 향해 소멸하며 위험보험료 공제 후 환급합니다.'
+  },
+  {
+    id: 106, category: 'life', subject: '보험료 산출·3이원방식',
+    question: '보험료 산출 3대 예정기초율과 보험료의 관계로 옳은 것은?',
+    options: [
+      '예정위험률이 인상되면 보험료는 인하된다.',
+      '예정사업비율은 보험료와 반비례한다.',
+      '예정이율이 인상되면 보험료는 인하된다.',
+      '3대 기초율은 모두 보험료와 비례한다.'
+    ],
+    correctAnswer: 2,
+    explanation: '예정이율(예상 투자수익률)만 유일하게 보험료와 반비례합니다. 예정위험률과 예정사업비율은 보험료와 비례합니다.'
+  },
+  {
+    id: 107, category: 'life', subject: '고지의무·인과관계',
+    question: '고지의무 위반 시 효력에 대한 설명으로 옳은 것은?',
+    options: [
+      '보험사는 고지의무 위반을 안 날부터 1개월, 계약일로부터 3년 내에 해지할 수 있다.',
+      '당뇨병을 미고지한 사람이 교통사고로 다쳤다면 보험금은 지급되지 않는다.',
+      '고지의무 위반이 있으면 인과관계와 관계없이 모든 보험금이 지급되지 않는다.',
+      '계약 해지는 위반 사실 안 날부터 6개월 내에만 가능하다.'
+    ],
+    correctAnswer: 0,
+    explanation: '해지 제척기간은 안 날 1개월·계약일 3년입니다. 인과관계가 없는 사고(당뇨 미고지 후 교통사고)는 보험금을 전액 지급하고 장래 계약만 해지할 수 있습니다.'
+  },
+  {
+    id: 108, category: 'life', subject: '연체·부활·무효',
+    question: '보험료 연체와 계약 부활에 대한 설명으로 옳은 것은?',
+    options: [
+      '2회 이후 연체 시 14일 이상의 납입최고 후 실효된다.',
+      '실효된 계약은 5년 이내에 부활할 수 있다.',
+      '부활 시 고지의무를 다시 이행할 필요가 없다.',
+      '부활해도 암보험 90일 면책기간은 새로 시작되지 않는다.'
+    ],
+    correctAnswer: 0,
+    explanation: '납입최고 기간은 14일 이상, 부활 신청은 실효 후 3년 이내입니다. 부활 시에는 고지의무를 다시 이행해야 하고 암보험 90일 면책기간도 부활일부터 새로 시작됩니다.'
+  },
+  {
+    id: 109, category: 'life', subject: '변액보험·퇴직연금',
+    question: '변액보험과 퇴직연금에 대한 설명으로 옳은 것은?',
+    options: [
+      '변액보험의 특별계정 운용 실적 부분도 예금자보호 대상이다.',
+      '변액보험의 최저사망보험금 보증 부분은 1인당 5천만원 한도로 예금자보호가 적용된다.',
+      'DC형은 적립금 운용 책임이 회사에 있다.',
+      'DB형은 회사가 연간 임금총액의 1/12을 납입하는 제도이다.'
+    ],
+    correctAnswer: 1,
+    explanation: '변액보험은 특별계정 실적 부분이 비보호지만 회사가 보증한 최저사망·최저연금 보증 부분은 5천만원 한도로 예금자보호가 적용됩니다. DB형은 급여 확정·회사 운용 책임, DC형은 부담금(1/12) 확정·근로자 운용 책임입니다.'
+  },
+  {
+    id: 110, category: 'life', subject: '보험세제·예금자보호',
+    question: '보험 세제 혜택과 예금자보호에 대한 설명으로 옳은 것은?',
+    options: [
+      '보장성보험 세액공제는 개인사업자도 연 100만원 한도로 받을 수 있다.',
+      '저축성보험 이자소득 비과세는 10년 이상 유지 시 적용된다.',
+      '월적립식 저축성보험 비과세는 월 200만원까지 납입 가능하다.',
+      '순금융재산 6천만원의 상속공제액은 1,200만원이다.'
+    ],
+    correctAnswer: 1,
+    explanation: '저축성 비과세는 10년 이상 유지·일시납 1억원 이하·월납 150만원(연 1,800만원) 이하 요건입니다. 보장성 세액공제는 근로소득자만 가능하고, 순금융재산 2천만~1억 구간은 무조건 2,000만원 공제입니다.'
+  },
+  {
+    id: 111, category: 'life', subject: '보험사기방지법·AML',
+    question: '보험사기방지특별법과 자금세탁방지제도에 대한 설명으로 옳은 것은?',
+    options: [
+      '보험사기죄는 5년 이하 징역 또는 3천만원 이하 벌금에 처한다.',
+      '입원적정성 심사는 보험회사가 직접 건강보험심사평가원에 의뢰한다.',
+      '고액현금거래보고(CTR)는 하루 1천만원 이상 현금거래 시 작동한다.',
+      '의심거래보고(STR)는 일정 금액 이상인 경우에만 보고한다.'
+    ],
+    correctAnswer: 2,
+    explanation: '보험사기죄는 10년 이하 징역 또는 5천만원 이하 벌금이며, 입원적정성 심사는 수사기관이 심평원에 의뢰합니다. CTR은 1일 1천만원 이상, STR은 금액 기준 없이 보고합니다.'
+  },
+  {
+    id: 112, category: 'life', subject: '상법 통칙',
+    question: '상법상 인보험의 특징으로 옳은 것은?',
+    options: [
+      '보험가액 개념이 존재해 초과보험이 무효가 된다.',
+      '타인의 사망을 보험사고로 하는 계약은 피보험자의 서면동의가 필요하다.',
+      '인보험에는 보험자대위권이 인정된다.',
+      '중복보험 가입이 금지된다.'
+    ],
+    correctAnswer: 1,
+    explanation: '인보험은 사람의 생명을 가격으로 환산할 수 없어 보험가액·보험자대위가 없고 초과·중복보험이 가능합니다. 단, 타인 사망을 보험사고로 하려면 피보험자의 서면동의가 필수입니다.'
+  },
+  {
+    id: 203, category: 'property', subject: '손해보험 원리',
+    question: '보험가액 2억원인 건물에 1억 2천만원을 가입한 후 3천만원의 손해가 발생했다면 지급보험금은?',
+    options: [
+      '3,000만원 전액',
+      '2,400만원',
+      '1,800만원 (비례보상)',
+      '1,200만원'
+    ],
+    correctAnswer: 2,
+    explanation: '가입비율 = 1억 2천만 ÷ 2억 = 60% 일부보험이므로, 지급보험금 = 손해액 × (가입금액 ÷ 보험가액) = 3,000만원 × 60% = 1,800만원을 비례보상합니다.'
+  },
+  {
+    id: 204, category: 'property', subject: '손해보험 원리',
+    question: '보험자대위(청구권대위·잔존물대위)에 대한 설명으로 옳은 것은?',
+    options: [
+      '전손보험금 지급 시 보험사는 잔존물에 대한 권리를 취득한다.',
+      '생계를 같이하는 가족의 과실 사고에도 구상권을 행사할 수 있다.',
+      '일부보험에서는 잔존물대위를 행사할 수 없다.',
+      '청구권대위는 고의 사고 가해자에게도 행사할 수 없다.'
+    ],
+    correctAnswer: 0,
+    explanation: '전손보험금 지급 시 잔존물대위로 소유권이 보험사에 이전합니다(일부보험은 가입비율만큼). 생계를 같이하는 가족의 과실 사고는 고의가 아닌 한 구상권 행사가 불가합니다.'
+  },
+  {
+    id: 205, category: 'property', subject: '자동차보험',
+    question: '자동차손해배상 보장법상 피해자 보호 제도에 대한 설명으로 옳은 것은?',
+    options: [
+      '가불금은 추정보험금의 50% 한도로 청구할 수 있다.',
+      '정부보장사업은 대물 피해도 보상한다.',
+      '의무보험의 보장 범위는 대인배상I과 대물 5천만원이다.',
+      '무보험차상해 담보는 자동차 탑승 중 사고만 보상한다.'
+    ],
+    correctAnswer: 0,
+    explanation: '가불금은 추정보험금의 50%를 선지급받는 제도입니다. 정부보장사업은 대인 피해만 보상하고, 의무보험은 대인I+대물 2천만원, 무보험차상해는 보행 중 사고도 보상합니다.'
+  },
+  {
+    id: 206, category: 'property', subject: '자동차보험',
+    question: '음주·무면허 사고 시 보험사의 처리 방식으로 옳은 것은?',
+    options: [
+      '피해자에게 보험금을 지급하지 않고 운전자에게만 책임을 묻는다.',
+      '피해자에게 먼저 보상한 뒤 가해 운전자에게 사고부담금을 구상한다.',
+      '계약을 해지하고 모든 보상을 거부한다.',
+      '고의 사고와 동일하게 전액 면책된다.'
+    ],
+    correctAnswer: 1,
+    explanation: '음주·무면허 운전은 피해자 보호가 우선입니다. 보험사가 피해자에게 먼저 보상한 후 가해 운전자에게 사고부담금을 구상합니다. 고의 사고는 면책됩니다.'
+  },
+  {
+    id: 207, category: 'property', subject: '화재보험',
+    question: '화재보험 목적물과 보상 범위에 대한 설명으로 옳은 것은?',
+    options: [
+      '현금과 유가증권은 청약서에 명기하면 보상받을 수 있다.',
+      '주택화재보험은 폭발·파열 손해를 기본계약으로 보상한다.',
+      '일반화재에서 귀금속은 명기 없이도 보상된다.',
+      '잔존물제거비용은 손해액의 30%까지 보상된다.'
+    ],
+    correctAnswer: 1,
+    explanation: '주택화재보험은 폭발·파열 손해와 귀금속을 명기 없이 기본 보상합니다. 현금·유가증권은 제외물건이고, 일반화재에서 귀금속(300만원 이상)·설계도 등은 명기 필요, 잔존물제거비용은 손해액의 10% 한도입니다.'
+  },
+  {
+    id: 208, category: 'property', subject: '배상책임보험',
+    question: '배상책임보험 증권의 적용 기준으로 옳은 것은?',
+    options: [
+      '의사·변호사 등 전문직 배상책임은 사고발생기준증권을 사용한다.',
+      '영업배상책임은 손해배상청구기준증권을 사용한다.',
+      '전문직 배상책임은 소급담보일 이후 발생한 과실에 대해 보험기간 중 최초 청구 시 보상한다.',
+      '일상생활배상은 청구기준증권을 사용한다.'
+    ],
+    correctAnswer: 2,
+    explanation: '전문직(의사·변호사·회계사) 배상책임은 소급담보일이 명시된 손해배상청구기준증권을 사용합니다. 일반 영업·시설·일상생활 배상은 사고발생기준증권입니다.'
+  },
+  {
+    id: 209, category: 'property', subject: '장기손해·보증보험',
+    question: '장기손해보험과 보증보험에 대한 설명으로 옳은 것은?',
+    options: [
+      '장기손해보험의 적립보험료에는 고정 예정이율이 적용된다.',
+      '직업·직무 변경 통지의무는 질병 담보에도 적용된다.',
+      '보증보험은 계약자(채무자)의 고의 사고도 피보험자(채권자)에게 보상한 후 구상한다.',
+      '보증보험은 예금자보호법 적용 대상이다.'
+    ],
+    correctAnswer: 2,
+    explanation: '보증보험은 3당사자 구조로 계약자(채무자)의 고의 사고도 피보험자(채권자)에게 먼저 보상한 뒤 계약자에게 전액 구상하며, 예금자보호 제외입니다. 장기손해는 보장료에 예정이율·적립료에 공시이율, 통지의무는 상해 담보만 적용입니다.'
+  },
+  {
+    id: 210, category: 'property', subject: '해상·특종보험',
+    question: '해상보험과 기계보험에 대한 설명으로 옳은 것은?',
+    options: [
+      '위부(Abandonment)는 현실전손에서만 행사할 수 있다.',
+      '공동해손은 선장의 고의적 투하 등 공동 위험 회피를 위한 희생 손해이다.',
+      '기계보험은 화재로 인한 기계 소실 손해도 보상한다.',
+      '재보험의 원수보험 계약자는 재보험사에 직접 청구할 수 있다.'
+    ],
+    correctAnswer: 1,
+    explanation: '공동해손은 공동 안전을 위한 고의적 희생으로 이해관계자가 비례 분담합니다. 위부는 오직 추정전손에서만, 기계보험은 화재·폭발·도난 면책, 재보험은 직접청구권이 없습니다.'
+  },
+  {
+    id: 302, category: 'third', subject: '상해보험',
+    question: '상해보험의 성립 요건과 후유장해에 대한 설명으로 옳은 것은?',
+    options: [
+      '급격성·우연성·외래성 중 2가지만 충족되면 상해로 인정된다.',
+      '제왕절개 수술은 상해보험금 지급 대상이다.',
+      '5년 이상 지속되는 한시적 장해는 해당 장해지급률의 20%를 인정한다.',
+      '스카이다이빙 중 사고는 상해로 보상된다.'
+    ],
+    correctAnswer: 2,
+    explanation: '상해는 급격·우연·외래 3요소를 동시에 충족해야 하며, 제왕절개·다이빙 사고는 면책입니다. 5년 이상 한시적 장해는 장해지급률의 20%를 지급합니다.'
+  },
+  {
+    id: 303, category: 'third', subject: '암보험',
+    question: '암보험 90일 면책기간의 예외에 해당하지 않는 것은?',
+    options: [
+      '만 15세 미만 피보험자',
+      '갑상선암',
+      '위암 (일반암)',
+      '제자리암(상피내암)'
+    ],
+    correctAnswer: 2,
+    explanation: '만 15세 미만과 4대 유사암(갑상선암·기타피부암·제자리암·경계성종양)은 90일 면책 없이 첫날부터 보장합니다. 위암 등 일반암은 90일 면책이 적용되며 90일 내 진단 시 계약 무효·보험료 반환입니다.'
+  },
+  {
+    id: 304, category: 'third', subject: '4세대 실손',
+    question: '4세대 실손의료보험의 구조에 대한 설명으로 옳은 것은?',
+    options: [
+      '보험료는 5년마다 갱신되고 1년마다 재가입한다.',
+      '급여 항목의 본인부담금 중 20%를 공제한다.',
+      '비급여 통원 최소공제금액은 1만원이다.',
+      '도수치료는 연간 횟수 제한이 없다.'
+    ],
+    correctAnswer: 1,
+    explanation: '4세대 실손은 1년 갱신·5년 재가입이며 급여 20%·비급여 30% 공제, 통원 최소공제는 급여 1만원(병·의원)/2만원(종합 이상)·비급여 3만원입니다. 도수치료는 연 350만원·50회 제한입니다.'
+  },
+  {
+    id: 305, category: 'third', subject: '업권별 취급·치매보험',
+    question: '생명보험사와 손해보험사의 제3보험 취급 차이로 옳은 것은?',
+    options: [
+      '손해보험사도 일반사망을 주계약으로 취급할 수 있다.',
+      '손해보험사의 질병사망 특약은 만기 80세 이하·개인당 2억원 이내로 제한된다.',
+      '치매보험의 면책기간은 계약일로부터 90일이다.',
+      '임상치매척도 CDR 2점은 경도 치매에 해당한다.'
+    ],
+    correctAnswer: 1,
+    explanation: '손보사는 일반사망 취급이 불가하며 질병사망도 특약으로만 80세 만기·2억원 한도입니다. 치매보험 면책기간은 통상 1년이고 CDR은 1점 경도·2점 중등도·3점 이상 중증입니다.'
+  }
+);
+
 /* ── 영속 상태 (개선: 원본은 새로고침 시 소멸 → localStorage 보존) ── */
 const STORE_KEY = 'n-academy-state-v1';
 const state = {
   loggedIn: true, userName: '채우혁 단장',
   activeTab: 'lect', category: 'all', courseId: ACADEMY_COURSES[0].id,
   sceneIdx: 0, completed: [], isPlaying: false, muted: false, speed: 1.0, sentIdx: 0,
-  examCategory: 'all', answers: {}, submitted: false,
+  examCategory: 'all', answers: {}, submitted: false, voiceName: '', wrongIds: [],
   history: [
     { date: '2026.10.14', cat: '생명보험 실전 모의고사 1회', score: 85, passed: true },
     { date: '2026.10.12', cat: '손해보험 핵심 기출 1회', score: 80, passed: true }
@@ -1342,7 +1737,8 @@ function saveState() {
   try {
     localStorage.setItem(STORE_KEY, JSON.stringify({
       completed: state.completed, history: state.history,
-      schedules: state.schedules, courseId: state.courseId, speed: state.speed
+      schedules: state.schedules, courseId: state.courseId, speed: state.speed,
+      voiceName: state.voiceName, wrongIds: state.wrongIds
     }));
   } catch (e) { /* file:// 제한 등 — 무시 */ }
 }
@@ -1356,6 +1752,8 @@ function loadState() {
     if (Array.isArray(s.schedules)) state.schedules = s.schedules;
     if (typeof s.courseId === 'string' && ACADEMY_COURSES.some(c => c.id === s.courseId)) state.courseId = s.courseId;
     if (typeof s.speed === 'number') state.speed = s.speed;
+    if (typeof s.voiceName === 'string') state.voiceName = s.voiceName;
+    if (Array.isArray(s.wrongIds)) state.wrongIds = s.wrongIds;
   } catch (e) { /* 손상 시 무시 */ }
 }
 
@@ -1373,12 +1771,33 @@ function esc(s) {
   return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 }
 
-/* ── 음성 강의 엔진 (Web Speech API + 폴백 타이머) ── */
-let speechTimer = null, speechSafety = null;
+/* ── 음성 강의 엔진 (Web Speech API + 폴백 타이머 + 아나운서 립싱크) ── */
+let speechTimer = null, speechSafety = null, lipTimer = null;
 const synthSupported = typeof window !== 'undefined' && 'speechSynthesis' in window;
 function cancelSpeech() {
   if (synthSupported) window.speechSynthesis.cancel();
   clearTimeout(speechTimer); clearTimeout(speechSafety);
+  stopLipSync();
+}
+/* 아나운서 립싱크 — 발화 중 입 모양을 음절 밀도처럼 변화 */
+function startLipSync() {
+  stopLipSync();
+  const mouth = document.getElementById('anchor-mouth');
+  const teeth = document.getElementById('anchor-teeth');
+  if (!mouth) return;
+  lipTimer = setInterval(() => {
+    const open = 1.4 + Math.abs(Math.sin(Date.now() / 130)) * (2.2 + Math.random() * 2.6);
+    mouth.setAttribute('ry', open.toFixed(2));
+    mouth.setAttribute('rx', (8.4 + Math.random() * 1.4).toFixed(2));
+    teeth.setAttribute('opacity', open > 2.6 ? '.85' : '0');
+  }, 95);
+}
+function stopLipSync() {
+  clearInterval(lipTimer); lipTimer = null;
+  const mouth = document.getElementById('anchor-mouth');
+  const teeth = document.getElementById('anchor-teeth');
+  if (mouth) { mouth.setAttribute('ry', '1.6'); mouth.setAttribute('rx', '9'); }
+  if (teeth) teeth.setAttribute('opacity', '0');
 }
 function courseById(id) { return ACADEMY_COURSES.find(c => c.id === id) || ACADEMY_COURSES[0]; }
 function sentencesOf(scene) {
@@ -1417,8 +1836,10 @@ function speakCurrent() {
       u.lang = 'ko-KR'; u.pitch = 0.92; u.rate = state.speed;
       const voices = window.speechSynthesis.getVoices();
       const kor = voices.filter(v => v.lang.includes('ko') || v.lang.includes('KR'));
-      const pick = kor.find(v => /InJoon|Minsu|Male|Online|Natural/i.test(v.name)) || kor[0];
+      const chosen = state.voiceName ? kor.find(v => v.name === state.voiceName) : null;
+      const pick = chosen || kor.find(v => /InJoon|Minsu|Male|Online|Natural/i.test(v.name)) || kor[0];
       if (pick) u.voice = pick;
+      startLipSync();
       let finished = false;
       const done = () => {
         if (finished) return;
@@ -1490,6 +1911,7 @@ function renderSlide() {
     '<div class="hi">' + esc(card.highlight) + '</div></div>' +
     '<div class="pt">' + esc(card.point) + '</div></div>').join('');
   $('#slide-formula').textContent = s.memoryFormula;
+  $('#ticker-text').textContent = c.moduleCode + ' · ' + c.title + '  ┃  ' + s.chapterTitle + '  ┃  ' + s.mainKeyword;
 }
 function renderTeleprompter() {
   const sents = sentencesOf(currentScene());
@@ -1556,12 +1978,26 @@ function renderSchedule() {
     (s.applied ? '접수 완료 (취소)' : '응시 접수') + '</button></div>').join('');
 }
 function renderResults() {
-  $('#results-panel').innerHTML = '<h3>모의고사 응시 및 성취도 이력</h3><div>' +
+  const wrongQs = state.wrongIds
+    .map(id => ACADEMY_QUESTIONS.find(q => q.id === id))
+    .filter(Boolean);
+  const wrongHtml = wrongQs.length ? wrongQs.map(q =>
+    '<div class="expl" style="margin-bottom:12px"><div class="lab">[' + CAT_LABEL[q.category] + '] ' + esc(q.subject) + '</div>' +
+    '<p style="margin-bottom:6px"><b>' + esc(q.question) + '</b></p>' +
+    '<p style="color:var(--ok);font-weight:700;margin-bottom:4px">정답: ' + (q.correctAnswer + 1) + '번. ' + esc(q.options[q.correctAnswer]) + '</p>' +
+    '<p>' + esc(q.explanation) + '</p></div>').join('')
+    : '<div class="empty">오답 문항이 없습니다. 모의고사를 응시하면 틀린 문항이 여기에 모입니다.</div>';
+  $('#results-panel').innerHTML =
+    '<h3>모의고사 응시 및 성취도 이력</h3><div>' +
     (state.history.length ? state.history.map(h =>
       '<div class="res-row"><div><div class="cat">' + esc(h.cat) + '</div><div class="dt">' + esc(h.date) + '</div></div>' +
       '<div style="display:flex;gap:12px;align-items:center"><span class="sc">' + h.score + '점</span>' +
       '<span class="pill ' + (h.passed ? 'tag-ok' : 'tag-bad') + '">' + (h.passed ? '합격권' : '재응시 권장') + '</span></div></div>').join('')
-    : '<div class="empty">아직 응시 이력이 없습니다.</div>') + '</div>';
+    : '<div class="empty">아직 응시 이력이 없습니다.</div>') + '</div>' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin:22px 0 12px">' +
+    '<h3 style="margin:0">📖 오답노트 (' + wrongQs.length + '문항)</h3>' +
+    (wrongQs.length ? '<button class="btn ghost" data-act="clear-wrong">오답노트 비우기</button>' : '') +
+    '</div>' + wrongHtml;
 }
 function renderAll() {
   renderProgress(); renderCurrList(); renderSlide(); renderTeleprompter();
@@ -1613,15 +2049,26 @@ document.addEventListener('click', (e) => {
     if (Object.keys(state.answers).length < qs.length) { toast('모든 문항의 답안을 선택해 주십시오.'); return; }
     state.submitted = true;
     let correct = 0;
-    qs.forEach(q => { if (state.answers[q.id] === q.correctAnswer) correct++; });
+    const wrong = [];
+    qs.forEach(q => {
+      if (state.answers[q.id] === q.correctAnswer) correct++;
+      else wrong.push(q.id);
+    });
     const score = Math.round((correct / qs.length) * 100);
     state.history.unshift({ date: '2026.10.15', cat: '실전 기출 모의고사', score, passed: score >= 60 });
-    saveState(); renderExam(); renderResults(); toast('채점이 완료되었습니다. 취득 점수: ' + score + '점');
+    state.wrongIds = [...new Set(wrong.concat(state.wrongIds))];  // 오답노트 — 중복 없이 누적
+    saveState(); renderExam(); renderResults();
+    toast('채점이 완료되었습니다. 취득 점수: ' + score + '점');
     return;
   }
   if (t.dataset.act === 'reset-exam') {
     state.answers = {}; state.submitted = false;
     renderExam(); return;
+  }
+  if (t.dataset.act === 'clear-wrong') {
+    state.wrongIds = [];
+    saveState(); renderResults(); toast('오답노트를 비웠습니다.');
+    return;
   }
 });
 
@@ -1650,6 +2097,26 @@ $('#exam-link-btn').addEventListener('click', () => {
   state.answers = {}; state.submitted = false;
   state.activeTab = 'exam'; renderAll();
 });
+$('#voice-select').addEventListener('change', (e) => {
+  state.voiceName = e.target.value;
+  saveState();
+  toast('강사 보이스가 변경되었습니다.');
+});
+/* 한국어 보이스 목록 채우기 — 로드 시점이 늦은 브라우저 대비 재시도 */
+function populateVoices() {
+  if (!synthSupported) return;
+  const kor = window.speechSynthesis.getVoices()
+    .filter(v => v.lang.includes('ko') || v.lang.includes('KR'));
+  if (!kor.length) return;
+  const sel = $('#voice-select');
+  sel.innerHTML = '<option value="">기본 보이스</option>' + kor.map(v =>
+    '<option value="' + esc(v.name) + '"' + (v.name === state.voiceName ? ' selected' : '') + '>' +
+    esc(v.name.replace(/Microsoft |Google /, '')) + '</option>').join('');
+}
+if (synthSupported) {
+  populateVoices();
+  window.speechSynthesis.onvoiceschanged = populateVoices;
+}
 $('#logout-btn').addEventListener('click', () => {
   cancelSpeech(); state.isPlaying = false;
   state.loggedIn = false; renderAuth();
