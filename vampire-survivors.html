@@ -82,6 +82,14 @@
   .chesticon{font-size:72px;filter:drop-shadow(0 0 18px rgba(232,182,76,.6));margin:6px 0;}
   .buildlist{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:12px 0 2px;}
   .buildlist .slot{width:34px;height:34px;font-size:19px;}
+  /* 장비 확장 (무기58 · 방어구210 · 셋트10) */
+  .psec{font-size:12px;font-weight:900;color:var(--gold);margin:10px 0 4px;letter-spacing:1px;}
+  .prow{display:flex;flex-wrap:wrap;gap:5px;justify-content:center;min-height:20px;}
+  .prow .slot{width:32px;height:32px;font-size:18px;}
+  .setrow{display:flex;gap:10px;align-items:baseline;justify-content:space-between;font-size:12.5px;padding:3px 2px;border-bottom:1px dashed rgba(255,255,255,.08);}
+  .setrow .sn{font-weight:800;white-space:nowrap;}
+  .setrow.done .sn{color:var(--gold);}
+  .statline{font-size:12.5px;line-height:1.9;color:var(--text);}
   /* ---------- 메타 진행 (BACKLOG #11) ---------- */
   .metaChips{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-top:8px;}
   .chip{display:inline-block;padding:3px 10px;font-size:12px;font-weight:800;color:#7fd0ff;
@@ -353,41 +361,102 @@ const HERO_STYLE = {
   alchemist:{ skin:"#eebd8d", hair:"#c96a2b", outfit:"#5a7a4a", trim:"#d8c8a8", pants:"#3f5535", hat:"goggles", hatCol:"#3a2d20", accent:"#8fd0ff" },
 };
 
-/* ---------------- 데이터: 무기 (레벨 최대 8) ---------------- */
-const WEAPONS = {
-  whip: {
-    icon:"⚔️", name:"채찍", desc:"전방을 수평으로 후려쳐 피해를 준다", cd:1.15,
-    dmg:[12,16,22,22,30,30,38,50], ar:[1,1.1,1.2,1.2,1.4,1.4,1.6,1.6],
-    up:["피해 +4","범위 +10%","피해 +6","후방 채찍 추가!","범위 +20%","피해 +8","피해 +12"],
-  },
-  wand: {
-    icon:"🪄", name:"마법봉", desc:"가장 가까운 적에게 마법탄을 발사한다", cd:1.0,
-    dmg:[10,10,14,14,18,18,22,26], count:[1,2,2,3,3,4,4,5],
-    up:["탄환 +1","피해 +4","탄환 +1","피해 +4","탄환 +1","피해 +4","피해 +4"],
-  },
-  axe: {
-    icon:"🪓", name:"도끼", desc:"포물선을 그리며 날아가 적을 관통한다", cd:1.6,
-    dmg:[16,20,20,26,26,32,32,40], count:[1,1,2,2,3,3,4,4],
-    up:["피해 +4","도끼 +1","피해 +6","도끼 +1","피해 +6","도끼 +1","피해 +8"],
-  },
-  bible: {
-    icon:"📕", name:"성서", desc:"주위를 도는 성서가 닿는 적을 친다", cd:3.8,
-    dmg:[8,8,12,12,16,16,20,24], count:[1,1,2,2,3,3,4,4], dur:[3,3,3.5,3.5,4,4,4.5,5],
-    up:["피해 +4","성서 +1","지속 +0.5초","성서 +1","피해 +4","성서 +1","지속 +0.5초"],
-  },
-  garlic: {
-    icon:"🧄", name:"마늘", desc:"주변 오라로 가까운 적을 태워 쫓아낸다", cd:0.45,
-    dmg:[4,5,6,7,8,10,12,14], rad:[70,75,80,85,90,100,110,120],
-    up:["피해 +1","범위 +5","피해 +1","범위 +5","피해 +2","범위 +10","피해 +2"],
-  },
-  holy: {
-    icon:"🍶", name:"성수", desc:"성수를 던져 바닥에 부식 지대를 만든다", cd:3.2,
-    dmg:[5,6,7,8,10,12,14,16], rad:[42,46,50,54,58,62,66,72], count:[1,1,2,2,2,3,3,3],
-    up:["피해 +1","성수 +1","범위 +4","피해 +2","성수 +1","범위 +4","피해 +2"],
-  },
-};
+/* ---------------- 데이터: 아이템 등급 (신설 — 무기/방어구 공통) ---------------- */
+const GRADES = [
+  { key:"common",   name:"일반", col:"#a8adb8", mult:1.00, w:50  },
+  { key:"uncommon", name:"고급", col:"#5ad46a", mult:1.15, w:25  },
+  { key:"rare",     name:"희귀", col:"#4da3ff", mult:1.32, w:13  },
+  { key:"epic",     name:"영웅", col:"#b06aff", mult:1.52, w:7   },
+  { key:"legend",   name:"전설", col:"#ff9a3d", mult:1.75, w:3.5 },
+  { key:"mythic",   name:"신화", col:"#ff4d6b", mult:2.10, w:1.5 },
+];
+function rollGrade(){ // 가중치 랜덤 등급 (일반 50% → 신화 1.5%)
+  let r = Math.random() * 100, acc = 0;
+  for (let i = 0; i < GRADES.length; i++){ acc += GRADES[i].w; if (r < acc) return i; }
+  return 0;
+}
 
-/* ---------------- 데이터: 진화 (무기 만렙 8 + 전용 패시브 + 상자) ---------------- */
+/* ---------------- 데이터: 무기 58종 (12계열 × 고유 스탯/등급) ---------------- */
+const WEAPONS = {};
+function W(id, name, icon, cat, grade, dmg, cd, o){ WEAPONS[id] = Object.assign({ name, icon, cat, grade, dmg, cd }, o || {}); }
+const CAT_DESC = {
+  arc:"전방을 휘두르는 근접 공격 (Lv.4 후방 추가)", shot:"가장 가까운 적 조준 발사", spread:"부채꼴로 퍼지는 산탄",
+  lob:"포물선 투척 — 적을 관통", orbit:"주위를 도는 오브제", aura:"주변 오라로 지속 피해", zone:"바닥에 장판을 생성",
+  pierce:"적을 꿰뚫는 관통 발사체", boomerang:"던지면 되돌아오는 무기", chain:"적 사이를 연쇄하는 번개",
+  homing:"적을 끝까지 추적하는 탄환", nova:"사방으로 뿜어져 나오는 폭발",
+};
+/* 근접 휘두르기 (arc) */
+W("whip","채찍","⚔️","arc",0,12,1.15,{ col:"#f5e6c8" });
+W("greatsword","대검","🗡️","arc",4,26,1.35,{ col:"#c8d8f0", area:1.25 });
+W("halberd","미늘창","🔱","arc",2,18,1.2,{ col:"#ffd9a0", area:1.15 });
+W("chainscythe","사슬낫","🌾","arc",3,20,1.25,{ col:"#c8a8f0", area:1.3 });
+W("flamebrand","화염곡도","🔥","arc",2,16,1.05,{ col:"#ff9a5a" });
+W("stormblade","폭풍검","🌪️","arc",5,30,1.1,{ col:"#a8e8ff", area:1.35 });
+/* 조준 사격 (shot) */
+W("wand","마법봉","🪄","shot",0,10,1.0,{ col:"#b8e0ff" });
+W("revolver","연발 권총","🔫","shot",1,9,0.85,{ col:"#e8d8a8" });
+W("bow","사냥꾼의 활","🏹","shot",2,14,1.1,{ col:"#d8c8a0" });
+W("spiritgem","정령의 눈","🌀","shot",4,16,0.95,{ col:"#8af0d8" });
+W("musket","장거리 머스켓","🔭","shot",3,20,1.4,{ col:"#ffd76a" });
+W("gauntlet","마도 권갑","🥊","shot",2,8,0.7,{ col:"#f0b0a0" });
+W("crossbow","강화 석궁","🎐","shot",3,18,1.15,{ col:"#d0e8b0" });
+/* 산탄 (spread) */
+W("scattergun","산탄 화승총","💥","spread",2,7,1.5,{ col:"#ffc888" });
+W("frostfan","서리 부채","🧊","spread",3,6,1.35,{ col:"#b8f0ff" });
+W("emberburst","불꽃 분사","🎇","spread",1,6,1.4,{ col:"#ffb056" });
+W("sandstorm","모래폭풍","🏜️","spread",2,5,1.3,{ col:"#e8d8a0" });
+W("voidfan","심연 부채","🕳️","spread",5,9,1.45,{ col:"#c8a8f8" });
+/* 포물선 투척 (lob) */
+W("axe","도끼","🪓","lob",0,16,1.6,{ col:"#d8c8b0" });
+W("shuriken","수리검","✴️","lob",1,10,1.2,{ col:"#c8d0e0" });
+W("warhammer","투척 해머","🔨","lob",3,24,1.8,{ col:"#b8b8c8", area:1.2 });
+W("molotov","소이병","🧪","lob",2,14,1.5,{ col:"#ff9848" });
+W("comet","낙하 유성","☄️","lob",5,34,1.9,{ col:"#ffd0f0", area:1.4 });
+/* 궤도 (orbit) */
+W("bible","성서","📕","orbit",0,8,3.8,{ col:"#e86a6a", dur:3 });
+W("sawblade","톱니 방패","⚙️","orbit",2,12,4.0,{ col:"#c0c8d8", dur:3.5 });
+W("planetring","유성 링","🪐","orbit",4,16,4.2,{ col:"#f0d8a8", dur:4 });
+W("crossrelic","십자 성유물","✝️","orbit",3,14,4.0,{ col:"#fff0c0", dur:3.8 });
+W("dancetalis","춤추는 부적","🧿","orbit",1,9,3.6,{ col:"#8ac8f8", dur:3 });
+/* 오라 (aura) */
+W("garlic","마늘","🧄","aura",0,4,0.45,{ col:"#d8f0a0", rad:70 });
+W("sanctuary","성역","🕊️","aura",3,6,0.45,{ col:"#fff8d8", rad:85 });
+W("frostaura","서리 오라","🌨️","aura",2,5,0.45,{ col:"#c8f0ff", rad:80 });
+W("poisoncloud","독구름","☁️","aura",2,5,0.5,{ col:"#b8e89a", rad:90 });
+W("teslafield","전자기장","🔮","aura",4,8,0.45,{ col:"#d0a8ff", rad:95 });
+/* 장판 (zone) */
+W("holy","성수","🍶","zone",0,5,3.2,{ col:"#a8c8ff", rad:42 });
+W("napalm","소이 지대","🧨","zone",2,7,3.2,{ col:"#ff9a48", rad:48 });
+W("acid","부식액","☠️","zone",2,6,3.2,{ col:"#b8e05a", rad:50 });
+W("glacier","빙하 장판","🧊","zone",3,8,3.2,{ col:"#a8e8ff", rad:55 });
+W("magmalava","마력 용암","🌋","zone",5,11,3.2,{ col:"#ff7038", rad:60 });
+/* 관통 발사 (pierce) */
+W("piercearrow","관통 화살","🪶","pierce",1,13,1.3,{ col:"#e8e0c8", pierce:4 });
+W("lightlance","광선 랜스","🔆","pierce",4,18,1.6,{ col:"#fff2a8", pierce:6 });
+W("javelin","강철 투창","🔩","pierce",2,15,1.45,{ col:"#c8d0e0", pierce:5 });
+W("sonicwave","파동 음속탄","🎵","pierce",3,12,1.25,{ col:"#c8a8f0", pierce:8 });
+W("darklance","심연의 창","🖤","pierce",5,24,1.7,{ col:"#9070c0", pierce:7 });
+/* 부메랑 (boomerang) */
+W("boomerang","부메랑","🪃","boomerang",1,12,1.5,{ col:"#d8b878" });
+W("chakram","회전 차크람","⭕","boomerang",3,16,1.7,{ col:"#c8c8d8" });
+W("icespin","얼음 회전날개","❄️","boomerang",2,14,1.6,{ col:"#b8ecff" });
+W("sunscythe","태양의 낫","🌞","boomerang",5,22,1.8,{ col:"#ffdf70" });
+/* 연쇄 번개 (chain) */
+W("sparkchain","번개 사슬","⛓️","chain",2,11,1.6,{ col:"#ffe98a" });
+W("stormcall","폭풍 소환","🌩️","chain",4,14,1.8,{ col:"#a8d8ff" });
+W("holybolt","성스러운 벼락","⚡","chain",3,12,1.7,{ col:"#fff4b8" });
+W("voidlink","심연 결속","⚫","chain",5,16,1.9,{ col:"#b898e8" });
+/* 추적탄 (homing) */
+W("wisp","추적 정령","👁️","homing",2,8,1.3,{ col:"#a8f0e0" });
+W("seeker","유도 마탄","🟣","homing",3,11,1.4,{ col:"#d8a8ff" });
+W("spiritfury","정령 격노","🌠","homing",5,14,1.5,{ col:"#ffe0a8" });
+/* 방사 폭발 (nova) */
+W("starnova","별의 폭발","💫","nova",3,14,2.2,{ col:"#fff0a0" });
+W("froststorm","서리 폭풍","💠","nova",2,11,2.0,{ col:"#c8f0ff" });
+W("thornburst","가시 폭발","🌵","nova",1,10,2.0,{ col:"#a8d878" });
+W("voidnova","심연 붕괴","🌑","nova",5,20,2.4,{ col:"#b090e8" });
+
+/* ---------------- 데이터: 진화 (전용 6종 — 무기 만렙 8 + 전용 패시브 + 상자) ---------------- */
 const EVO = {
   whip:   { icon:"🩸", name:"피의 눈물",       passive:"heart",  dmg:80, cd:0.85, desc:"적을 치를 때마다 체력을 흡수하는 마검 채찍" },
   wand:   { icon:"✨", name:"성마봉",           passive:"tome",   dmg:14, cd:0.13, desc:"거의 쉬지 않고 마법탄을 쏟아낸다" },
@@ -397,7 +466,7 @@ const EVO = {
   holy:   { icon:"💣", name:"라 로바",         passive:"magnet", dmg:22, rad:85,  desc:"끝나는 순간 폭발하는 거대한 성수 지대" },
 };
 
-/* ---------------- 데이터: 패시브 (레벨 최대 5) ---------------- */
+/* ---------------- 데이터: 패시브(유물) (레벨 최대 5) ---------------- */
 const PASSIVES = {
   heart:  { icon:"❤️", name:"심장",  max:5, desc:"최대 체력 +20%" },
   tome:   { icon:"📖", name:"마도서", max:5, desc:"쿨타임 −8%" },
@@ -406,6 +475,111 @@ const PASSIVES = {
   herb:   { icon:"🌿", name:"허브",  max:5, desc:"재생 +0.6/초" },
   wings:  { icon:"👟", name:"날개",  max:5, desc:"이동 속도 +8%" },
 };
+
+/* ---------------- 데이터: 방어구 210종 (기본 36종 × 5등급 생성 + 셋트 전용 30종) ---------------- */
+const ARMOR_SLOTS = 8; // 장착 가능 방어구 수
+const ARMOR_BASES = [];
+function A(id, name, icon, stats){ ARMOR_BASES.push({ id, name, icon, stats }); }
+A("leathercap","가죽 두건","🧢",{ hp:15 });
+A("ironhelm","철 투구","⛑️",{ hp:30, dr:3 });
+A("wizhat","마법사 모자","🎩",{ area:8, cdm:4 });
+A("huntercap","사냥 투구","🪖",{ crit:5 });
+A("goldcrown","황금 왕관","👑",{ gold:25, xp:8 });
+A("frostcirc","서리 관","🌨️",{ hp:20, area:6 });
+A("chainmail","사슬 갑옷","🧥",{ hp:35, dr:5 });
+A("platearmor","판금 갑옷","🦺",{ hp:55, dr:8 });
+A("sagerobe","현자의 로브","👘",{ cdm:6, area:6 });
+A("shadowcloak","그림자 망토","🌑",{ dodge:6, spd:4 });
+A("backpack","모험가 배낭","🎒",{ pickR:15, hp:10 });
+A("leatherglove","가죽 장갑","🧤",{ crit:4, projSpd:8 });
+A("steelglove","강철 건틀렛","🥊",{ might:8 });
+A("windglove","질풍 장갑","💨",{ spd:6, cdm:3 });
+A("leatherboots","가죽 부츠","🥾",{ spd:8 });
+A("swiftboots","질주의 신발","👟",{ spd:12, dodge:3 });
+A("strring","힘의 반지","💍",{ might:10 });
+A("magring","마법 반지","💠",{ cdm:7 });
+A("rubyring","루비 반지","🔴",{ critDmg:12, might:5 });
+A("richring","부자의 반지","💰",{ gold:30 });
+A("frostring","서리 반지","🧊",{ area:7, hp:15 });
+A("lifeneck","생명 목걸이","📿",{ hp:40, regen:0.4 });
+A("vampneck","흡혈 목걸이","🧛",{ might:5, critDmg:15 });
+A("sageneck","현자의 목걸이","🦉",{ xp:12, cdm:3 });
+A("fangneck","야수 이빨 목걸이","🦷",{ might:12, critDmg:10 });
+A("guardamul","수호 부적","🧿",{ dr:8, hp:20 });
+A("luckamul","행운의 부적","🍀",{ dodge:6, xp:8 });
+A("greedamul","탐욕의 부적","🪙",{ gold:35, pickR:10 });
+A("windamul","바람의 부적","🍃",{ spd:8, dodge:4 });
+A("woodshield","나무 방패","🪵",{ dr:10, hp:25 });
+A("ironshield","강철 방패","🔰",{ dr:14, hp:30 });
+A("dragonscale","용비늘 방패","🐉",{ dr:12, hp:50, might:6 });
+A("bersbelt","광전사의 허리띠","🥋",{ might:14 });
+A("angelfeather","천사의 깃털","🪶",{ regen:0.8, hp:20 });
+A("chronoclock","시간의 시계","⏰",{ cdm:9 });
+A("starpend","별의 펜던트","⭐",{ xp:15, might:6 });
+
+/* 셋트 아이템 10종 — 3부위 수집 시 전용 보너스 */
+function SP(id, name, icon, grade, stats){ return { id, name, icon, grade, stats }; }
+const SETS = [
+  { id:"adv",    name:"모험가의 시작",   icon:"🎒", bonus:{ spd:10, pickR:30 }, bText:"이동 +10% · 획득 범위 +30%",
+    pieces:[ SP("advhat","모험가 모자","🎩",1,{ hp:12, pickR:8 }), SP("advcape","낡은 망토","🧣",3,{ hp:18, spd:4 }), SP("advboots","낡은 신발","🥿",5,{ spd:8, pickR:8 }) ] },
+  { id:"guard",  name:"수호자의 맹세",   icon:"🛡️", bonus:{ dr:15, hp:25 }, bText:"방어 +15 · 최대 체력 +25%",
+    pieces:[ SP("guardhelm","수호 투구","⛑️",1,{ hp:20, dr:4 }), SP("guardplate","수호 판금 갑옷","🦺",3,{ hp:30, dr:6 }), SP("guardshield","수호 대방패","🛡️",5,{ hp:25, dr:8 }) ] },
+  { id:"blood",  name:"피의 계약",       icon:"🩸", bonus:{ might:12, healOnKill:1 }, bText:"피해 +12% · 적 처치 시 체력 +1",
+    pieces:[ SP("bloodneck","피의 목걸이","🩸",1,{ might:6, crit:4 }), SP("bloodring","피의 반지","💍",3,{ might:8 }), SP("bloodcape","피의 망토","🧥",5,{ hp:15, might:6 }) ] },
+  { id:"gale",   name:"질풍의 질주",     icon:"💨", bonus:{ spd:18, cdm:10 }, bText:"이동 +18% · 쿨타임 −10%",
+    pieces:[ SP("galeboots","질풍 부츠","👟",1,{ spd:10, dodge:3 }), SP("galegloves","폭풍 장갑","🧤",3,{ spd:6, cdm:4 }), SP("galetalis","질풍 부적","🍃",5,{ spd:8, cdm:5 }) ] },
+  { id:"arcana", name:"마력 공명",       icon:"🔮", bonus:{ cdm:12, area:18 }, bText:"쿨타임 −12% · 범위 +18%",
+    pieces:[ SP("arcanahat","마력 투구","🎩",1,{ cdm:5, area:8 }), SP("arcanarobe","공명 로브","👘",3,{ cdm:6, area:6 }), SP("arcanabead","공명의 보주","✨",5,{ cdm:7, area:8 }) ] },
+  { id:"hunter", name:"사냥꾼의 본능",   icon:"🎯", bonus:{ crit:15, critDmg:35 }, bText:"치명타 +15% · 치명 피해 +35%",
+    pieces:[ SP("huntcap","사냥꾼의 후드","🎯",1,{ crit:6 }), SP("horngloves","매의 장갑","🦅",3,{ crit:5, projSpd:8 }), SP("bonering","짐승 사냥 반지","🦴",5,{ crit:6, critDmg:15 }) ] },
+  { id:"gold",   name:"황금 사냥",       icon:"💰", bonus:{ gold:50, xp:12 }, bText:"골드 +50% · 경험치 +12%",
+    pieces:[ SP("goldbrace","황금 팔찌","📿",1,{ gold:18 }), SP("goldpurse","금화 주머니","👝",3,{ gold:20, xp:5 }), SP("greedcrown","탐욕의 왕관","🤑",5,{ gold:25, xp:6 }) ] },
+  { id:"frost",  name:"얼음 왕의 유산",  icon:"❄️", bonus:{ frost:1, hp:15 }, bText:"주변 적 둔화 30% · 최대 체력 +15%",
+    pieces:[ SP("frostcrown","서리 왕관","👑",1,{ hp:12, area:6 }), SP("glacierplate","빙하 갑옷","🧊",3,{ hp:22, dr:5 }), SP("eternalheart","영구의 심장","💙",5,{ hp:25, regen:0.4 }) ] },
+  { id:"beast",  name:"야수의 숨결",     icon:"🐗", bonus:{ might:20, crit:8 }, bText:"피해 +20% · 치명타 +8%",
+    pieces:[ SP("megafang","거대 송곳니","🦖",1,{ might:8, critDmg:8 }), SP("beastleather","야성 가죽갑옷","🐗",3,{ might:8, hp:12 }), SP("roarneck","포효의 목걸이","🦁",5,{ might:10, crit:4 }) ] },
+  { id:"abyss",  name:"심연의 각성",     icon:"🌑", bonus:{ might:15, cdm:10, area:15 }, bText:"피해 +15% · 쿨타임 −10% · 범위 +15%",
+    pieces:[ SP("abysshelm","심연 투구","🌑",1,{ might:6, cdm:4 }), SP("abyssrobe","심연 로브","🖤",3,{ might:6, area:6 }), SP("abyssring","심연 반지","⚫",5,{ might:7, critDmg:10 }) ] },
+];
+/* 전체 방어구 풀 생성: 기본 36×5등급 = 180 + 셋트 30 = 210종 */
+const ARMOR_POOL = [];
+const ARMOR_BY_ID = {};
+for (const b of ARMOR_BASES){
+  for (let g = 0; g < 5; g++){
+    const stats = {};
+    for (const k in b.stats) stats[k] = Math.round(b.stats[k] * GRADES[g].mult * 10) / 10;
+    const piece = { id: g ? b.id + "_g" + g : b.id, name: g ? GRADES[g].name + " " + b.name : b.name,
+                    icon: b.icon, grade: g, stats, set: null };
+    ARMOR_POOL.push(piece); ARMOR_BY_ID[piece.id] = piece;
+  }
+}
+for (const S of SETS){
+  for (const p of S.pieces){
+    const stats = {};
+    for (const k in p.stats) stats[k] = Math.round(p.stats[k] * GRADES[p.grade].mult * 10) / 10;
+    const piece = { id:p.id, name:GRADES[p.grade].name + " " + p.name, icon:p.icon, grade:p.grade, stats, set:S.id };
+    ARMOR_POOL.push(piece); ARMOR_BY_ID[piece.id] = piece;
+  }
+}
+const STAT_LABEL = {
+  hp:v=>`최대 체력 +${v}%`, spd:v=>`이동 속도 +${v}%`, cdm:v=>`쿨타임 −${v}%`, area:v=>`범위 +${v}%`,
+  pickR:v=>`획득 범위 +${v}%`, regen:v=>`재생 +${v}/초`, might:v=>`피해 +${v}%`, crit:v=>`치명타 +${v}%`,
+  critDmg:v=>`치명 피해 +${v}%`, dr:v=>`방어 +${v}`, dodge:v=>`회피 +${v}%`, xp:v=>`경험치 +${v}%`,
+  gold:v=>`골드 +${v}%`, projSpd:v=>`탄속 +${v}%`,
+};
+function armorStatText(a){ return Object.keys(a.stats).map(k => (STAT_LABEL[k] || (v=>k)) (a.stats[k])).join(" · "); }
+function rollArmorPiece(minGrade){
+  // 등급 가중치 랜덤 + 세트 시작자 가중(×5) — 미보유 조각만
+  const setStart = new Set();
+  for (const id in G.armors){ const s = ARMOR_BY_ID[id] && ARMOR_BY_ID[id].set; if (s) setStart.add(s); }
+  const pool = ARMOR_POOL.filter(a => !G.armors[a.id] && (!minGrade || a.grade >= minGrade));
+  if (!pool.length) return null;
+  const wList = pool.map(a => ({ a, w: GRADES[a.grade].w * (a.set && setStart.has(a.set) ? 5 : 1) }));
+  let tot = 0; for (const it of wList) tot += it.w;
+  let r = Math.random() * tot;
+  for (const it of wList){ r -= it.w; if (r <= 0) return it.a; }
+  return wList[wList.length - 1].a;
+}
 
 /* ---------------- 데이터: 적 (메이플풍 몬스터, col = 처치 파티클 색) ---------------- */
 const ENEMIES = {
@@ -611,8 +785,10 @@ function newGame(charId){
     charId, t:0, kills:0, gold:0, level:1, xp:0, xpNext:xpNeed(1), luQueue:0,
     hitstop:0, rerollLeft:2, dmgDealt:0,
     p:{ x:0, y:0, hp:c.hp, baseHp:c.hp, maxHp:c.hp, baseSpd:c.spd, spd:c.spd, baseRegen:c.regen,
-        regen:c.regen, cdm:1, baseArea:c.area || 1, area:c.area || 1, pickR:50, face:1, moving:false, anim:0, hurtT:0, iv:0 },
-    passives:{}, weapons:[{ id:(metaStartWeapon || c.weapon), lv:1, t:0.4, evolved:false, books:null, bT:0, bA:0 }], // 정복자 언락: 시작 무기 선택 (미선택 시 캐릭터 기본)
+        regen:c.regen, cdm:1, baseArea:c.area || 1, area:c.area || 1, pickR:50, face:1, moving:false, anim:0, hurtT:0, iv:0,
+        might:1, crit:0, critDmg:2, dr:0, dodge:0, xpB:0, goldB:0, projSpd:0, setFx:{} },
+    passives:{}, armors:{}, // 방어구: 소유 조각 id 집합 (210종 풀, 최대 ARMOR_SLOTS 장착)
+    weapons:[{ id:(metaStartWeapon || c.weapon), lv:1, grade:0, t:0.4, evolved:false, books:null, bT:0, bA:0 }], // 정복자 언락: 시작 무기 선택 (미선택 시 캐릭터 기본)
     enemies:[], bullets:[], pools:[], gems:[], pickups:[], texts:[], parts:[], effects:[],
     cam:{ x:0, y:0 }, shake:0, animT:0,
     spawnT:1.2, flockIdx:0, eliteIdx:0, bossIdx:0, boss:null,
@@ -631,12 +807,56 @@ function newGame(charId){
 
 function recalcStats(){
   const P = G.p, lv = id => G.passives[id] || 0;
-  P.maxHp = Math.round(P.baseHp * (1 + 0.2 * lv("heart")));
-  P.spd   = P.baseSpd * (1 + 0.08 * lv("wings"));
-  P.cdm   = Math.max(0.4, 1 - 0.08 * lv("tome"));
-  P.area  = (P.baseArea || 1) * (1 + 0.12 * lv("candel"));
-  P.pickR = 50 * (1 + 0.3 * lv("magnet"));
-  P.regen = P.baseRegen + 0.6 * lv("herb");
+  // 1) 기본 + 유물(패시브)
+  let hpFrac = 0.2 * lv("heart");
+  let spdPct = 8 * lv("wings");
+  let cdmPct = 8 * lv("tome");
+  let areaFrac = 0.12 * lv("candel");
+  let pickPct = 30 * lv("magnet");
+  let regen = P.baseRegen + 0.6 * lv("herb");
+  let mightPct = 0, crit = 0, critDmg = 0, dr = 0, dodge = 0, xpPct = 0, goldPct = 0, projPct = 0;
+  const setFx = {};
+  // 2) 방어구 집계 (등급 배수는 조각 생성 시 스탯에 반영됨)
+  for (const id in G.armors){
+    const a = ARMOR_BY_ID[id];
+    if (!a) continue;
+    const s = a.stats;
+    hpFrac += (s.hp || 0) / 100; spdPct += s.spd || 0; cdmPct += s.cdm || 0;
+    areaFrac += (s.area || 0) / 100; pickPct += s.pickR || 0;
+    regen += s.regen || 0; mightPct += s.might || 0; crit += s.crit || 0;
+    critDmg += s.critDmg || 0; dr += s.dr || 0; dodge += s.dodge || 0;
+    xpPct += s.xp || 0; goldPct += s.gold || 0; projPct += s.projSpd || 0;
+  }
+  // 3) 셋트 보너스 (3부위 완성 시) — 수치는 합산, 특수 효과(healOnKill·frost)는 플래그
+  for (const S of SETS){
+    if (!S.pieces.every(p => G.armors[p.id])) continue;
+    for (const k in S.bonus){
+      const v = S.bonus[k];
+      if (k === "hp") hpFrac += v / 100;
+      else if (k === "area") areaFrac += v / 100;
+      else if (k === "cdm") cdmPct += v;
+      else if (k === "spd") spdPct += v;
+      else if (k === "pickR") pickPct += v;
+      else if (k === "might") mightPct += v;
+      else if (k === "crit") crit += v;
+      else if (k === "critDmg") critDmg += v;
+      else if (k === "dr") dr += v;
+      else if (k === "regen") regen += v;
+      else setFx[k] = v;
+    }
+  }
+  P.maxHp = Math.round(P.baseHp * (1 + hpFrac));
+  P.spd   = P.baseSpd * (1 + spdPct / 100);
+  P.cdm   = Math.max(0.35, 1 - cdmPct / 100);
+  P.area  = (P.baseArea || 1) * (1 + areaFrac);
+  P.pickR = 50 * (1 + pickPct / 100);
+  P.regen = regen;
+  P.might = 1 + mightPct / 100;
+  P.crit  = Math.min(0.8, crit / 100);
+  P.critDmg = 2 + critDmg / 100;
+  P.dr = dr; P.dodge = Math.min(0.5, dodge / 100);
+  P.xpB = xpPct / 100; P.goldB = goldPct / 100; P.projSpd = projPct / 100;
+  P.setFx = setFx;
   P.hp = Math.min(P.hp, P.maxHp);
 }
 
@@ -855,12 +1075,15 @@ function burst(x, y, col, n, sp){
 function dealDmg(e, dmg, opts){
   if (e.dead) return;
   opts = opts || {};
+  const P = G.p;
   let d = dmg, crit = false;
-  if (opts.crit && Math.random() < opts.crit){ d *= 2; crit = true; }
+  const cc = opts.crit !== undefined ? opts.crit : P.crit; // 치명타: 무기 전용 확률 우선, 없으면 방어구 합산 스탯
+  if (cc > 0 && Math.random() < cc){ d *= P.critDmg; crit = true; }
+  d *= P.might; // 방어구/셋트 피해량 % (메타 dmgMult는 wstats에서 이미 반영)
   e.hp -= d; e.flash = 0.13;
   G.dmgDealt += d; // 런 종료 요약용 누적 피해량 (무기·오라·웅덩이·폭탄 출처 불문)
   addText(e.x + rand(-9,9), e.y - e.r - 8, Math.round(d), crit ? "#ffd24a" : "#ffffff", crit);
-  if (opts.lifesteal) G.p.hp = Math.min(G.p.maxHp, G.p.hp + opts.lifesteal);
+  if (opts.lifesteal) P.hp = Math.min(P.maxHp, P.hp + opts.lifesteal);
   if (e.hp <= 0) killEnemy(e);
 }
 function hitRect(cx, cy, hw, hh, dmg, opts){
@@ -897,6 +1120,7 @@ function killEnemy(e){
   if (e.dead) return;
   e.dead = true;
   G.kills++;
+  if (G.p.setFx && G.p.setFx.healOnKill) G.p.hp = Math.min(G.p.maxHp, G.p.hp + 1); // 셋트「피의 계약」흡혈
   const col = (e.elite || e.boss) ? "#ff5b5b" : (ENEMIES[e.type] && ENEMIES[e.type].col) || "#b9a7e0";
   burst(e.x, e.y, col, e.boss ? 30 : e.elite ? 18 : 6);
   if (e.elite || e.boss){
@@ -908,7 +1132,7 @@ function killEnemy(e){
   dropGem(e.x, e.y, e.xp);
   if (e.elite) G.pickups.push({ x:e.x, y:e.y, kind:pick(["magnet","chicken","bomb"]), ph:rand(0,TAU) });
   if (e.boss){
-    G.boss = null; G.gold += 100;
+    G.boss = null; addGold(100);
     G.pickups.push({ x:e.x, y:e.y, kind:"chest", ph:0 });
     banner("🎁 보물 상자!", "상자를 열어 무기를 진화시켜라");
     SFX.bossdie(); G.shake = 12;
@@ -926,6 +1150,12 @@ function dropGem(x, y, v){
 function damagePlayer(d){
   const P = G.p;
   if (P.iv > 0 || P.hp <= 0) return;
+  if (P.dodge > 0 && Math.random() < P.dodge){ // 회피 (방어구 스탯)
+    addText(P.x, P.y - 26, "회피!", "#a8f0e0");
+    P.iv = 0.12;
+    return;
+  }
+  d = Math.round(d / (1 + P.dr / 60)); // 방어력: 완화 공식 (수확 체감)
   P.iv = 0.25; P.hp -= d; P.hurtT = 0.35;
   G.hitstop = Math.max(G.hitstop, 0.04);
   G.shake = Math.min(10, G.shake + 3);
@@ -934,94 +1164,176 @@ function damagePlayer(d){
   if (P.hp <= 0){ P.hp = 0; setScene("over"); SFX.lose(); playSfx("gameover"); }
 }
 
-/* ---------------- 무기 시스템 ---------------- */
+/* ---------------- 무기 시스템 (12계열 × 58종 · 등급/레벨 스케일링) ---------------- */
 function wstats(w){
   const P = G.p, D = WEAPONS[w.id], L = Math.min(w.lv, 8);
+  const dm = P.dmgMult || 1, ps = 1 + (P.projSpd || 0); // 메타 피해 배수 · 방어구 탄속 보너스
   if (w.evolved){
     const E = EVO[w.id];
-    return { dmg:E.dmg * (P.dmgMult || 1), cd:(E.cd || 1) * P.cdm, count:E.count || 1, area:P.area, rad:(E.rad || 60) * P.area, spd:360 }; // dmg에 메타 피해 배수 (BACKLOG #11)
+    return { dmg:E.dmg * dm, cd:(E.cd || 1) * P.cdm, count:E.count || 1, area:P.area,
+             rad:(E.rad || 60) * P.area, spd:520 * ps, pierce:3, dur:3, col:D.col };
   }
+  const gm = GRADES[w.grade || 0].mult; // 아이템 등급 배수 (일반 1.0 → 신화 2.1)
+  const grow = 1 + 0.22 * (L - 1);      // 레벨당 피해 +22%
   return {
-    dmg:D.dmg[L-1] * (P.dmgMult || 1), // 메타 피해 배수 (BACKLOG #11)
-    cd:D.cd * P.cdm,
-    count:D.count ? D.count[L-1] : 1,
-    area:P.area * (D.ar ? D.ar[L-1] : 1),
-    rad:(D.rad ? D.rad[L-1] : 0) * P.area,
-    spd:360,
+    dmg: D.dmg * gm * grow * dm,
+    cd: D.cd * P.cdm,
+    count: D.count ? D.count + Math.floor((L - 1) / 4) : 1, // 4레벨마다 발사체 +1
+    area: P.area * (D.area || 1) * (1 + 0.05 * (L - 1)),
+    rad: (D.rad || 0) * P.area * (1 + 0.05 * (L - 1)),
+    spd: 360 * ps,
+    pierce: D.pierce || 0,
+    dur: D.dur || 3,
+    col: D.col || "#b8e0ff",
   };
 }
-function garlicRad(w){
-  return (w.evolved ? EVO.garlic.rad : WEAPONS.garlic.rad[Math.min(w.lv,8)-1]) * G.p.area;
+function garlicRad(w){ return wstats(w).rad || 70; }
+function nearestEnemyExcl(x, y, maxD, exclIds){
+  let best = null, bd = maxD * maxD;
+  for (const e of G.enemies){
+    if (e.dead || exclIds.includes(e.id)) continue;
+    const d = dist2(x, y, e.x, e.y);
+    if (d < bd){ bd = d; best = e; }
+  }
+  return best;
 }
 function fireWeapon(w){
-  const S = wstats(w), P = G.p;
-  if (w.id === "whip"){
+  const S = wstats(w), P = G.p, D = WEAPONS[w.id], col = S.col;
+  if (D.cat === "arc"){ // 근접 휘두르기 — Lv.4부터 후방까지
     SFX.whip();
     const hw = 80 * S.area, hh = 55 * S.area;
     const opts = w.evolved ? { crit:0.3, lifesteal:2 } : {};
     const fx = P.x + P.face * hw;
-    G.effects.push({ type:"slash", x:fx, y:P.y - 4, dir:P.face, area:S.area, t:0.2, max:0.2 });
+    G.effects.push({ type:"slash", x:fx, y:P.y - 4, dir:P.face, area:S.area, col, t:0.2, max:0.2 });
     hitRect(fx, P.y - 4, hw, hh, S.dmg, opts);
     if (w.lv >= 4 || w.evolved){
       const bx = P.x - P.face * hw;
-      G.effects.push({ type:"slash", x:bx, y:P.y - 4, dir:-P.face, area:S.area, t:0.2, max:0.2 });
+      G.effects.push({ type:"slash", x:bx, y:P.y - 4, dir:-P.face, area:S.area, col, t:0.2, max:0.2 });
       hitRect(bx, P.y - 4, hw, hh, S.dmg, opts);
     }
   }
-  else if (w.id === "wand"){
+  else if (D.cat === "shot"){ // 조준 사격
     const tgt = nearestEnemy(P.x, P.y, 720);
     const baseA = tgt ? Math.atan2(tgt.y - P.y, tgt.x - P.x) : (P.face > 0 ? 0 : Math.PI);
-    const spd = w.evolved ? 520 : 360;
     for (let i = 0; i < S.count; i++){
       const a = baseA + (i - (S.count - 1) / 2) * 0.14;
-      G.bullets.push({ kind:"wand", x:P.x, y:P.y - 6, vx:Math.cos(a)*spd, vy:Math.sin(a)*spd,
+      G.bullets.push({ kind:"wand", col, x:P.x, y:P.y - 6, vx:Math.cos(a)*S.spd, vy:Math.sin(a)*S.spd,
                        r:6, dmg:S.dmg, pierce:0, t:1.6, hit:[] });
     }
     SFX.shoot();
   }
-  else if (w.id === "axe"){
+  else if (D.cat === "spread"){ // 부채꼴 산탄
+    const tgt = nearestEnemy(P.x, P.y, 520);
+    const baseA = tgt ? Math.atan2(tgt.y - P.y, tgt.x - P.x) : (P.face > 0 ? 0 : Math.PI);
+    for (let i = 0; i < S.count; i++){
+      const a = baseA + (S.count > 1 ? (i / (S.count - 1) - 0.5) * 0.95 : 0);
+      G.bullets.push({ kind:"wand", col, x:P.x, y:P.y - 6, vx:Math.cos(a)*S.spd*0.9, vy:Math.sin(a)*S.spd*0.9,
+                       r:5, dmg:S.dmg, pierce:0, t:0.55, hit:[] });
+    }
+    SFX.shoot();
+  }
+  else if (D.cat === "lob"){ // 포물선 투척 — 진화 시 사방 낫칼
     if (w.evolved){
       const n = 10;
       for (let i = 0; i < n; i++){
         const a = i / n * TAU + rand(-0.1, 0.1);
-        G.bullets.push({ kind:"knife", x:P.x, y:P.y, vx:Math.cos(a)*175, vy:Math.sin(a)*175,
+        G.bullets.push({ kind:"knife", col, x:P.x, y:P.y, vx:Math.cos(a)*175, vy:Math.sin(a)*175,
                          r:13, dmg:S.dmg, pierce:3, t:2.2, hit:[], rot:a });
       }
-      SFX.axe();
     } else {
       for (let i = 0; i < S.count; i++){
-        G.bullets.push({ kind:"axe", x:P.x, y:P.y - 10, vx:P.face*rand(30,130)+rand(-30,30), vy:-rand(300,430),
+        G.bullets.push({ kind:"axe", col, x:P.x, y:P.y - 10, vx:P.face*rand(30,130)+rand(-30,30), vy:-rand(300,430),
                          g:760, r:17, dmg:S.dmg, pierce:99, t:2.4, hit:[], rot:rand(0,TAU) });
       }
-      SFX.axe();
     }
+    SFX.axe();
   }
-  else if (w.id === "holy"){
+  else if (D.cat === "zone"){ // 장판 생성 — 진화 시 최종 폭발
     for (let i = 0; i < S.count; i++){
       const tgt = nearestEnemy(P.x + rand(-200,200), P.y + rand(-200,200), 500);
       let tx, ty;
       if (tgt){ tx = tgt.x; ty = tgt.y; }
       else { const a = rand(0, TAU), d = rand(130, 320); tx = P.x + Math.cos(a)*d; ty = P.y + Math.sin(a)*d; }
-      G.bullets.push({ kind:"flask", sx:P.x, sy:P.y - 10, tx, ty, x:P.x, y:P.y - 10,
+      G.bullets.push({ kind:"flask", col, sx:P.x, sy:P.y - 10, tx, ty, x:P.x, y:P.y - 10,
                        dur:0.8, t:0, dmg:S.dmg, rad:S.rad, evolved:w.evolved });
     }
     SFX.axe();
   }
+  else if (D.cat === "pierce"){ // 관통 발사체
+    const tgt = nearestEnemy(P.x, P.y, 700);
+    const baseA = tgt ? Math.atan2(tgt.y - P.y, tgt.x - P.x) : (P.face > 0 ? 0 : Math.PI);
+    const n = Math.min(S.count, 3);
+    for (let i = 0; i < n; i++){
+      const a = baseA + (i - (n - 1) / 2) * 0.22;
+      G.bullets.push({ kind:"lance", col, x:P.x, y:P.y - 6, vx:Math.cos(a)*S.spd*1.5, vy:Math.sin(a)*S.spd*1.5,
+                       r:8, dmg:S.dmg, pierce:S.pierce, t:1.4, hit:[], ang:a });
+    }
+    SFX.shoot();
+  }
+  else if (D.cat === "boomerang"){ // 던지고 되돌아옴
+    const n = Math.min(S.count, 3);
+    for (let i = 0; i < n; i++){
+      const a = (P.face > 0 ? 0 : Math.PI) + (i - (n - 1) / 2) * 0.5;
+      G.bullets.push({ kind:"ring", col, x:P.x, y:P.y - 6, vx:Math.cos(a)*430, vy:Math.sin(a)*430,
+                       r:13, dmg:S.dmg, pierce:99, t:2.6, hit:[], rot:0, phase:"out" });
+    }
+    SFX.axe();
+  }
+  else if (D.cat === "chain"){ // 연쇄 번개 — 적에서 적으로 점프
+    let src = { x:P.x, y:P.y };
+    const struck = [];
+    let dmg = S.dmg, struckAny = false;
+    for (let j = 0; j < S.count; j++){
+      const tgt = nearestEnemyExcl(src.x, src.y, 340, struck);
+      if (!tgt) break;
+      struck.push(tgt.id);
+      const pts = [[src.x, src.y]]; // 지그재그 경로 사전 계산 (프레임 떨림 방지)
+      for (let k = 1; k < 4; k++){
+        const tt = k / 4;
+        pts.push([ lerp(src.x, tgt.x, tt) + rand(-14,14), lerp(src.y, tgt.y, tt) + rand(-14,14) ]);
+      }
+      pts.push([tgt.x, tgt.y]);
+      G.effects.push({ type:"bolt", pts, col, t:0.16, max:0.16 });
+      dealDmg(tgt, dmg, {});
+      src = { x:tgt.x, y:tgt.y };
+      dmg *= 0.85;
+      struckAny = true;
+    }
+    if (struckAny) throttled("zap", 90, () => tone(1200, 200, 0.1, "sawtooth", 0.08));
+  }
+  else if (D.cat === "homing"){ // 추적탄
+    for (let i = 0; i < Math.min(S.count, 4); i++){
+      const a = rand(0, TAU);
+      G.bullets.push({ kind:"orb", col, x:P.x, y:P.y - 6, vx:Math.cos(a)*230, vy:Math.sin(a)*230,
+                       r:7, dmg:S.dmg, pierce:0, t:2.2, hit:[], spd0:230 });
+    }
+    SFX.shoot();
+  }
+  else if (D.cat === "nova"){ // 방사 폭발
+    const n = Math.min(S.count, 12);
+    for (let i = 0; i < n; i++){
+      const a = i / n * TAU + rand(0, 0.3);
+      G.bullets.push({ kind:"knife", col, x:P.x, y:P.y, vx:Math.cos(a)*190, vy:Math.sin(a)*190,
+                       r:11, dmg:S.dmg, pierce:2, t:1.3, hit:[], rot:a });
+    }
+    SFX.axe();
+  }
 }
-function updateBible(w, dt){
+function updateOrbit(w, dt){ // orbit 계열 — 궤도 오브제 (성서·톱니·부적 등)
   const P = G.p;
   if (w.books){
+    const S = wstats(w);
     const R = (w.evolved ? 115 : 95) * P.area;
-    const spd = w.evolved ? 2.6 : (2.0 + 0.12 * w.lv);
-    w.bA += spd * dt;
-    const n = w.books.length, dmg = w.evolved ? EVO.bible.dmg : wstats(w).dmg;
+    const ospd = w.evolved ? 2.6 : (2.0 + 0.12 * w.lv);
+    w.bA += ospd * dt;
+    const n = w.books.length;
     for (let i = 0; i < n; i++){
       const a = w.bA + i / n * TAU, b = w.books[i];
       b.x = P.x + Math.cos(a) * R; b.y = P.y + Math.sin(a) * R * 0.82;
       for (const e of G.enemies){
         if (e.dead || e.bibT > 0) continue;
         const rr = 24 * P.area + e.r;
-        if (dist2(b.x, b.y, e.x, e.y) < rr * rr){ e.bibT = 0.5; dealDmg(e, dmg, {}); SFX.hit(); }
+        if (dist2(b.x, b.y, e.x, e.y) < rr * rr){ e.bibT = 0.5; dealDmg(e, S.dmg, {}); SFX.hit(); }
       }
     }
     if (!w.evolved){
@@ -1034,7 +1346,7 @@ function updateBible(w, dt){
       const n = w.evolved ? 4 : wstats(w).count;
       w.books = []; w.bA = 0;
       for (let i = 0; i < n; i++) w.books.push({ x:P.x, y:P.y });
-      if (!w.evolved) w.bT = WEAPONS.bible.dur[Math.min(w.lv,8)-1];
+      if (!w.evolved) w.bT = wstats(w).dur;
       SFX.book();
     }
   }
@@ -1042,25 +1354,26 @@ function updateBible(w, dt){
 function updateWeapons(dt){
   const P = G.p;
   for (const w of G.weapons){
-    if (w.id === "garlic"){
+    const cat = WEAPONS[w.id].cat;
+    if (cat === "aura"){ // 오라 계열 — 주기 틱 (마늘·성역·전자기장 등)
       w.t -= dt;
       if (w.t <= 0){
+        const S = wstats(w);
         w.t = 0.45 * P.cdm;
-        const rad = garlicRad(w);
-        const dmg = w.evolved ? EVO.garlic.dmg : WEAPONS.garlic.dmg[Math.min(w.lv,8)-1];
+        const rad = S.rad || 70;
         let hits = 0;
         for (const e of G.enemies){
           if (e.dead) continue;
-          if (dist2(e.x, e.y, P.x, P.y) < sq(rad + e.r)){ dealDmg(e, dmg, {}); knockback(e, P.x, P.y, 22); hits++; }
+          if (dist2(e.x, e.y, P.x, P.y) < sq(rad + e.r)){ dealDmg(e, S.dmg, {}); knockback(e, P.x, P.y, 22); hits++; }
         }
         if (hits > 0){
           throttled("garlic", 200, () => tone(240, 120, 0.08, "sawtooth", 0.05));
-          if (w.evolved) P.hp = Math.min(P.maxHp, P.hp + 2);
+          if (w.evolved) P.hp = Math.min(P.maxHp, P.hp + 2); // 영혼 포식자 흡수
         }
       }
       continue;
     }
-    if (w.id === "bible"){ updateBible(w, dt); continue; }
+    if (cat === "orbit"){ updateOrbit(w, dt); continue; }
     w.t -= dt;
     if (w.t <= 0){ fireWeapon(w); w.t = wstats(w).cd; }
   }
@@ -1096,7 +1409,9 @@ function updateEnemies(dt){
     e.bibT = Math.max(0, e.bibT - dt);
     let dx = P.x - e.x, dy = P.y - e.y;
     const d = Math.hypot(dx, dy) || 1;
-    let vx = dx / d * e.spd, vy = dy / d * e.spd;
+    let spdMul = 1;
+    if (P.setFx && P.setFx.frost && d < 170) spdMul = 0.7; // 셋트「얼음 왕의 유산」둔화 오라
+    let vx = dx / d * e.spd * spdMul, vy = dy / d * e.spd * spdMul;
     if (e.wob){
       const s = Math.sin(G.animT * 5 + e.phase) * e.spd * 0.45;
       vx += -dy / d * s; vy += dx / d * s;
@@ -1118,7 +1433,7 @@ function updateEnemies(dt){
   G.enemies = es.filter(e => !e.dead);
 }
 function updateBullets(dt){
-  const bs = G.bullets;
+  const bs = G.bullets, P = G.p;
   for (let i = bs.length - 1; i >= 0; i--){
     const b = bs[i];
     if (b.kind === "flask"){
@@ -1127,7 +1442,7 @@ function updateBullets(dt){
       b.x = lerp(b.sx, b.tx, k);
       b.y = lerp(b.sy, b.ty, k) - Math.sin(k * Math.PI) * 90;
       if (k >= 1){
-        G.pools.push({ x:b.tx, y:b.ty, r:b.rad, dmg:b.dmg, life:b.evolved ? 3.0 : 2.5, tick:0, boom:b.evolved ? 120 : 0 });
+        G.pools.push({ x:b.tx, y:b.ty, r:b.rad, dmg:b.dmg, life:b.evolved ? 3.0 : 2.5, tick:0, boom:b.evolved ? 120 : 0, col:b.col });
         bs.splice(i, 1); SFX.splash();
       }
       continue;
@@ -1135,6 +1450,28 @@ function updateBullets(dt){
     b.t -= dt;
     if (b.kind === "axe"){ b.vy += b.g * dt; b.rot += dt * 10; }
     if (b.kind === "knife") b.rot += dt * 14;
+    if (b.kind === "ring"){ // 부메랑: 감속 → 귀환 (방향 전환 시 타격 목록 초기화 = 복귀 경로 재타격)
+      b.rot += dt * 13;
+      if (b.phase === "out"){
+        b.vx *= Math.max(0, 1 - 2.2 * dt); b.vy *= Math.max(0, 1 - 2.2 * dt);
+        if (Math.hypot(b.vx, b.vy) < 60){ b.phase = "back"; b.hit.length = 0; }
+      } else {
+        const dx = P.x - b.x, dy = P.y - b.y, d = Math.hypot(dx, dy) || 1;
+        b.vx += dx / d * 1500 * dt; b.vy += dy / d * 1500 * dt;
+        if (d < 22) b.t = 0;
+      }
+    }
+    if (b.kind === "orb"){ // 추적탄: 제한된 회전율로 최근접 적 추적
+      const tgt = nearestEnemy(b.x, b.y, 420);
+      if (tgt){
+        const want = Math.atan2(tgt.y - b.y, tgt.x - b.x), cur = Math.atan2(b.vy, b.vx);
+        let diff = want - cur;
+        while (diff > Math.PI) diff -= TAU;
+        while (diff < -Math.PI) diff += TAU;
+        const turn = clamp(diff, -5 * dt, 5 * dt), a = cur + turn;
+        b.vx = Math.cos(a) * b.spd0; b.vy = Math.sin(a) * b.spd0;
+      }
+    }
     b.x += b.vx * dt; b.y += b.vy * dt;
     let dead = b.t <= 0;
     if (!dead){
@@ -1143,8 +1480,8 @@ function updateBullets(dt){
         const rr = b.r + e.r;
         if (dist2(b.x, b.y, e.x, e.y) < rr * rr){
           b.hit.push(e.id);
-          dealDmg(e, b.dmg, { crit: b.kind === "axe" ? 0.15 : 0 });
-          if (b.kind === "axe" || b.kind === "knife") knockback(e, b.x, b.y, 30);
+          dealDmg(e, b.dmg, {}); // 치명타는 플레이어 스탯으로 중앙 판정
+          if (b.kind === "axe" || b.kind === "knife" || b.kind === "lance") knockback(e, b.x, b.y, 30);
           SFX.hit();
           if (b.hit.length > b.pierce){ dead = true; break; }
         }
@@ -1251,30 +1588,56 @@ function update(dt){
 }
 
 /* ---------------- 성장 / 진화 ---------------- */
+function addGold(n){ G.gold += Math.round(n * (1 + (G.p.goldB || 0))); } // 골드 획득 일원화 (방어구 골드 % 보너스)
 function gainXp(v){
-  G.xp += v;
+  G.xp += v * (1 + (G.p.xpB || 0)); // 방어구 경험치 % 보너스
   while (G.xp >= G.xpNext){ G.xp -= G.xpNext; G.level++; G.xpNext = xpNeed(G.level); G.luQueue++; }
   if (G.luQueue > 0 && scene === "play") setScene("levelup");
 }
 function owned(id){ return G.weapons.find(w => w.id === id); }
+function wpick(list){ // 가중치 랜덤 1개 (list: [{c, w}])
+  let tot = 0; for (const it of list) tot += it.w;
+  let r = Math.random() * tot;
+  for (const it of list){ r -= it.w; if (r <= 0) return it.c; }
+  return list[list.length - 1].c;
+}
 function rollChoices(){
   const out = [];
-  const evos = shuffle(G.weapons.filter(w => !w.evolved && w.lv >= 8 && (G.passives[EVO[w.id].passive] || 0) > 0).map(w => w.id));
+  // 1) 진화는 항상 최우선 (전용 6종: 만렙 + 전용 패시브)
+  const evos = shuffle(G.weapons.filter(w => !w.evolved && w.lv >= 8 && EVO[w.id] && (G.passives[EVO[w.id].passive] || 0) > 0).map(w => w.id));
   for (const id of evos) out.push({ type:"evo", id });
-  const pool = [];
+  // 2) 무기/유물 풀
+  const wpool = [];
   const wSlots = G.weapons.length < 6;
-  for (const id of Object.keys(WEAPONS)) if (!owned(id) && wSlots) pool.push({ type:"wnew", id });
-  for (const w of G.weapons) if (!w.evolved && w.lv < 8) pool.push({ type:"wup", id:w.id });
+  for (const id of Object.keys(WEAPONS)) if (!owned(id) && wSlots) wpool.push({ c:{ type:"wnew", id }, w:10 });
+  for (const w of G.weapons) if (!w.evolved && w.lv < 8) wpool.push({ c:{ type:"wup", id:w.id }, w:10 });
   const pSlots = Object.keys(G.passives).length < 6;
   for (const id of Object.keys(PASSIVES)){
     const lv = G.passives[id] || 0;
-    if (lv === 0 && pSlots) pool.push({ type:"pnew", id });
-    else if (lv > 0 && lv < PASSIVES[id].max) pool.push({ type:"pup", id });
+    if (lv === 0 && pSlots) wpool.push({ c:{ type:"pnew", id }, w:8 });
+    else if (lv > 0 && lv < PASSIVES[id].max) wpool.push({ c:{ type:"pup", id }, w:8 });
   }
-  shuffle(pool);
-  for (const c of pool){
-    if (out.length >= 3) break;
-    if (!out.some(o => o.id === c.id)) out.push(c);
+  // 3) 방어구 풀 (등급 가중치 + 세트 시작자 가중 ×5 — 셋트 수집 보장)
+  const apool = [];
+  if (Object.keys(G.armors).length < ARMOR_SLOTS){
+    const setStart = new Set();
+    for (const id in G.armors){ const s = ARMOR_BY_ID[id] && ARMOR_BY_ID[id].set; if (s) setStart.add(s); }
+    for (const a of ARMOR_POOL){
+      if (G.armors[a.id]) continue;
+      apool.push({ c:{ type:"anew", id:a.id }, w: GRADES[a.grade].w * (a.set && setStart.has(a.set) ? 5 : 1) });
+    }
+  }
+  // 4) 슬롯 채우기: 첫 빈 슬롯은 방어구 보장, 이후 40% 확률
+  let first = true, guard = 0;
+  while (out.length < 3 && guard++ < 24){
+    const useA = apool.length > 0 && (first || Math.random() < 0.4);
+    first = false;
+    let src = (useA && apool.length) ? apool : (wpool.length ? wpool : apool);
+    if (!src.length) break;
+    let c = wpick(src), tries = 0;
+    while (out.some(o => o.type === c.type && o.id === c.id) && tries++ < 8) c = wpick(src);
+    if (out.some(o => o.type === c.type && o.id === c.id)) continue;
+    out.push(c);
   }
   let fb = 0;
   while (out.length < 3) out.push({ type: fb++ % 2 ? "gold" : "heal" });
@@ -1291,12 +1654,27 @@ function buildLevelUp(isReroll){
   for (const k in EVO) evoByPassive[EVO[k].passive] = k;
   luChoices.forEach((c, i) => {
     const el = document.createElement("div");
-    let icon, name, tag, desc, cls = "lucard";
+    let icon, name, tag, desc, cls = "lucard", gcol = null;
     if (c.type === "evo"){ const E = EVO[c.id]; icon = E.icon; name = E.name; tag = "★ 진화"; desc = E.desc; cls += " evo"; }
-    else if (c.type === "wnew"){ const D = WEAPONS[c.id]; icon = D.icon; name = D.name; tag = "새 무기"; desc = D.desc; }
-    else if (c.type === "wup"){ const D = WEAPONS[c.id]; icon = D.icon; name = D.name + " Lv." + (owned(c.id).lv + 1); tag = "무기 강화"; desc = D.up[owned(c.id).lv - 1]; }
-    else if (c.type === "pnew"){ const P = PASSIVES[c.id]; icon = P.icon; name = P.name; tag = "새 패시브"; desc = P.desc; }
-    else if (c.type === "pup"){ const P = PASSIVES[c.id]; icon = P.icon; name = P.name + " Lv." + ((G.passives[c.id] || 0) + 1); tag = "패시브 강화"; desc = P.desc; }
+    else if (c.type === "wnew"){
+      const D = WEAPONS[c.id], g = GRADES[c.grade];
+      icon = D.icon; name = D.name; tag = `${g.name} 무기`; desc = CAT_DESC[D.cat] || ""; gcol = g.col;
+      if (c.grade >= 3) cls += " evo"; // 희귀 이상 무기는 고품 카드 연출
+    }
+    else if (c.type === "wup"){
+      const D = WEAPONS[c.id], w = owned(c.id), g = GRADES[w.grade || 0], nl = w.lv + 1;
+      icon = D.icon; name = D.name + " Lv." + nl; tag = "무기 강화"; gcol = g.col;
+      desc = "피해 +22% · 범위 +5%" + (nl === 5 ? " · 발사체 +1" : "");
+    }
+    else if (c.type === "anew"){
+      const A = ARMOR_BY_ID[c.id], g = GRADES[A.grade];
+      icon = A.icon; name = A.name; gcol = g.col;
+      tag = A.set ? `${g.name} 방어구 · ${SETS.find(S => S.id === A.set).name}` : `${g.name} 방어구`;
+      desc = armorStatText(A);
+      if (A.grade >= 3) cls += " evo";
+    }
+    else if (c.type === "pnew"){ const P = PASSIVES[c.id]; icon = P.icon; name = P.name; tag = "새 유물"; desc = P.desc; }
+    else if (c.type === "pup"){ const P = PASSIVES[c.id]; icon = P.icon; name = P.name + " Lv." + ((G.passives[c.id] || 0) + 1); tag = "유물 강화"; desc = P.desc; }
     else if (c.type === "heal"){ icon = "🍗"; name = "치킨"; tag = "회복"; desc = "체력을 30 회복한다"; }
     else { icon = "💰"; name = "골드"; tag = "재화"; desc = "골드 +60"; }
     // 진화 레시프 배지
@@ -1305,24 +1683,33 @@ function buildLevelUp(isReroll){
       const w = owned(evoByPassive[c.id]);
       if (w && w.lv <= 7) badge = `★ ${WEAPONS[w.id].name} 만렙 시 「${EVO[w.id].name}」 재료`;
       else if (w) badge = `★ 지금 「${EVO[w.id].name}」으로 진화 가능!`;
-    } else if (c.type === "wup" && owned(c.id).lv + 1 >= 8){
+    } else if (c.type === "wup" && EVO[c.id] && owned(c.id).lv + 1 >= 8){
       const P = PASSIVES[EVO[c.id].passive];
       badge = (G.passives[EVO[c.id].passive] || 0) > 0
         ? "★ 진화 준비 완료 — 레벨업/보물상자에서 진화"
         : `★ 만렙! ${P.icon}${P.name} 갖추면 진화`;
+    } else if (c.type === "wup" && !EVO[c.id] && owned(c.id).lv + 1 >= 8){
+      badge = "★ 만렙 완료!";
+    } else if (c.type === "anew" && ARMOR_BY_ID[c.id].set){
+      const S = SETS.find(S => S.id === ARMOR_BY_ID[c.id].set);
+      const n = S.pieces.filter(p => G.armors[p.id] || p.id === c.id).length;
+      badge = `✨ ${S.name} ${n}/3 ${n >= 3 ? "— 셋트 발동!" : "— 3개 모으면 「" + S.bText + "」"}`;
     }
     el.className = cls;
-    el.innerHTML = `<span class="key">${i + 1}</span><div class="ci">${icon}</div><div class="ct">${tag}</div><div class="cn">${name}</div><div class="cd">${desc}</div>` + (badge ? `<div class="cv">${badge}</div>` : "");
+    if (gcol){ el.style.borderColor = gcol; el.style.boxShadow = `0 0 14px ${gcol}33`; }
+    el.innerHTML = `<span class="key">${i + 1}</span><div class="ci">${icon}</div><div class="ct"${gcol ? ` style="color:${gcol}"` : ""}>${tag}</div><div class="cn">${name}</div><div class="cd">${desc}</div>` + (badge ? `<div class="cv">${badge}</div>` : "");
     el.addEventListener("click", () => chooseCard(i));
     wrap.appendChild(el);
   });
-  // 진행 스트립: 이번 런의 진화 목표
+  // 진행 스트립: 이번 런의 진화 목표 (진화 불가 무기는 만렙 표기만)
   let strip;
-  if (G.weapons.every(w => w.evolved)) strip = "이번 런 목표 — 전 무기 진화 완료!";
+  if (G.weapons.every(w => w.evolved || !EVO[w.id]) && G.weapons.some(w => w.evolved)) strip = "이번 런 목표 — 진화 가능 무기 전부 완료!";
   else {
-    const segs = G.weapons.map(w => w.evolved
-      ? `${EVO[w.id].icon} 진화 완료`
-      : `${WEAPONS[w.id].icon} ${w.lv}/8 · ${PASSIVES[EVO[w.id].passive].icon} ${G.passives[EVO[w.id].passive] || 0}/5`);
+    const segs = G.weapons.map(w => {
+      if (w.evolved) return `${EVO[w.id].icon} 진화 완료`;
+      if (!EVO[w.id]) return `${WEAPONS[w.id].icon} ${w.lv}/8`;
+      return `${WEAPONS[w.id].icon} ${w.lv}/8 · ${PASSIVES[EVO[w.id].passive].icon} ${G.passives[EVO[w.id].passive] || 0}/5`;
+    });
     strip = "이번 런 목표 — " + segs.join(" · ");
   }
   $("luEvoStrip").textContent = strip;
@@ -1342,7 +1729,7 @@ function doSkip(){
   if (scene !== "levelup") return;
   const heal = Math.ceil(G.p.maxHp * 0.08);
   G.p.hp = Math.min(G.p.maxHp, G.p.hp + heal);
-  G.gold += 30;
+  addGold(30);
   addText(G.p.x, G.p.y - 30, "+" + heal, "#6bff8f");
   G.luQueue--;
   if (G.luQueue > 0) buildLevelUp();
@@ -1352,11 +1739,12 @@ function chooseCard(i){
   if (scene !== "levelup" || !luChoices[i]) return;
   const c = luChoices[i];
   if (c.type === "evo"){ const w = owned(c.id); w.evolved = true; G.effects.push({ type:"ring", x:G.p.x, y:G.p.y, r:120, t:0.5, max:0.5 }); SFX.evo(); G.slotsDirty = true; }
-  else if (c.type === "wnew"){ G.weapons.push({ id:c.id, lv:1, t:0.3, evolved:false, books:null, bT:0, bA:0 }); G.slotsDirty = true; }
+  else if (c.type === "wnew"){ G.weapons.push({ id:c.id, lv:1, grade:c.grade !== undefined ? c.grade : rollGrade(), t:0.3, evolved:false, books:null, bT:0, bA:0 }); G.slotsDirty = true; } // 획득 시 등급 확정
   else if (c.type === "wup"){ owned(c.id).lv++; G.slotsDirty = true; }
+  else if (c.type === "anew"){ G.armors[c.id] = true; recalcStats(); G.slotsDirty = true; SFX.pick(); }
   else if (c.type === "pnew" || c.type === "pup"){ G.passives[c.id] = (G.passives[c.id] || 0) + 1; recalcStats(); G.slotsDirty = true; }
   else if (c.type === "heal"){ G.p.hp = Math.min(G.p.maxHp, G.p.hp + 30); addText(G.p.x, G.p.y - 30, "+30", "#6bff8f"); }
-  else if (c.type === "gold"){ G.gold += 60; }
+  else if (c.type === "gold"){ addGold(60); }
   G.luQueue--;
   if (G.luQueue > 0) buildLevelUp();
   else setScene("play");
@@ -1371,7 +1759,12 @@ function openChest(){
     //                          ② 상자 골드 +10% (goldMult) — 진화 실패 시 대체 재화에만 적용
     const near = G.weapons.find(w => !w.evolved && w.lv >= 8);
     if (near && Math.random() < (G.p.evoBonus || 0)) data = { evoId:near.id };
-    else data = { gold:Math.round(100 * (G.p.goldMult || 1)), heal:40 };
+    else {
+      data = { gold:Math.round(100 * (G.p.goldMult || 1)), heal:40 };
+      // 방어구 확장: 상자에서 희귀(2) 이상 등급 방어구 드랍 (슬롯 여유 시)
+      const drop = (Object.keys(G.armors).length < ARMOR_SLOTS) ? rollArmorPiece(2) : null;
+      if (drop) data.armorId = drop.id;
+    }
   }
   G.chestData = data;
   G.chestPhase = "closed"; G.chestApplied = false;
@@ -1391,8 +1784,9 @@ function chestAdvance(){
         G.effects.push({ type:"ring", x:G.p.x, y:G.p.y, r:140, t:0.6, max:0.6 });
         SFX.evo();
       } else {
-        G.gold += G.chestData.gold;
+        addGold(G.chestData.gold);
         G.p.hp = Math.min(G.p.maxHp, G.p.hp + G.chestData.heal);
+        if (G.chestData.armorId){ G.armors[G.chestData.armorId] = true; recalcStats(); G.slotsDirty = true; }
       }
     }
     metaCheck(); // BACKLOG #11: 진화/상자 업적 판정
@@ -1414,9 +1808,14 @@ function buildChest(){
       <p class="hint">${E.desc}</p>`;
     btn.textContent = "확인";
   } else {
+    let extra = "";
+    if (G.chestData.armorId){
+      const A = ARMOR_BY_ID[G.chestData.armorId], g = GRADES[A.grade];
+      extra = `<br><br>장비 획득: <b style="color:${g.col}">${A.icon} ${A.name}</b><br><span class="hint">${armorStatText(A)}${A.set ? " · 「" + SETS.find(S => S.id === A.set).name + "」" : ""}</span>`;
+    }
     b.innerHTML = `<div class="chesticon">💰</div><h2>상자 개봉</h2>
       <p class="hint" style="font-size:15px">진화 조건이 갖춰진 무기가 없다…<br>
-      대신 <b style="color:var(--gold)">골드 +${G.chestData.gold}</b>, <b style="color:#6bff8f">체력 +${G.chestData.heal}</b> 획득!<br>
+      대신 <b style="color:var(--gold)">골드 +${G.chestData.gold}</b>, <b style="color:#6bff8f">체력 +${G.chestData.heal}</b> 획득!${extra}<br>
       힌트: 무기 만렙(8) + 전용 패시브를 갖추면 진화한다</p>`;
     btn.textContent = "확인";
   }
@@ -1473,8 +1872,9 @@ function finishChestSpin(){
       G.effects.push({ type:"ring", x:G.p.x, y:G.p.y, r:140, t:0.6, max:0.6 });
       SFX.evo();
     } else {
-      G.gold += G.chestData.gold;
+      addGold(G.chestData.gold);
       G.p.hp = Math.min(G.p.maxHp, G.p.hp + G.chestData.heal);
+      if (G.chestData.armorId){ G.armors[G.chestData.armorId] = true; recalcStats(); G.slotsDirty = true; }
     }
   }
   metaCheck(); // BACKLOG #11: 진화/상자 업적 판정
@@ -1644,22 +2044,50 @@ function buildChar(){
   }
 }
 function buildPause(){
-  let h = "";
+  // 장비 3카테고리: 무기(등급 테두리) · 유물 · 방어구(등급 테두리 + 셋트 ★)
+  let h = `<div class="psec">⚔️ 무기</div><div class="prow">`;
   for (const w of G.weapons){
-    const ic = w.evolved ? EVO[w.id].icon : WEAPONS[w.id].icon;
-    h += `<div class="slot${w.evolved ? " evo" : ""}" title="${w.evolved ? EVO[w.id].name : WEAPONS[w.id].name}">${ic}<span class="lv">${w.evolved ? "★" : w.lv}</span></div>`;
+    const D = WEAPONS[w.id], g = GRADES[w.grade || 0];
+    const ic = w.evolved ? EVO[w.id].icon : D.icon;
+    const nm = w.evolved ? EVO[w.id].name : `${D.name} Lv.${w.lv} (${g.name})`;
+    h += `<div class="slot${w.evolved ? " evo" : ""}" style="border-color:${w.evolved ? "var(--gold)" : g.col}" title="${nm}">${ic}<span class="lv">${w.evolved ? "★" : w.lv}</span></div>`;
   }
-  for (const id in G.passives) h += `<div class="slot" title="${PASSIVES[id].name}">${PASSIVES[id].icon}<span class="lv">${G.passives[id]}</span></div>`;
+  h += `</div><div class="psec">🧿 유물</div><div class="prow">`;
+  for (const id in G.passives) h += `<div class="slot" title="${PASSIVES[id].name} Lv.${G.passives[id]}">${PASSIVES[id].icon}<span class="lv">${G.passives[id]}</span></div>`;
+  h += `</div><div class="psec">🛡️ 방어구 ${Object.keys(G.armors).length}/${ARMOR_SLOTS}</div><div class="prow">`;
+  let aCnt = 0;
+  for (const id in G.armors){
+    const a = ARMOR_BY_ID[id];
+    if (!a) continue;
+    aCnt++;
+    h += `<div class="slot" style="border-color:${GRADES[a.grade].col}" title="${a.name} — ${armorStatText(a)}">${a.icon}${a.set ? '<span class="lv">★</span>' : ""}</div>`;
+  }
+  if (!aCnt) h += `<span class="hint" style="align-self:center">아직 없음 — 레벨업/보물상자에서 획득</span>`;
+  h += `</div>`;
   $("pauseBuild").innerHTML = h;
+  // 진화 힌트 (진화 가능 무기만)
   const hints = [];
   for (const w of G.weapons){
-    if (!w.evolved && w.lv >= 8){
+    if (!w.evolved && EVO[w.id] && w.lv >= 8){
       const P = PASSIVES[EVO[w.id].passive];
       const has = (G.passives[EVO[w.id].passive] || 0) > 0;
       hints.push(`${WEAPONS[w.id].icon}${WEAPONS[w.id].name} → ${P.icon}${P.name} 보유 ${has ? "✔ 보물상자를 기다려라!" : "✘ 필요"}`);
     }
   }
-  $("pauseEvo").innerHTML = hints.length ? hints.join("<br>") : "무기 만렙 + 전용 패시브 + 보물상자 = 진화";
+  // 셋트 현황 + 전투 스탯 요약
+  const P = G.p;
+  let sh = "";
+  for (const S of SETS){
+    const n = S.pieces.filter(p => G.armors[p.id]).length;
+    sh += `<div class="setrow${n >= 3 ? " done" : ""}"><span class="sn">${S.icon} ${S.name} <b>${n}/3</b></span><span class="hint">${S.bText}${n >= 3 ? " ✅" : ""}</span></div>`;
+  }
+  const statline =
+    `⚔️ 피해 +${Math.round((P.might - 1) * 100)}% · 🎯 치명 ${Math.round(P.crit * 100)}% ×${P.critDmg.toFixed(1)} · 🛡️ 방어 ${P.dr} · 💨 회피 ${Math.round(P.dodge * 100)}%<br>` +
+    `📘 경험치 +${Math.round(P.xpB * 100)}% · 💰 골드 +${Math.round(P.goldB * 100)}% · 💫 탄속 +${Math.round(P.projSpd * 100)}% · 🌿 재생 ${P.regen.toFixed(1)}/초`;
+  $("pauseEvo").innerHTML =
+    (sh ? `<div class="psec">✨ 셋트</div>${sh}` : "") +
+    `<div class="psec">📊 전투 스탯 (방어구·셋트 합산)</div><div class="statline">${statline}</div>` +
+    (hints.length ? `<div class="hint" style="margin-top:8px">${hints.join("<br>")}</div>` : "");
 }
 function buildEnd(s){
   const win = s === "win";
@@ -1683,17 +2111,20 @@ function buildEnd(s){
      <span>총 피해량<b>${Math.round(G.dmgDealt).toLocaleString("en-US")}</b></span>
      <span>DPS<b>${dps}</b></span>`;
   $("endSub").textContent = win ? "새벽이 밝았다. 뱀파이어의 밤은 끝났다." : "10분을 버티면 승리한다!";
-  // 다음 런 목표 (결정론적 3규칙)
+  // 다음 런 목표 (결정론적 3규칙 — 진화 불가 무기는 제외)
   const evoCnt = G.weapons.filter(w => w.evolved).length;
+  const evoCapable = G.weapons.filter(w => EVO[w.id]);
   let goal;
-  if (evoCnt === 0){
-    let best = G.weapons[0];
-    for (const w of G.weapons) if (w.lv > best.lv) best = w; // 동률 시 먼저 획득한 것
+  if (evoCnt === 0 && evoCapable.length){
+    let best = evoCapable[0];
+    for (const w of evoCapable) if (w.lv > best.lv) best = w; // 동률 시 먼저 획득한 것
     goal = `🎯 다음 런 목표: ${WEAPONS[best.id].name} 만렙(8) + ${PASSIVES[EVO[best.id].passive].name} 획득 → 「${EVO[best.id].name}」`;
+  } else if (evoCnt === 0){
+    goal = "🎯 전설 6종(채찍·마법봉·도끼·성서·마늘·성수)은 만렙 시 진화한다 — 수집해 보세요!";
   } else if (!win){
     goal = `🎯 다음 런 목표: 진화 무기 ${evoCnt}개 상태로 10분 생존`;
   } else {
-    goal = "🎉 완벽한 새벽! 다른 캐릭터의 진화 빌드에 도전해 보세요";
+    goal = "🎉 완벽한 새벽! 다른 캐릭터·셋트 빌드에 도전해 보세요";
   }
   $("endGoal").textContent = goal;
   // BACKLOG #11: 이번 런 신규 업적 안내
@@ -1724,10 +2155,14 @@ function hudUpd(){
     G.slotsDirty = false;
     let h = "";
     for (const w of G.weapons){
-      const ic = w.evolved ? EVO[w.id].icon : WEAPONS[w.id].icon;
-      h += `<div class="slot${w.evolved ? " evo" : ""}">${ic}<span class="lv">${w.evolved ? "★" : w.lv}</span></div>`;
+      const g = GRADES[w.grade || 0], ic = w.evolved ? EVO[w.id].icon : WEAPONS[w.id].icon;
+      h += `<div class="slot${w.evolved ? " evo" : ""}" style="border-color:${w.evolved ? "var(--gold)" : g.col}">${ic}<span class="lv">${w.evolved ? "★" : w.lv}</span></div>`;
     }
     for (const id in G.passives) h += `<div class="slot">${PASSIVES[id].icon}<span class="lv">${G.passives[id]}</span></div>`;
+    for (const id in G.armors){
+      const a = ARMOR_BY_ID[id];
+      if (a) h += `<div class="slot" style="border-color:${GRADES[a.grade].col}">${a.icon}${a.set ? '<span class="lv">★</span>' : ""}</div>`;
+    }
     $("slots").innerHTML = h;
   }
   const bw = $("bosswrap");
@@ -1765,6 +2200,10 @@ function emoji(ch, x, y, size, rot){
   ctx.fillText(ch, 0, 0);
   ctx.restore();
 }
+function hexA(hex, a){ // "#rrggbb" → rgba() (무기별 발사체/오라/장판 색상 틴트)
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+}
 const CELL = 140;
 function drawFloor(){
   const x0 = Math.floor((G.cam.x - vw/2) / CELL) - 1, x1 = Math.floor((G.cam.x + vw/2) / CELL) + 1;
@@ -1797,28 +2236,29 @@ function drawFloor(){
     }
   }
 }
-function drawGarlic(){
+function drawGarlic(){ // aura 계열 전체 — 무기별 색상 오라
   for (const w of G.weapons){
-    if (w.id !== "garlic") continue;
-    const rad = garlicRad(w);
+    if (WEAPONS[w.id].cat !== "aura") continue;
+    const rad = garlicRad(w), col = WEAPONS[w.id].col || "#bef08f";
     const pulse = 0.5 + 0.5 * Math.sin(G.animT * 4);
-    ctx.fillStyle = "rgba(190,255,140,0.05)";
+    ctx.fillStyle = hexA(col, 0.055);
     circle(G.p.x, G.p.y, rad);
-    ctx.strokeStyle = `rgba(190,255,140,${0.18 + 0.1 * pulse})`;
+    ctx.strokeStyle = hexA(col, 0.18 + 0.1 * pulse);
     ctx.lineWidth = 2;
     ctx.beginPath(); ctx.arc(G.p.x, G.p.y, rad, 0, TAU); ctx.stroke();
   }
 }
 function drawPools(){
   for (const p of G.pools){
-    ctx.fillStyle = "rgba(107,63,212,0.32)";
+    const col = p.col || "#6b3fd4";
+    ctx.fillStyle = hexA(col, 0.32);
     circle(p.x, p.y, p.r);
-    ctx.strokeStyle = "rgba(154,110,255,0.55)"; ctx.lineWidth = 2;
+    ctx.strokeStyle = hexA(col, 0.55); ctx.lineWidth = 2;
     ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, TAU); ctx.stroke();
     for (let i = 0; i < 3; i++){
       const a = G.animT * 2 + i * 2.1 + p.x;
       const bx = p.x + Math.cos(a) * p.r * 0.5, by = p.y + Math.sin(a * 1.3) * p.r * 0.4;
-      ctx.fillStyle = "rgba(200,160,255,0.4)";
+      ctx.fillStyle = hexA(col, 0.4);
       circle(bx, by, 3 + Math.sin(a * 3) * 1.5);
     }
   }
@@ -2229,9 +2669,27 @@ function drawPlayer(){
 }
 function drawBullets(){
   for (const b of G.bullets){
+    const col = b.col || "#b8e0ff";
     if (b.kind === "wand"){
-      ctx.fillStyle = "rgba(154,215,255,0.45)"; circle(b.x, b.y, 8);
+      ctx.fillStyle = hexA(col, 0.45); circle(b.x, b.y, 8);
       ctx.fillStyle = "#eaf7ff"; circle(b.x, b.y, 3.5);
+    } else if (b.kind === "lance"){ // 관통 창 — 속도 방향의 긴 막대
+      const a = Math.atan2(b.vy, b.vx), L = 26;
+      ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(a);
+      ctx.strokeStyle = hexA(col, 0.9); ctx.lineWidth = 5; ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(-L, 0); ctx.lineTo(L * 0.6, 0); ctx.stroke();
+      ctx.fillStyle = "#fff"; circle(L * 0.55, 0, 2.5);
+      ctx.restore();
+    } else if (b.kind === "ring"){ // 부메랑 — 회하는 쌍날
+      ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.rot);
+      ctx.strokeStyle = col; ctx.lineWidth = 6; ctx.lineCap = "round";
+      ctx.beginPath(); ctx.arc(0, 0, 11, 0.4, Math.PI - 0.4); ctx.stroke();
+      ctx.beginPath(); ctx.arc(0, 0, 11, Math.PI + 0.4, TAU - 0.4); ctx.stroke();
+      ctx.restore();
+    } else if (b.kind === "orb"){ // 추적탄 — 맥동하는 마력구
+      ctx.fillStyle = hexA(col, 0.3); circle(b.x, b.y, 11 + Math.sin(G.animT * 10) * 2);
+      ctx.fillStyle = hexA(col, 0.9); circle(b.x, b.y, 5);
+      ctx.fillStyle = "#fff"; circle(b.x - 1.5, b.y - 1.5, 1.8);
     } else if (b.kind === "axe") emoji("🪓", b.x, b.y, 28, b.rot);
     else if (b.kind === "knife") emoji("🔪", b.x, b.y, 24, b.rot);
     else if (b.kind === "flask"){
@@ -2244,7 +2702,8 @@ function drawBullets(){
 function drawBooks(){
   for (const w of G.weapons){
     if (!w.books) continue;
-    for (const b of w.books) emoji(w.evolved ? "📿" : "📕", b.x, b.y, 26, Math.sin(G.animT * 6) * 0.3);
+    const ic = w.evolved ? EVO[w.id].icon : WEAPONS[w.id].icon; // orbit 계열은 각자 아이콘으로 표시
+    for (const b of w.books) emoji(ic, b.x, b.y, 26, Math.sin(G.animT * 6) * 0.3);
   }
 }
 function drawEffects(){
@@ -2252,7 +2711,7 @@ function drawEffects(){
     const k = e.t / e.max;
     if (e.type === "slash"){
       ctx.save(); ctx.translate(e.x, e.y); ctx.scale(e.dir, 1);
-      ctx.strokeStyle = `rgba(255,240,215,${0.9 * k})`;
+      ctx.strokeStyle = hexA(e.col || "#fff0d7", 0.9 * k);
       ctx.lineWidth = 9 * k + 2; ctx.lineCap = "round";
       ctx.beginPath(); ctx.arc(-40, 0, 85 * e.area, -1, 1); ctx.stroke();
       ctx.restore();
@@ -2261,6 +2720,14 @@ function drawEffects(){
       ctx.strokeStyle = `rgba(255,220,140,${0.8 * k})`;
       ctx.lineWidth = 5;
       ctx.beginPath(); ctx.arc(e.x, e.y, rr, 0, TAU); ctx.stroke();
+    } else if (e.type === "bolt"){ // 연쇄 번개 — 사전 계산된 지그재그 경로
+      ctx.strokeStyle = hexA(e.col || "#ffe98a", 0.9 * k);
+      ctx.lineWidth = 3.5; ctx.lineJoin = "round"; ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(e.pts[0][0], e.pts[0][1]);
+      for (let i = 1; i < e.pts.length; i++) ctx.lineTo(e.pts[i][0], e.pts[i][1]);
+      ctx.stroke();
+      ctx.strokeStyle = `rgba(255,255,255,${0.6 * k})`; ctx.lineWidth = 1.4; ctx.stroke();
     }
   }
 }

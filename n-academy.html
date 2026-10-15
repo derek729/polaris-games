@@ -1,0 +1,1677 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>N금융사업부 설계사 자격시험 연수원</title>
+<style>
+:root {
+  --bg: #f4f6f8; --card: #ffffff; --line: #e2e8f0; --ink: #0f172a; --ink2: #475569;
+  --ink3: #94a3b8; --accent: #0284c7; --dark: #0f172a; --ok: #059669; --bad: #e11d48;
+  --chip: #f1f5f9;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: 'Pretendard', 'Apple SD Gothic Neo', 'Malgun Gothic', -apple-system, sans-serif;
+  font-size: 14px; min-height: 100vh; display: flex; flex-direction: column;
+}
+button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+button:disabled { cursor: default; opacity: .45; }
+header {
+  background: var(--card); border-bottom: 1px solid var(--line);
+  position: sticky; top: 0; z-index: 30;
+}
+.hwrap {
+  max-width: 1200px; margin: 0 auto; padding: 0 20px; height: 62px;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+}
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand .mark {
+  width: 32px; height: 32px; background: var(--dark); color: #fff; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px;
+}
+.brand .t1 { font-size: 15px; font-weight: 800; }
+.brand .t2 { font-size: 11px; color: var(--ink2); }
+nav { display: flex; gap: 4px; flex-wrap: wrap; }
+nav button {
+  padding: 8px 13px; border-radius: 8px; font-size: 12.5px; font-weight: 700; color: var(--ink2);
+}
+nav button:hover { background: var(--chip); color: var(--ink); }
+nav button.on { background: var(--dark); color: #fff; }
+.huser { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--ink2); }
+.huser b { color: var(--ink); font-size: 12px; }
+.huser button { color: var(--ink3); font-size: 15px; padding: 4px; }
+.huser button:hover { color: var(--ink); }
+main { max-width: 1200px; width: 100%; margin: 0 auto; padding: 22px 20px 60px; flex: 1; }
+
+/* 공용 */
+.panel { background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
+.pill { padding: 3px 9px; border-radius: 6px; font-size: 11px; font-weight: 700; }
+.tag-lab { background: var(--chip); color: var(--ink2); }
+.tag-ok { background: #ecfdf5; color: var(--ok); }
+.tag-bad { background: #fff1f2; color: var(--bad); }
+.muted { color: var(--ink2); font-size: 12px; }
+.mini { color: var(--ink3); font-size: 11px; }
+.btn {
+  padding: 9px 14px; border-radius: 8px; font-size: 12px; font-weight: 800;
+  background: var(--dark); color: #fff;
+}
+.btn:hover { background: #1e293b; }
+.btn.ghost { background: var(--chip); color: var(--ink2); border: 1px solid var(--line); }
+.btn.ghost:hover { background: #e8edf3; }
+.btn.accent { background: var(--accent); }
+.btn.accent:hover { background: #0369a1; }
+.btn.danger { background: #e11d48; }
+.btn.danger:hover { background: #be123c; }
+
+/* 토스트 */
+#toast {
+  position: fixed; right: 20px; bottom: 22px; z-index: 60;
+  background: var(--dark); color: #fff; padding: 11px 16px; border-radius: 9px;
+  font-size: 12px; font-weight: 600; display: none; box-shadow: 0 8px 24px rgba(15,23,42,.25);
+}
+
+/* 로그인 */
+.login {
+  min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 18px;
+}
+.login .box {
+  width: 100%; max-width: 420px; background: var(--card); border: 1px solid var(--line);
+  border-radius: 14px; padding: 34px; box-shadow: 0 10px 30px rgba(15,23,42,.06);
+}
+.login h1 { font-size: 20px; margin: 5px 0 6px; }
+.login p { font-size: 12px; color: var(--ink2); }
+.login .cap {
+  font-size: 11px; font-weight: 800; color: var(--ink2); letter-spacing: .08em;
+  text-transform: uppercase; padding-bottom: 18px; margin-bottom: 22px;
+  border-bottom: 1px solid #f1f5f9;
+}
+.kakao {
+  width: 100%; padding: 14px; border-radius: 10px; background: #FEE500;
+  font-weight: 800; font-size: 13px; margin-top: 24px;
+}
+.kakao:hover { background: #f5dc00; }
+
+/* ===== 강의실 ===== */
+.studio { display: grid; grid-template-columns: 1fr; gap: 20px; }
+@media (min-width: 1024px) { .studio { grid-template-columns: 3fr 9fr; } }
+.curr { display: flex; flex-direction: column; overflow: hidden; }
+.curr .head { padding: 15px; background: var(--chip); border-bottom: 1px solid var(--line); }
+.curr .head h2 { font-size: 11.5px; font-weight: 800; color: var(--ink2); letter-spacing: .05em; margin-bottom: 10px; }
+.catbar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; background: #e2e8f0; padding: 4px; border-radius: 8px; }
+.catbar button { padding: 7px 0; border-radius: 6px; font-size: 11.5px; font-weight: 800; color: var(--ink2); }
+.catbar button.on { background: #fff; color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+.curr .list { max-height: 560px; overflow-y: auto; }
+.course-row {
+  width: 100%; text-align: left; padding: 14px; border-bottom: 1px solid #f1f5f9;
+  display: flex; justify-content: space-between; gap: 8px; align-items: flex-start;
+}
+.course-row:hover { background: #f8fafc; }
+.course-row.on { background: var(--dark); color: #fff; }
+.course-row .code { font-size: 11px; font-weight: 800; color: var(--ink3); }
+.course-row.on .code { color: #38bdf8; }
+.course-row .cat { font-size: 12px; font-weight: 800; margin-top: 4px; line-height: 1.4; }
+.course-row .done { color: var(--ok); font-size: 15px; flex-shrink: 0; }
+.course-row.on .done { color: #34d399; }
+
+.lecture { display: flex; flex-direction: column; gap: 16px; }
+.lect-top { padding: 18px 20px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.lect-top .sub { font-size: 12px; color: var(--ink2); margin-bottom: 4px; display: flex; gap: 8px; align-items: center; }
+.lect-top h2 { font-size: 17px; }
+.parts { display: flex; gap: 6px; flex-shrink: 0; }
+.parts button {
+  padding: 7px 12px; border-radius: 8px; font-size: 11.5px; font-weight: 800;
+  border: 1px solid var(--line); color: var(--ink2); background: #fff;
+}
+.parts button.on { background: var(--dark); color: #fff; border-color: var(--dark); }
+.parts button:hover:not(.on) { background: #f8fafc; }
+
+.stage { display: grid; grid-template-columns: 1fr; overflow: hidden; }
+@media (min-width: 1024px) { .stage { grid-template-columns: 8fr 4fr; } }
+.slide { padding: 26px 28px; display: flex; flex-direction: column; }
+.slide .meta { display: flex; justify-content: space-between; border-bottom: 1px solid #f1f5f9; padding-bottom: 12px; margin-bottom: 18px; }
+.slide .chap { color: #0369a1; font-weight: 800; font-size: 12px; }
+.slide h3 { font-size: 21px; line-height: 1.45; margin-bottom: 8px; }
+.slide .sub { color: var(--ink2); font-size: 12.5px; margin-bottom: 20px; }
+.vcards { display: grid; grid-template-columns: 1fr; gap: 14px; margin: 6px 0 20px; }
+@media (min-width: 640px) { .vcards { grid-template-columns: 1fr 1fr; } }
+.vcard {
+  border: 1px solid var(--line); border-radius: 12px; background: #f8fafc; padding: 18px;
+  display: flex; flex-direction: column; justify-content: space-between; min-height: 150px;
+}
+.vcard .tag { font-size: 10.5px; font-weight: 800; color: var(--ink2); text-transform: uppercase; }
+.vcard .ttl { font-size: 13px; font-weight: 800; margin-top: 5px; }
+.vcard .hi { font-size: 16px; font-weight: 800; color: var(--accent); margin: 8px 0; }
+.vcard .pt { font-size: 11.5px; color: var(--ink2); line-height: 1.6; border-top: 1px solid #e2e8f0; padding-top: 8px; }
+.formula {
+  background: var(--dark); color: #fff; border-radius: 9px; padding: 12px 16px;
+  font-size: 12.5px; font-weight: 700; margin-top: auto;
+}
+
+/* 강사 패널 */
+.presenter {
+  background: #141821; color: #fff; display: flex; flex-direction: column;
+  justify-content: space-between; padding: 22px; user-select: none;
+  border-top: 1px solid var(--line);
+}
+@media (min-width: 1024px) { .presenter { border-top: none; border-left: 1px solid var(--line); } }
+.presenter .top { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1e293b; padding-bottom: 14px; }
+.presenter .studio-lab { font-size: 10.5px; font-weight: 800; letter-spacing: .08em; color: #94a3b8; text-transform: uppercase; }
+.presenter h4 { font-size: 13.5px; margin-top: 3px; }
+.state-chip { padding: 4px 10px; border-radius: 6px; font-size: 10.5px; font-weight: 700; background: #1e293b; color: #94a3b8; }
+.state-chip.speaking { background: rgba(16,185,129,.15); color: #34d399; border: 1px solid rgba(16,185,129,.3); }
+.avatar-wrap { display: flex; flex-direction: column; align-items: center; margin: 22px 0; }
+.avatar-ring {
+  position: relative; width: 140px; height: 140px; border-radius: 50%;
+  background: rgba(30,41,59,.9); border: 2px solid #334155;
+  display: flex; align-items: center; justify-content: center; overflow: hidden;
+}
+.avatar-ring.speaking::before {
+  content: ""; position: absolute; inset: -2px; border-radius: 50%;
+  border: 2px solid rgba(56,189,248,.6); animation: ping 1.2s ease-out infinite;
+}
+@keyframes ping { 0% { transform: scale(1); opacity: .8; } 100% { transform: scale(1.25); opacity: 0; } }
+.avatar-ring svg { width: 112px; height: 112px; }
+.eq { display: flex; gap: 4px; align-items: flex-end; height: 24px; margin-top: 18px; }
+.eq span { width: 4px; border-radius: 4px; background: #334155; height: 5px; transition: height .15s; }
+.eq span.hot { background: #38bdf8; }
+.presenter .hint { font-size: 11px; color: #94a3b8; margin-top: 8px; text-align: center; }
+.audio-box { background: #1c222e; border: 1px solid #1e293b; border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+.arow { display: flex; justify-content: space-between; align-items: center; }
+.arow .lab { font-size: 11px; color: #cbd5e1; font-weight: 600; }
+.speed-set { display: flex; gap: 4px; }
+.speed-set button { padding: 5px 9px; border-radius: 6px; font-size: 10.5px; font-weight: 800; background: #1e293b; color: #94a3b8; }
+.speed-set button:hover { color: #fff; }
+.speed-set button.on { background: #0284c7; color: #fff; }
+.mute-btn { padding: 5px 10px; border-radius: 6px; font-size: 10.5px; font-weight: 800; background: #1e293b; color: #e2e8f0; display: flex; align-items: center; gap: 5px; }
+.mute-btn.muted { background: rgba(225,29,72,.2); color: #fda4af; border: 1px solid rgba(225,29,72,.3); }
+
+/* 텔레프롬프터 */
+.tele { padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; }
+.tele .frame { background: #f8fafc; border: 1px solid var(--line); border-radius: 10px; padding: 15px; }
+.tele .frame .head { display: flex; justify-content: space-between; margin-bottom: 8px; }
+.tele .body { font-size: 13px; line-height: 2; }
+.tele .body span.s { cursor: pointer; padding: 1px 2px; border-radius: 4px; color: var(--ink2); }
+.tele .body span.s:hover { color: var(--ink); }
+.tele .body span.s.cur { background: #e0f2fe; color: var(--ink); font-weight: 800; }
+.ctrls { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.ctrls .left { display: flex; gap: 8px; align-items: center; }
+.ctrls .right { display: flex; gap: 8px; align-items: center; }
+.play-btn { padding: 11px 20px; border-radius: 9px; font-weight: 800; font-size: 12.5px; color: #fff; display: flex; align-items: center; gap: 8px; }
+.icon-btn {
+  width: 38px; height: 38px; border-radius: 9px; border: 1px solid var(--line);
+  color: var(--ink2); display: flex; align-items: center; justify-content: center; font-size: 15px;
+}
+.icon-btn:hover:not(:disabled) { background: #f8fafc; }
+
+/* ===== 모의고사 ===== */
+.exam-top { padding: 14px 16px; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: center; }
+.exam-cats { display: flex; gap: 6px; flex-wrap: wrap; }
+.exam-cats button { padding: 8px 14px; border-radius: 8px; font-size: 11.5px; font-weight: 800; background: var(--chip); color: var(--ink2); }
+.exam-cats button.on { background: var(--dark); color: #fff; }
+.q { padding: 22px; margin-top: 14px; }
+.q .head { display: flex; justify-content: space-between; margin-bottom: 12px; }
+.q h3 { font-size: 14.5px; margin-bottom: 16px; line-height: 1.6; }
+.opt {
+  width: 100%; text-align: left; border: 1px solid var(--line); border-radius: 9px;
+  padding: 13px 14px; display: flex; gap: 10px; align-items: flex-start; margin-top: 8px;
+  font-size: 12.5px; color: var(--ink2); line-height: 1.6; background: #fff;
+}
+.opt:hover:not(:disabled) { background: #f8fafc; }
+.opt .no { width: 20px; height: 20px; border-radius: 5px; background: var(--chip); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; flex-shrink: 0; }
+.opt.sel { border-color: var(--dark); background: rgba(15,23,42,.05); color: var(--ink); font-weight: 700; }
+.opt.ans { border-color: var(--ok); background: #ecfdf5; color: #064e3b; font-weight: 800; }
+.opt.wrong { border-color: #fb7185; background: #fff1f2; color: #881337; text-decoration: line-through; }
+.expl { margin-top: 14px; background: #f8fafc; border: 1px solid var(--line); border-radius: 9px; padding: 14px; }
+.expl .lab { font-size: 12px; font-weight: 800; margin-bottom: 4px; }
+.expl p { font-size: 12px; color: var(--ink2); line-height: 1.7; }
+.exam-submit { display: flex; justify-content: flex-end; margin-top: 18px; }
+
+/* 일정 */
+.sch-head { padding: 18px 20px; border-bottom: 1px solid var(--line); font-size: 15px; font-weight: 800; }
+.sch-row { padding: 18px 20px; display: flex; justify-content: space-between; align-items: center; gap: 12px; border-bottom: 1px solid #f1f5f9; flex-wrap: wrap; }
+.sch-row:last-child { border-bottom: none; }
+.sch-row .tt { font-size: 13.5px; font-weight: 800; }
+.sch-row .dd { font-size: 11.5px; color: var(--ink2); margin-top: 4px; }
+
+/* 현황 */
+.res-panel { padding: 22px; }
+.res-panel h3 { font-size: 15px; margin-bottom: 14px; }
+.res-row { padding: 13px 0; display: flex; justify-content: space-between; align-items: center; gap: 10px; border-bottom: 1px solid #f1f5f9; flex-wrap: wrap; }
+.res-row:last-child { border-bottom: none; }
+.res-row .cat { font-size: 13px; font-weight: 800; }
+.res-row .dt { font-size: 11px; color: var(--ink3); margin-top: 3px; }
+.res-row .sc { font-size: 13px; font-weight: 800; }
+.empty { padding: 30px; text-align: center; color: var(--ink3); font-size: 12.5px; }
+</style>
+</head>
+
+<body>
+<div id="toast"></div>
+
+<!-- 로그인 화면 -->
+<div id="login-view" class="login">
+  <div class="box">
+    <div class="cap">N-FINANCE CORPORATE ACADEMY</div>
+    <h1>N금융사업부 설계사 자격시험 연수원</h1>
+    <p>생명보험 · 손해보험 · 제3보험 자격취득 온라인 교육 시스템</p>
+    <button id="kakao-btn" class="kakao">카카오톡 간편인증 로그인</button>
+  </div>
+</div>
+
+<!-- 메인 앱 -->
+<div id="app-view">
+  <header>
+    <div class="hwrap">
+      <div class="brand">
+        <div class="mark">N</div>
+        <div>
+          <div class="t1">N금융사업부</div>
+          <div class="t2">자격시험 연수 시스템</div>
+        </div>
+      </div>
+      <nav>
+        <button data-tab="lect" class="on">이론 강의실 (13강)</button>
+        <button data-tab="exam">기출 모의고사 (CBT)</button>
+        <button data-tab="schedule">시험 일정·접수</button>
+        <button data-tab="results">수강·합격 현황</button>
+      </nav>
+      <div class="huser">
+        <span id="progress-line"></span>
+        <span>👤</span>
+        <b id="user-name"></b>
+        <button id="logout-btn" title="로그아웃">⏻</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- TAB 1: 이론 강의실 -->
+    <div class="tab-pane" data-pane="lect">
+      <div class="studio">
+        <aside class="panel curr">
+          <div class="head">
+            <h2>과목별 커리큘럼 (13강)</h2>
+            <div class="catbar">
+              <button data-cat-course="all" class="on">전체</button>
+              <button data-cat-course="life">생보</button>
+              <button data-cat-course="property">손보</button>
+              <button data-cat-course="third">제3</button>
+            </div>
+          </div>
+          <div class="list" id="curr-list"></div>
+        </aside>
+
+        <section class="lecture">
+          <div class="panel lect-top">
+            <div>
+              <div class="sub" id="lect-sub"></div>
+              <h2 id="lect-title"></h2>
+            </div>
+            <div class="parts" id="parts"></div>
+          </div>
+
+          <div class="panel stage">
+            <div class="slide">
+              <div class="meta">
+                <span class="chap" id="slide-chap"></span>
+                <span class="mini" id="slide-time"></span>
+              </div>
+              <h3 id="slide-keyword"></h3>
+              <p class="sub" id="slide-sub"></p>
+              <div class="vcards" id="slide-cards"></div>
+              <div class="formula" id="slide-formula"></div>
+            </div>
+            <div class="presenter">
+              <div class="top">
+                <div>
+                  <span class="studio-lab">N-FINANCE EDU STUDIO</span>
+                  <h4>박준호 수석 전문강사</h4>
+                </div>
+                <span class="state-chip" id="state-chip">일시정지</span>
+              </div>
+              <div class="avatar-wrap">
+                <div class="avatar-ring" id="avatar-ring">
+                  <svg viewBox="0 0 120 120">
+                    <circle cx="60" cy="42" r="20" fill="#cbd5e1"/>
+                    <path d="M22 112 C22 82, 40 70, 60 70 C80 70, 98 82, 98 112 Z" fill="#334155"/>
+                    <polygon points="52,70 68,70 60,96" fill="#f8fafc"/>
+                    <polygon points="57,76 63,76 64,106 60,112 56,106" fill="#0284c7"/>
+                  </svg>
+                </div>
+                <div class="eq" id="eq"></div>
+                <div class="hint" id="pres-hint"></div>
+              </div>
+              <div class="audio-box">
+                <div class="arow">
+                  <span class="lab">오디오 출력 상태</span>
+                  <button id="mute-btn" class="mute-btn">🔊 음성 켜짐</button>
+                </div>
+                <div class="arow" style="border-top:1px solid #1e293b;padding-top:12px">
+                  <span class="lab">🎚 강의 배속</span>
+                  <div class="speed-set">
+                    <button data-speed="0.92">0.9x</button>
+                    <button data-speed="1.0" class="on">1.0x</button>
+                    <button data-speed="1.15">1.15x</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel tele">
+            <div class="frame">
+              <div class="head">
+                <span style="font-size:12px;font-weight:800">강의 대본 및 실시간 음성 자막</span>
+                <span class="mini">문장을 클릭하면 해당 위치부터 읽어줍니다</span>
+              </div>
+              <div class="body" id="tele-body"></div>
+            </div>
+            <div class="ctrls">
+              <div class="left">
+                <button id="play-btn" class="play-btn accent">▶ <span>음성 강의 재생</span></button>
+                <button id="rewind-btn" class="icon-btn" title="현재 파트 처음부터 듣기">⟲</button>
+                <button id="prev-part" class="icon-btn" title="이전 파트">‹</button>
+                <button id="next-part" class="icon-btn" title="다음 파트">›</button>
+              </div>
+              <div class="right">
+                <button id="copy-btn" class="btn ghost">📋 교안 대본 복사</button>
+                <button id="exam-link-btn" class="btn">📄 단원 기출문제 풀기</button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <!-- TAB 2: 모의고사 -->
+    <div class="tab-pane" data-pane="exam" style="display:none">
+      <div class="panel exam-top">
+        <div class="exam-cats" id="exam-catbar"></div>
+        <div id="exam-actions" style="display:flex;gap:8px"></div>
+      </div>
+      <div id="exam-list"></div>
+      <div class="exam-submit" id="exam-actions-bottom"></div>
+    </div>
+
+    <!-- TAB 3: 시험 일정 -->
+    <div class="tab-pane" data-pane="schedule" style="display:none">
+      <div class="panel">
+        <div class="sch-head">생명보험 및 손해보험 협회 자격시험 일정</div>
+        <div id="schedule-list"></div>
+      </div>
+    </div>
+
+    <!-- TAB 4: 수강·합격 현황 -->
+    <div class="tab-pane" data-pane="results" style="display:none">
+      <div class="panel res-panel" id="results-panel"></div>
+    </div>
+  </main>
+</div>
+
+<script>
+'use strict';
+const ACADEMY_DONE = false;
+const ACADEMY_COURSES = [
+  {
+    id: 'course-life-1',
+    moduleCode: '생명보험 01',
+    duration: '25분',
+    category: 'life',
+    categoryLabel: '모집종사자 권한 및 금소법',
+    title: '모집종사자 3대 법적 권한과 특별이익·금소법 핵심 기준',
+    subtitle: '보험설계사와 대리점의 고지수령권 차이 및 청약철회·위법계약해지 비교',
+    scenes: [
+      {
+        sceneNumber: 1,
+        timeCode: '00:00 - 06:30',
+        chapterTitle: '제1절. 보험설계사와 대리점의 법적 권한',
+        mainKeyword: '보험설계사는 고지수령권과 계약체결권이 없다',
+        subHeadline: '계약자가 설계사에게 구두로 병력을 알려도 상법상 고지의무 이행 효력은 인정되지 않습니다.',
+        visualCards: [
+          {
+            tag: '보험설계사 (단순 중개인)',
+            title: '3대 대리 권한 모두 없음',
+            highlight: '고지수령권 X · 체결권 X',
+            point: '계약을 중개할 뿐이므로 고객의 고지사항을 접수하거나 계약을 확정할 권한이 없음'
+          },
+          {
+            tag: '보험대리점 (상법상 대리인)',
+            title: '3대 대리 권한 모두 보유',
+            highlight: '고지수령권 O · 체결권 O',
+            point: '보험회사를 대리하므로 대리점에 고지하면 보험회사에 고지한 것과 동일한 법적 효력 발생'
+          }
+        ],
+        memoryFormula: '핵심 판례 기준: 설계사는 중개인이므로 고지수령권이 없으며, 청약서 질문표 서면 기재만 유효함',
+        avatarScript: '안녕하십니까, N금융사업부 후보자 여러분. 전담 강사 박준호입니다. 첫 번째 시간에는 시험 1번 문항으로 출제되는 보험설계사와 대리점의 권한 차이를 살펴보겠습니다. 결론부터 말씀드리면 보험설계사에게는 고지수령권이 없습니다. 고객이 설계사에게 말로 과거 병력을 알렸더라도 법적인 고지로 인정되지 않기 때문에, 반드시 청약서 질문표에 직접 서면으로 작성해야 합니다. 반면 보험대리점은 회사를 대리하므로 고지수령권과 계약체결권, 보험료수령권을 모두 가집니다.'
+      },
+      {
+        sceneNumber: 2,
+        timeCode: '06:30 - 13:00',
+        chapterTitle: '제2절. 교차모집 제도와 등록 결격사유',
+        mainKeyword: '교차모집은 생명보험 1개사와 손해보험 1개사만 허용',
+        subHeadline: '1사 전속주의의 예외로서 서로 다른 업종의 보험사 1곳씩만 추가 등록할 수 있습니다.',
+        visualCards: [
+          {
+            tag: '교차모집 등록 원칙',
+            title: '생명보험 1사 + 손해보험 1사',
+            highlight: '이종 보험사 각 1곳 허용',
+            point: '동일 업종인 생보사 2곳 또는 손보사 2곳에 중복 등록하는 것은 법적으로 금지됨'
+          },
+          {
+            tag: '등록취소 후 재등록 제한',
+            title: '일반 취소 2년 / 부당승환 3년',
+            highlight: '부당승환 취소 시 3년 제한',
+            point: '미성년자, 피성년후견인, 파산선고 후 복권되지 아니한 자는 설계사 등록 불가'
+          }
+        ],
+        memoryFormula: '핵심 법규 기준: 교차모집은 생보 1사 + 손보 1사 조합만 가능하며, 부당승환 취소 시 3년간 재등록 불가',
+        avatarScript: '두 번째 파트는 교차모집 제도입니다. 원칙적으로 설계사는 소속된 한 곳의 보험사 상품만 모집할 수 있지만, 생명보험사 한 곳과 손해보험사 한 곳을 결합하는 교차모집은 예외적으로 허용됩니다. 또한 법규 위반으로 등록이 취소되면 2년간 재등록이 제한되지만, 부당승환계약으로 등록이 취소된 경우에는 3년 동안 설계사로 다시 등록할 수 없습니다.'
+      },
+      {
+        sceneNumber: 3,
+        timeCode: '13:00 - 19:30',
+        chapterTitle: '제3절. 특별이익 제공 금지와 부당승환 제한',
+        mainKeyword: '특별이익 한도는 연간 보험료의 10%와 3만원 중 적은 금액',
+        subHeadline: '청약 전후 6개월 이내 기존 계약을 소멸시키는 경우 부당승환으로 간주됩니다.',
+        visualCards: [
+          {
+            tag: '특별이익 제공 허용 한도',
+            title: '연납 보험료 10%와 3만원 비교',
+            highlight: '둘 중 적은 금액 이내 합법',
+            point: '금품 제공, 보험료 대납, 대출금 이자 대납은 금액 불문 금지되며 위반 시 3년/3천만원 처벌'
+          },
+          {
+            tag: '부당승환계약 판단 기준',
+            title: '신계약 청약 전후 6개월 이내',
+            highlight: '비교안내 확인서 징구 필수',
+            point: '기존 계약 해지 시 사업비 이중 부담 및 면책기간 재적용 등 소비자 피해 발생 방지'
+          }
+        ],
+        memoryFormula: '핵심 법규 기준: 사은품은 연 보험료 10%와 3만원 중 적은 금액 한도 / 승환계약 기준 기간은 전후 6개월',
+        avatarScript: '세 번째 파트는 특별이익 한도와 부당승환입니다. 고객에게 제공할 수 있는 사은품 한도는 연간 납입보험료의 10퍼센트와 3만 원 중 더 적은 금액까지만 허용됩니다. 또한 새로운 보험 청약 전후 6개월 이내에 기존 보험을 해지하게 하면 부당한 승환계약으로 보며, 반드시 기존 계약과 신계약의 중요사항을 비교 안내해야 합니다.'
+      },
+      {
+        sceneNumber: 4,
+        timeCode: '19:30 - 25:00',
+        chapterTitle: '제4절. 금융소비자보호법상 청약철회와 위법계약해지',
+        mainKeyword: '청약철회는 소급 무효, 위법계약해지는 장래를 향하여 소멸',
+        subHeadline: '단순 변심에 의한 청약철회와 법 위반에 따른 위법계약해지의 환급 범위를 구분해야 합니다.',
+        visualCards: [
+          {
+            tag: '청약철회권 (소비자 단순 변심)',
+            title: '증권 수령 15일 / 청약일 30일 내',
+            highlight: '3영업일 이내 전액 반환',
+            point: '계약이 처음부터 없던 것으로 소급 소멸 (단, 진단계약 및 90일 이하 단기계약은 제외)'
+          },
+          {
+            tag: '위법계약해지권 (모집 법규 위반)',
+            title: '위법 안 날 1년 / 계약일 5년 내',
+            highlight: '장래를 향하여 효력 소멸',
+            point: '해지 시점부터 효력이 소멸하므로 해지 전까지 보장받은 위험보험료는 공제 후 환급'
+          }
+        ],
+        memoryFormula: '핵심 법규 기준: 청약철회는 15일·30일 내 전액 반환 / 위법계약해지는 1년·5년 내 장래 소멸(위험보험료 공제)',
+        avatarScript: '네 번째 파트는 금융소비자보호법입니다. 단순 변심으로 행사하는 청약철회권은 증권을 받은 날부터 15일, 청약일로부터 30일 이내에 가능하며 3영업일 안에 납입보험료 전액을 돌려줍니다. 반면 설명의무 위반 등으로 행사하는 위법계약해지권은 위법 사실을 안 날부터 1년, 계약일로부터 5년 이내에 행사하며, 해지 시점부터 장래를 향하여 소멸하므로 이미 보장받은 기간의 위험보험료를 제외한 금액을 환급합니다.'
+      }
+    ]
+  },
+  {
+    id: 'course-life-2',
+    moduleCode: '생명보험 02',
+    duration: '25분',
+    category: 'life',
+    categoryLabel: '3이원방식 및 고지의무 법리',
+    title: '보험료 산출 3이원방식과 계약 전 알릴 의무(고지의무) 판정',
+    subtitle: '예정이율 반비례 원리와 고지의무 위반 시 인과관계에 따른 보험금 지급 기준',
+    scenes: [
+      {
+        sceneNumber: 1,
+        timeCode: '00:00 - 08:30',
+        chapterTitle: '제1절. 보험료 산출 3대 예정기초율',
+        mainKeyword: '예정이율이 인상되면 보험료는 인하된다 (반비례)',
+        subHeadline: '예정위험률·예정사업비율은 보험료와 비례하지만, 투자수익률인 예정이율만 반비례합니다.',
+        visualCards: [
+          {
+            tag: '예정이율 (예상 투자수익률)',
+            title: '보험료와 반비례 관계',
+            highlight: '예정이율 인상 ↑ = 보험료 인하 ↓',
+            point: '보험사가 자산 운용으로 얻을 예상 수익이 커지므로 고객에게 받을 보험료를 할인함'
+          },
+          {
+            tag: '예정위험률 및 예정사업비율',
+            title: '보험료와 비례 관계',
+            highlight: '위험률·사업비 ↑ = 보험료 인상 ↑',
+            point: '사고 발생 확률이나 회사 운영 경비가 증가하면 고객이 부담할 보험료도 함께 상승함'
+          }
+        ],
+        memoryFormula: '핵심 수리 기준: 3대 예정기초율 중 예정이율만 보험료와 반비례하며, 위험률과 사업비율은 비례함',
+        avatarScript: '생명보험 두 번째 강의입니다. 보험료를 산출하는 세 가지 기초율 중 예정이율은 보험회사가 보험료를 투자해 얻을 예상 수익률입니다. 예상 수익률인 예정이율이 올라가면 적은 원금으로도 만기 보험금을 줄 수 있으므로 보험료는 내려갑니다. 반대로 예정위험률과 예정사업비율은 올라갈수록 보험료도 함께 비례해서 올라갑니다.'
+      },
+      {
+        sceneNumber: 2,
+        timeCode: '08:30 - 17:00',
+        chapterTitle: '제2절. 고지의무 위반과 인과관계',
+        mainKeyword: '고지의무 위반 사항과 인과관계가 없으면 보험금을 지급한다',
+        subHeadline: '위반 사실을 안 날부터 1개월, 계약일로부터 3년 내에 해지할 수 있으나 인과관계가 핵심입니다.',
+        visualCards: [
+          {
+            tag: '인과관계가 있는 사고',
+            title: '당뇨병 미고지 후 당뇨합병증 발생',
+            highlight: '계약 해지 O · 보험금 부지급',
+            point: '숨긴 병력과 직접적인 인과관계가 있는 사고이므로 보험금을 지급하지 않으며 해약환급금만 지급'
+          },
+          {
+            tag: '인과관계가 없는 사고',
+            title: '당뇨병 미고지 후 교통사고 골절',
+            highlight: '계약 해지 O · 보험금 전액 지급',
+            point: '숨긴 병력과 무관한 사고이므로 이번 사고 보험금은 전액 지급하고 장래 계약만 해지 가능'
+          }
+        ],
+        memoryFormula: '핵심 약관 기준: 해지 제척기간은 안 날 1개월·계약 3년 / 미고지 병력과 인과관계 없는 사고는 보험금 지급',
+        avatarScript: '두 번째 파트는 고지의무 위반과 인과관계입니다. 보험사는 고지의무 위반을 안 날부터 1개월, 계약일로부터 3년 안에 계약을 해지할 수 있습니다. 다만 고객이 당뇨병을 숨기고 가입했더라도 당뇨와 전혀 상관없는 교통사고로 다쳤다면 인과관계가 없기 때문에 이번 교통사고 보험금은 100퍼센트 지급해야 합니다.'
+      },
+      {
+        sceneNumber: 3,
+        timeCode: '17:00 - 25:00',
+        chapterTitle: '제3절. 보험료 연체 해지와 부활 및 무효',
+        mainKeyword: '14일 이상 납입최고 후 실효되며 3년 이내 부활 가능',
+        subHeadline: '부활 시에는 고지의무를 다시 이행해야 하며 암보험 90일 면책기간도 새로 시작됩니다.',
+        visualCards: [
+          {
+            tag: '연체 실효 및 계약 부활',
+            title: '14일 납입최고 · 3년 내 부활',
+            highlight: '부활 시 암 90일 면책 재시작',
+            point: '납입최고 기간 만료 다음 날 0시에 실효되며, 부활 청약 시 고지의무가 새롭게 적용됨'
+          },
+          {
+            tag: '사망보험 절대적 무효 사유',
+            title: '만 15세 미만자 · 심신상실자',
+            highlight: '친권자 동의 불문 절대 무효',
+            point: '단, 심신박약자는 본인이 직접 계약을 체결하거나 단체보험에서 서면동의 시 유효'
+          }
+        ],
+        memoryFormula: '핵심 약관 기준: 납입최고 기간은 14일 이상, 부활 신청은 실효 후 3년 이내, 15세 미만 사망담보는 무효',
+        avatarScript: '세 번째 파트는 보험료 연체와 부활입니다. 2회 이후 보험료가 연체되면 보험사는 14일 이상의 기간을 정해 납입최고를 해야 하며, 기간 내 미납 시 다음 날 0시부터 실효됩니다. 실효된 계약은 3년 이내에 부활을 신청할 수 있는데, 부활할 때는 고지의무를 다시 이행해야 하고 암보험의 90일 면책기간도 부활일로부터 새롭게 시작됩니다.'
+      }
+    ]
+  },
+  {
+    id: 'course-life-3',
+    moduleCode: '생명보험 03',
+    duration: '25분',
+    category: 'life',
+    categoryLabel: '생명보험 상품·변액·퇴직연금',
+    title: '종신·양로보험 구조와 변액보험 특별계정 및 퇴직연금 비교',
+    subtitle: '양로보험 보험료 수준, 변액보험 최저보증 예금자보호 특칙, DB형·DC형 운용 책임',
+    scenes: [
+      {
+        sceneNumber: 1,
+        timeCode: '00:00 - 08:30',
+        chapterTitle: '제1절. 종신 · 정기 · 양로보험 비교',
+        mainKeyword: '동일 가입금액 기준 보험료는 양로 > 종신 > 정기 순',
+        subHeadline: '사망보장과 만기 생존보장을 동시에 제공하는 양로보험(생사혼합보험)의 보험료가 가장 높습니다.',
+        visualCards: [
+          {
+            tag: '종신보험 vs 정기보험',
+            title: '평생 사망보장 vs 기간 한정 보장',
+            highlight: '정기보험이 보험료 최저',
+            point: '종신보험은 시점 불문 사망 시 100% 지급하며, 정기보험은 정해진 기간 내 사망만 보장'
+          },
+          {
+            tag: '양로보험 (생사혼합보험)',
+            title: '사망보험금과 만기보험금 동일',
+            highlight: '세 상품 중 보험료 최고',
+            point: '보험기간 중 사망 시 사망보험금을 지급하고, 만기 생존 시에도 동일한 만기보험금 지급'
+          }
+        ],
+        memoryFormula: '핵심 상품 기준: 사망과 생존을 모두 보장하는 양로보험이 종신보험이나 정기보험보다 보험료가 비쌈',
+        avatarScript: '생명보험 세 번째 강의입니다. 동일 가입금액일 때 보험료 크기를 비교하면 정해진 기간만 보장하는 정기보험이 가장 저렴하고, 평생 사망을 보장하는 종신보험이 그다음이며, 기간 중 사망해도 주고 만기까지 살아있어도 똑같은 금액을 주는 양로보험이 가장 비쌉니다.'
+      },
+      {
+        sceneNumber: 2,
+        timeCode: '08:30 - 17:00',
+        chapterTitle: '제2절. 변액보험 특별계정과 예금자보호',
+        mainKeyword: '변액보험의 최저사망·최저연금 보증은 예금자보호 대상',
+        subHeadline: '특별계정 투자 실적 부분은 보호되지 않으나, 회사가 보증한 최저보증 금액은 5천만원까지 보호됩니다.',
+        visualCards: [
+          {
+            tag: '특별계정 분리 운용',
+            title: '인플레이션(물가상승) 위험 방어',
+            highlight: '일반계정과 독립하여 운용',
+            point: '펀드 운용 실적에 따라 보험금이 변동하며 보험회사 파산 시에도 특별계정 자산은 안전'
+          },
+          {
+            tag: '예금자보호법 적용 특칙',
+            title: '원칙 비보호 / 최저보증은 보호',
+            highlight: '최저보증 5천만원 한도 보호',
+            point: '수익률 하락 시에도 보험사가 지급을 보증한 최저사망보험금·최저연금적립금은 예보 적용'
+          }
+        ],
+        memoryFormula: '핵심 법규 기준: 변액보험 적립금은 예금자보호 제외이나, 최저사망·최저연금 보증 부분은 예금자보호 적용',
+        avatarScript: '두 번째 파트는 변액보험입니다. 변액보험은 특별계정에서 펀드로 운용되므로 원칙적으로 예금자보호법이 적용되지 않습니다. 그러나 투자 수익률이 마이너스가 되더라도 보험회사가 최저한도로 보장하기로 약속한 최저사망보험금이나 최저연금적립금 보증 부분은 예금자보호법에 따라 1인당 5천만 원까지 보호됩니다.'
+      },
+      {
+        sceneNumber: 3,
+        timeCode: '17:00 - 25:00',
+        chapterTitle: '제3절. 퇴직연금 확정급여형(DB)과 확정기여형(DC)',
+        mainKeyword: 'DB형은 회사가 운용 책임, DC형은 근로자가 운용 책임',
+        subHeadline: '퇴직급여가 사전 확정되는지(DB), 사용자 부담금이 사전 확정되는지(DC)로 구분합니다.',
+        visualCards: [
+          {
+            tag: '확정급여형 (DB형)',
+            title: '근로자가 받을 퇴직급여 확정',
+            highlight: '적립금 운용 책임 = 회사',
+            point: '운용 손익이 회사에 귀속되며 임금상승률이 투자수익률보다 높을 때 근로자에게 유리'
+          },
+          {
+            tag: '확정기여형 (DC형)',
+            title: '회사의 연간 부담금(1/12) 확정',
+            highlight: '적립금 운용 책임 = 근로자',
+            point: '회사가 연간 임금총액의 1/12 이상을 근로자 계좌에 납입하면 근로자가 직접 운용'
+          }
+        ],
+        memoryFormula: '핵심 연금 기준: DB형은 급여 확정 및 회사 운용 책임 / DC형은 부담금(1/12) 확정 및 근로자 운용 책임',
+        avatarScript: '세 번째 파트는 퇴직연금입니다. 확정급여형인 DB형은 근로자가 받을 퇴직급여가 미리 정해져 있어 적립금 운용 책임을 회사가 집니다. 반대로 확정기여형인 DC형은 회사가 매년 임금총액의 12분의 1 이상을 근로자 계좌에 넣어주면 근로자 본인이 직접 운용하고 그 수익도 근로자에게 돌아갑니다.'
+      }
+    ]
+  },
+  {
+    id: 'course-life-4',
+    moduleCode: '생명보험 04',
+    duration: '20분',
+    category: 'life',
+    categoryLabel: '보험세제·상속·예금자보호',
+    title: '보장성 세액공제·저축성 비과세 요건 및 금융재산 상속공제',
+    subtitle: '근로소득자 세액공제 한도와 순금융재산 구간별 상속공제액 계산 기준',
+    scenes: [
+      {
+        sceneNumber: 1,
+        timeCode: '00:00 - 10:00',
+        chapterTitle: '제1절. 보장성 세액공제와 저축성 비과세',
+        mainKeyword: '보장성 세액공제는 근로소득자만 연 100만원 한도 적용',
+        subHeadline: '저축성보험 이자소득세 비과세는 10년 이상 유지 및 납입 한도 충족 시 적용됩니다.',
+        visualCards: [
+          {
+            tag: '보장성보험 특별세액공제',
+            title: '일반 100만원(12%) / 장애인 100만원(15%)',
+            highlight: '근로소득자만 공제 가능',
+            point: '개인사업자(자영업자)는 보장성보험 세액공제 대상이 아니며 근로소득자만 연말정산 가능'
+          },
+          {
+            tag: '저축성보험 비과세 요건',
+            title: '10년 이상 유지 필수',
+            highlight: '일시납 1억 / 월납 150만원 이하',
+            point: '월적립식은 5년 이상 납입 및 월 150만원(연 1,800만원) 이하 요건 충족 시 이자 비과세'
+          }
+        ],
+        memoryFormula: '핵심 세법 기준: 보장성 세액공제는 근로소득자만 가능 / 저축성 비과세는 10년 유지·일시납 1억·월납 150만원',
+        avatarScript: '생명보험 네 번째 강의는 세제 혜택입니다. 보장성보험 세액공제는 오직 근로소득자만 연 100만 원 한도로 공제받을 수 있으며 자영업자는 대상이 아닙니다. 저축성보험 비과세는 10년 이상 유지해야 하며 일시납은 1억 원 이하, 월적립식은 5년 이상 납입하면서 월 150만 원 이하여야 이자소득세가 면제됩니다.'
+      },
+      {
+        sceneNumber: 2,
+        timeCode: '10:00 - 20:00',
+        chapterTitle: '제2절. 금융재산 상속공제와 예금자보호 제외 대상',
+        mainKeyword: '순금융재산 2천만원 초과 1억원 이하는 무조건 2천만원 공제',
+        subHeadline: '1억원 초과 시에는 순금융재산의 20%를 공제하되 최대 한도는 2억원입니다.',
+        visualCards: [
+          {
+            tag: '금융재산 상속공제 계산',
+            title: '2천만 ~ 1억 구간은 정액 공제',
+            highlight: '무조건 2,000만원 공제',
+            point: '순금융재산이 6천만원이어도 20%(1,200만원)가 아닌 최저한도 2,000만원 전액 공제'
+          },
+          {
+            tag: '예금자보호 제외 계약',
+            title: '법인계약 · 보증보험 · 재보험',
+            highlight: '1인당 원리금 5천만원 보호',
+            point: '보험계약자가 법인인 계약과 보증보험, 재보험, 변액보험 적립금은 보호 대상에서 제외'
+          }
+        ],
+        memoryFormula: '핵심 세법 기준: 순금융재산 2천만~1억 구간은 정액 2,000만원 공제 / 법인·보증·재보험은 예금자보호 제외',
+        avatarScript: '두 번째 파트는 금융재산 상속공제입니다. 금융재산에서 금융채무를 뺀 순금융재산이 2천만 원에서 1억 원 사이라면 금액에 상관없이 무조건 2천만 원을 공제합니다. 1억 원을 초과할 때만 20퍼센트를 곱하며 최대 한도는 2억 원입니다. 또한 계약자가 법인인 계약과 보증보험, 재보험은 예금자보호 대상에서 제외됩니다.'
+      }
+    ]
+  },
+  {
+    id: 'course-life-5',
+    moduleCode: '생명보험 05',
+    duration: '20분',
+    category: 'life',
+    categoryLabel: '보험사기방지특별법 및 AML',
+    title: '보험사기방지특별법 처벌 규정과 자금세탁방지제도(CTR·STR)',
+    subtitle: '입원적정성 심사 의뢰 주체와 고액현금거래보고(1천만원)·의심거래보고 기준',
+    scenes: [
+      {
+        sceneNumber: 1,
+        timeCode: '00:00 - 10:00',
+        chapterTitle: '제1절. 보험사기방지특별법 핵심 법리',
+        mainKeyword: '입원적정성 심사는 수사기관이 건강보험심사평가원에 의뢰',
+        subHeadline: '보험사기죄는 10년 이하 징역 또는 5천만원 이하 벌금에 처하며 미수범도 처벌합니다.',
+        visualCards: [
+          {
+            tag: '보험사기죄 처벌 규정',
+            title: '10년 이하 징역 / 5천만원 이하 벌금',
+            highlight: '미수범 처벌 · 상습범 1/2 가중',
+            point: '일반 형법상 사기죄보다 벌금형을 강화하였으며 상습범은 형의 2분의 1까지 가중 처벌'
+          },
+          {
+            tag: '입원적정성 심사 절차',
+            title: '수사기관 ➔ 심평원 의뢰',
+            highlight: '보험회사가 직접 의뢰 불가',
+            point: '경찰·검찰 등 수사기관이 수사를 위해 필요한 경우 건강보험심사평가원에 심사를 의뢰함'
+          }
+        ],
+        memoryFormula: '핵심 법규 기준: 보험사기죄는 10년·5천만원 처벌 / 입원적정성 심사는 수사기관이 심평원에 의뢰',
+        avatarScript: '생명보험 다섯 번째 강의는 보험사기방지특별법입니다. 보험사기죄는 10년 이하의 징역 또는 5천만 원 이하의 벌금으로 처벌합니다. 특히 입원적정성 심사는 보험회사가 직접 의뢰하는 것이 아니라, 반드시 경찰이나 검찰 같은 수사기관이 건강보험심사평가원에 의뢰한다는 점을 정확히 구분하셔야 합니다.'
+      },
+      {
+        sceneNumber: 2,
+        timeCode: '10:00 - 20:00',
+        chapterTitle: '제2절. 자금세탁방지(AML)와 인보험 통칙',
+        mainKeyword: '고액현금거래보고(CTR)는 1천만원 이상, 의심거래(STR)는 금액 무관',
+        subHeadline: '사람의 생명·신체를 다루는 인보험에는 보험가액과 청구권대위가 존재하지 않습니다.',
+        visualCards: [
+          {
+            tag: '자금세탁방지 보고 기준',
+            title: 'CTR 1,000만원 / STR 금액 무관',
+            highlight: '관련 자료 5년간 보존 의무',
+            point: '하루 1천만원 이상 현금 거래는 자동 보고되며, 의심거래는 소액이라도 즉시 보고해야 함'
+          },
+          {
+            tag: '상법 인보험 통칙',
+            title: '보험가액 및 보험자대위 없음',
+            highlight: '타인 사망은 서면동의 필수',
+            point: '인보험은 사람의 생명을 가격으로 환산할 수 없으므로 초과·중복보험 및 대위권 불적용'
+          }
+        ],
+        memoryFormula: '핵심 법규 기준: 고액현금거래보고(CTR)는 1일 1천만원 이상 / 의심거래보고(STR)는 금액 기준 없음',
+        avatarScript: '두 번째 파트는 자금세탁방지제도입니다. 하루 1천만 원 이상의 현금을 입출금하면 고액현금거래보고가 작동하며, 자금세탁이 의심되는 거래는 금액 기준 없이 소액이라도 보고해야 합니다. 또한 상법상 인보험에는 보험가액이라는 개념이 없어 다수 보험 가입 시에도 중복 보상이 가능합니다.'
+      }
+    ]
+  },
+  {
+    id: 'course-prop-1',
+    moduleCode: '손해보험 01',
+    duration: '25분',
+    category: 'property',
+    categoryLabel: '이득금지의 원칙과 비례보상',
+    title: '손해보험 이득금지의 원칙과 일부보험·보험자대위 법리',
+    subtitle: '실손보상 원칙에 따른 일부보험 계산 공식과 가족에 대한 청구권대위 제한',
+    scenes: [
+      {
+        sceneNumber: 1,
+        timeCode: '00:00 - 12:00',
+        chapterTitle: '제1절. 이득금지의 원칙과 보험자대위',
+        mainKeyword: '생계를 같이하는 가족의 과실 사고에는 대위권을 행사할 수 없다',
+        subHeadline: '전손보험금 지급 시 잔존물대위, 제3자 가해 사고 시 청구권대위가 작동합니다.',
+        visualCards: [
+          {
+            tag: '잔존물대위 (목적물 권리 이전)',
+            title: '전손보험금 지급 시 자동 취득',
+            highlight: '일부보험은 가입 비율만큼 취득',
+            point: '목적물이 전부 멸실되어 전손보험금을 지급하면 잔존물의 소유권이 보험사로 이전됨'
+          },
+          {
+            tag: '청구권대위 (제3자 구상권)',
+            title: '가해자에 대한 배상청구권 취득',
+            highlight: '생계 같이하는 가족은 면제',
+            point: '가해자가 피보험자와 생계를 같이하는 가족이면 고의 사고가 아닌 한 구상권 행사 불가'
+          }
+        ],
+        memoryFormula: '핵심 법규 기준: 손해보험은 이득금지 원칙 적용 / 생계를 같이하는 가족의 과실 사고는 구상권 행사 불가',
+        avatarScript: '손해보험 첫 번째 강의입니다. 손해보험은 실제 손해액 이상으로 보상받을 수 없는 이득금지의 원칙이 적용됩니다. 제3자가 낸 사고로 보험금을 지급한 보험사는 가해자에게 구상권을 행사하는 청구권대위를 가지지만, 그 가해자가 피보험자와 생계를 같이하는 가족이라면 고의 사고가 아닌 한 구상권을 행사할 수 없습니다.'
+      },
+      {
+        sceneNumber: 2,
+        timeCode: '12:00 - 25:00',
+        chapterTitle: '제2절. 일부보험 비례보상 계산 공식',
+        mainKeyword: '지급보험금 = 손해액 × (보험가입금액 ÷ 보험가액)',
+        subHeadline: '보험가입금액이 보험가액보다 작은 일부보험은 가입한 비율만큼만 비례하여 보상합니다.',
+        visualCards: [
+          {
+            tag: '일부보험 비례보상 예시',
+            title: '가액 1억 건물에 6천만원 가입(60%)',
+            highlight: '2천만원 손해 시 1,200만원 지급',
+            point: '가입 비율이 60%이므로 발생한 손해액 2,000만원에 대해서도 60%인 1,200만원만 지급함'
+          },
+          {
+            tag: '손해방지비용 보상 특칙',
+            title: '가입금액 한도 초과 보상 가능',
+            highlight: '손해방지 실패 시에도 보상',
+            point: '화재 진압 등 손해의 방지와 경감을 위해 지출한 필요·유익비용은 가입금액 초과 시에도 보상'
+          }
+        ],
+        memoryFormula: '핵심 계산 기준: 일부보험 지급액 = 손해액 × (가입금액 ÷ 보험가액) / 손해방지비용은 가입금액 초과 보상',
+        avatarScript: '두 번째 파트는 일부보험 계산 공식입니다. 시가 1억 원짜리 건물에 6천만 원만 보험에 가입했다면 60퍼센트 일부보험입니다. 이때 화재로 2천만 원의 손해가 발생하면 손해액의 60퍼센트인 1,200만 원만 비례보상합니다. 다만 불을 끄기 위해 지출한 손해방지비용은 가입금액 한도를 초과하더라도 추가로 보상합니다.'
+      }
+    ]
+  },
+  {
+    id: 'course-prop-2',
+    moduleCode: '손해보험 02',
+    duration: '25분',
+    category: 'property',
+    categoryLabel: '자동차손해배상 보장법 및 자동차보험',
+    title: '자동차 의무보험 구조와 정부보장사업·음주무면허 구상 법리',
+    subtitle: '가불금 50% 청구권, 정부보장사업 대인 한정 보상, 무보험차상해 보행 중 보상',
+    scenes: [
+      {
+        sceneNumber: 1,
+        timeCode: '00:00 - 13:00',
+        chapterTitle: '제1절. 의무보험과 가불금 · 정부보장사업',
+        mainKeyword: '정부보장사업은 뺑소니·무보험차로 인한 대인 피해만 보상한다',
+        subHeadline: '가불금은 추정보험금의 50% 한도로 청구할 수 있으며 정부보장사업에서 대물 피해는 제외됩니다.',
+        visualCards: [
+          {
+            tag: '가불금 청구권 제도',
+            title: '추정보험금의 50% 한도 선지급',
+            highlight: '피해자 직접 청구 가능',
+            point: '치료비 등 긴급 자금이 필요한 피해자가 추정보험금의 절반을 먼저 지급받는 보호 제도'
+          },
+          {
+            tag: '정부보장사업 (국가 구제)',
+            title: '뺑소니 · 무보험·도난차 사고 구제',
+            highlight: '대인배상I 한도 내 대인만 보상',
+            point: '사람이 다치거나 사망한 대인 피해만 보상하며 차량 등 재물이 파손된 대물 피해는 보상 제외'
+          }
+        ],
+        memoryFormula: '핵심 자배법 기준: 의무보험은 대인I + 대물 2천만원 / 가불금은 추정보험금 50% / 정부보장사업은 대인만 보상',
+        avatarScript: '손해보험 두 번째 강의는 자동차보험입니다. 피해자는 치료비가 급할 때 추정보험금의 50퍼센트를 가불금으로 먼저 청구할 수 있습니다. 또한 뺑소니나 무보험차에 다쳤을 때 국가가 보상하는 정부보장사업은 오직 사람이 다친 대인 피해만 보상하며, 자동차가 부서진 대물 피해는 보상하지 않습니다.'
+      },
+      {
+        sceneNumber: 2,
+        timeCode: '13:00 - 25:00',
+        chapterTitle: '제2절. 무보험차상해와 음주·무면허 사고부담금',
+        mainKeyword: '음주·무면허 사고는 피해자에게 먼저 보상한 후 운전자에게 구상한다',
+        subHeadline: '무보험자동차에 의한 상해 담보는 자동차 탑승 중뿐만 아니라 보행 중 사고도 보상합니다.',
+        visualCards: [
+          {
+            tag: '무보험자동차에 의한 상해',
+            title: '탑승 중 + 보행 중 사고 모두 보상',
+            highlight: '타차운전위험담보 자동 포함',
+            point: '피보험자가 길을 걷다가(보행 중) 무보험·뺑소니 차량에 충격당한 인적 피해도 보상'
+          },
+          {
+            tag: '고의 사고 vs 음주·무면허',
+            title: '고의는 면책 / 음주·무면허는 구상',
+            highlight: '피해자 보호 후 사고부담금 징수',
+            point: '음주·무면허 운전은 피해자에게 먼저 보험금을 지급한 뒤 가해 운전자에게 부담금을 구상함'
+          }
+        ],
+        memoryFormula: '핵심 약관 기준: 무보험차상해는 보행 중 사고도 보상 / 음주·무면허는 피해자 선보상 후 운전자 구상',
+        avatarScript: '두 번째 파트는 무보험차상해와 음주·무면허 처리 기준입니다. 무보험자동차에 의한 상해 담보는 차에 타고 있을 때뿐 아니라 보행 중 무보험차에 치인 사고까지 보상합니다. 또한 음주운전이나 무면허운전 사고는 피해자를 보호하기 위해 보험사가 피해자에게 먼저 보상한 뒤 가해 운전자에게 사고부담금을 구상합니다.'
+      }
+    ]
+  },
+  {
+    id: 'course-prop-3',
+    moduleCode: '손해보험 03',
+    duration: '25분',
+    category: 'property',
+    categoryLabel: '화재보험 및 배상책임보험',
+    title: '화재보험 목적물 분류(제외·명기)와 배상책임보험 증권 기준',
+    subtitle: '주택화재보험 폭발·귀금속 기본 보상 특칙 및 전문직 손해배상청구기준증권',
+    scenes: [
+      {
+        sceneNumber: 1,
+        timeCode: '00:00 - 13:00',
+        chapterTitle: '제1절. 화재보험 제외물건과 명기물건',
+        mainKeyword: '주택화재보험은 폭발·파열 손해와 귀금속을 기본계약으로 보상한다',
+        subHeadline: '현금·유가증권은 제외물건이며, 일반화재에서 귀금속·설계도는 청약서에 명기해야 합니다.',
+        visualCards: [
+          {
+            tag: '일반화재 목적물 구분',
+            title: '현금·주식(제외) / 귀금속·원고(명기)',
+            highlight: '점당 300만원 이상 귀금속 명기',
+            point: '현금·유가증권은 가입 불가하며, 귀금속·골동품·설계도·타인 보관물은 명기해야 보상'
+          },
+          {
+            tag: '주택화재보험 특칙',
+            title: '폭발·파열 및 귀금속 기본 보상',
+            highlight: '잔존물제거비용은 손해액 10%',
+            point: '주택화재는 폭발·파열을 특약 없이 기본 보상하며 귀금속도 명기 없이 통상물건으로 포함'
+          }
+        ],
+        memoryFormula: '핵심 약관 기준: 현금·유가증권은 제외물건 / 주택화재는 폭발·파열 및 귀금속 기본 보상 / 잔존물제거비용은 손해액 10%',
+        avatarScript: '손해보험 세 번째 강의는 화재보험과 배상책임보험입니다. 현금과 유가증권은 화재보험에 가입할 수 없는 제외물건이며, 300만 원 이상 귀금속이나 설계도는 청약서에 적어야 보상하는 명기물건입니다. 단, 가정집이 가입하는 주택화재보험에서는 가스 폭발·파열 손해와 귀금속도 별도 특약이나 명기 없이 기본으로 보상합니다.'
+      },
+      {
+        sceneNumber: 2,
+        timeCode: '13:00 - 25:00',
+        chapterTitle: '제2절. 배상책임보험 증권 적용 기준',
+        mainKeyword: '의사·변호사 등 전문직 배상책임은 손해배상청구기준증권을 사용한다',
+        subHeadline: '일반 영업·일상생활 배상은 사고발생기준증권, 전문직은 소급담보일이 명시된 청구기준증권을 씁니다.',
+        visualCards: [
+          {
+            tag: '사고발생기준증권 (일반 배상)',
+            title: '보험기간 중 사고 발생 시 보상',
+            highlight: '영업 · 시설 · 일상생활배상',
+            point: '사고 발생 시점과 피해 인지가 동시에 이루어지는 일반 배상책임보험에 적용'
+          },
+          {
+            tag: '손해배상청구기준증권 (전문직)',
+            title: '보험기간 중 최초 배상청구 시 보상',
+            highlight: '의사 · 변호사 · 회계사 배상',
+            point: '소급담보일 이후 발생한 전문직 과실에 대해 보험기간 내 피해자가 최초 청구할 때 보상'
+          }
+        ],
+        memoryFormula: '핵심 약관 기준: 일반 배상책임은 사고발생기준증권 / 의사·변호사 전문직 배상책임은 손해배상청구기준증권',
+        avatarScript: '두 번째 파트는 배상책임보험 증권입니다. 식당이나 일상생활 배상책임은 보험기간 중 사고가 발생하면 보상하는 사고발생기준증권을 사용합니다. 반면 의사나 변호사 같은 전문직 배상책임보험은 소급담보일 이후 발생한 과실에 대해 피해자가 보험기간 중 최초로 배상을 청구했을 때 보상하는 손해배상청구기준증권을 사용합니다.'
+      }
+    ]
+  },
+  {
+    id: 'course-prop-4',
+    moduleCode: '손해보험 04',
+    duration: '20분',
+    category: 'property',
+    categoryLabel: '장기손해보험 및 보증보험',
+    title: '장기손해보험 이율 구조와 보증보험 3당사자 고의사고 보상',
+    subtitle: '직업 변경 통지의무 적용 범위와 보증보험 계약자 고의사고 보상 후 구상 원리',
+    scenes: [
+      {
+        sceneNumber: 1,
+        timeCode: '00:00 - 10:00',
+        chapterTitle: '제1절. 장기손해보험 구조와 통지의무',
+        mainKeyword: '직업·직무 변경 통지의무는 상해 담보에만 적용된다',
+        subHeadline: '장기손해보험의 보장보험료는 예정이율, 적립보험료는 연동형 공시이율을 적용합니다.',
+        visualCards: [
+          {
+            tag: '장기손해보험 이율 이원화',
+            title: '보장(예정이율) + 적립(공시이율)',
+            highlight: '보험기간 3년 이상 장기계약',
+            point: '위험보장 보험료는 고정 예정이율을 적용하고 만기환급 적립보험료는 공시이율을 적용함'
+          },
+          {
+            tag: '계약 후 알릴 의무 (통지의무)',
+            title: '직업·직무 변경 시 지체 없이 통지',
+            highlight: '질병 담보는 통지의무 없음',
+            point: '직업 위험도 변화는 상해 사고 확률에만 영향을 미치므로 순수 질병보험은 통지 대상 아님'
+          }
+        ],
+        memoryFormula: '핵심 약관 기준: 장기손해보험 보장보험료는 예정이율·적립보험료는 공시이율 / 직업 변경 통지는 상해 담보만 적용',
+        avatarScript: '손해보험 네 번째 강의입니다. 기간이 3년 이상인 장기손해보험은 보장보험료에 고정 예정이율을, 적립보험료에 변동 공시이율을 적용합니다. 또한 가입 후 직업이나 직무가 바뀌면 회사에 알려야 하는 통지의무는 다칠 위험과 직결된 상해 담보에만 적용되며, 질병 담보에는 적용되지 않습니다.'
+      },
+      {
+        sceneNumber: 2,
+        timeCode: '10:00 - 20:00',
+        chapterTitle: '제2절. 보증보험의 3당사자 구조와 고의사고 보상',
+        mainKeyword: '보증보험은 보험계약자의 고의 사고도 피보험자에게 보상한다',
+        subHeadline: '채권자인 피보험자에게 먼저 손해를 보상한 뒤 채무자인 계약자에게 전액 구상권을 행사합니다.',
+        visualCards: [
+          {
+            tag: '보증보험의 당사자 분리',
+            title: '계약자(채무자) ≠ 피보험자(채권자)',
+            highlight: '계약자 고의사고 100% 보상 후 구상',
+            point: '직원이 고의로 공금을 횡령해도 고용주(피보험자)에게 보상한 뒤 직원에게 구상권 행사'
+          },
+          {
+            tag: '보증보험의 법적 성격',
+            title: '예금자보호법 적용 제외',
+            highlight: '보증제도 성격의 손해보험',
+            point: '보험의 형태를 띠고 있으나 실질은 보증이므로 예금자보호 대상에서 제외됨'
+          }
+        ],
+        memoryFormula: '핵심 법규 기준: 보증보험은 계약자(채무자)의 고의 사고도 피보험자(채권자)에게 보상한 뒤 계약자에게 구상함',
+        avatarScript: '두 번째 파트는 보증보험입니다. 신원보증보험 등에서 보험료를 내는 계약자는 직원이고 보험금을 받는 피보험자는 고용주입니다. 만약 계약자인 직원이 고의로 횡령 사고를 내더라도 피해자인 고용주를 보호해야 하므로 보험사는 고용주에게 먼저 보험금을 지급하고, 사고를 낸 직원에게 전액 구상권을 행사합니다.'
+      }
+    ]
+  },
+  {
+    id: 'course-prop-5',
+    moduleCode: '손해보험 05',
+    duration: '20분',
+    category: 'property',
+    categoryLabel: '해상보험 위부 및 기계보험',
+    title: '해상보험 추정전손 위부(Abandonment) 요건과 기계보험 면책',
+    subtitle: '공동해손의 성립 요건, 추정전손 시 행사하는 위부, 기계보험의 화재·도난 면책',
+    scenes: [
+      {
+        sceneNumber: 1,
+        timeCode: '00:00 - 10:00',
+        chapterTitle: '제1절. 해상보험 공동해손과 위부',
+        mainKeyword: '해상보험의 위부(Abandonment)는 오직 추정전손에서만 행사한다',
+        subHeadline: '수리비가 선박 가액을 초과하는 추정전손 시 목적물의 모든 권리를 넘기고 전손보험금을 청구합니다.',
+        visualCards: [
+          {
+            tag: '공동해손 (General Average)',
+            title: '선장이 공동 위험 회피 위해 투하',
+            highlight: '선주·화주 이해관계자 비례 분담',
+            point: '폭풍우 속에서 선박과 화물의 공동 안전을 위해 고의로 일부 화물을 바다에 버린 희생 손해'
+          },
+          {
+            tag: '위부 (Abandonment)',
+            title: '오직 추정전손에서만 행사 가능',
+            highlight: '현실전손 · 분손은 위부 불가',
+            point: '피보험자가 잔존 선박의 모든 권리를 보험사에 이전하고 전손보험금 전액을 청구하는 권리'
+          }
+        ],
+        memoryFormula: '핵심 해상 기준: 위부(Abandonment)는 현실전손이나 분손에서는 불가하며 오직 추정전손에서만 행사 가능',
+        avatarScript: '손해보험 다섯 번째 강의는 해상보험과 특종보험입니다. 선박이 반파되어 수리비가 배값보다 더 많이 나오는 경제적 전손을 추정전손이라고 합니다. 이때 피보험자가 선박에 대한 모든 권리를 보험사에 넘기고 전손보험금을 청구하는 위부는 현실전손이나 분손이 아닌 오직 추정전손에서만 행사할 수 있습니다.'
+      },
+      {
+        sceneNumber: 2,
+        timeCode: '10:00 - 20:00',
+        chapterTitle: '제2절. 기계보험 면책 사유와 재보험',
+        mainKeyword: '기계보험에서 화재·벼락·폭발·도난 손해는 보상하지 않는다(면책)',
+        subHeadline: '화재 손해는 화재보험 영역이므로 기계보험은 순수한 기계적·전기적 사고만 보상합니다.',
+        visualCards: [
+          {
+            tag: '기계보험 면책 특칙',
+            title: '화재 · 벼락 · 폭발 · 도난 면책',
+            highlight: '기계적 · 전기적 사고만 보상',
+            point: '공장 화재로 기계가 소실된 손해는 화재보험에서 담보하므로 기계보험에서는 면책됨'
+          },
+          {
+            tag: '재보험의 법적 성격',
+            title: '책임보험 성격 · 예금자보호 제외',
+            highlight: '원수보험 계약자 직접청구권 없음',
+            point: '보험회사가 가입하는 보험이므로 일반 소비자는 재보험사에 직접 보험금을 청구할 수 없음'
+          }
+        ],
+        memoryFormula: '핵심 특종 기준: 기계보험에서 화재·폭발·도난 사고는 면책 / 재보험은 원수계약자 직접청구권 및 예금자보호 없음',
+        avatarScript: '두 번째 파트는 기계보험입니다. 기계보험은 기계 자체의 결함이나 전기적 사고만 보상하기 때문에, 화재나 폭발로 기계가 불에 탄 손해나 도난당한 손해는 보상하지 않습니다. 화재 손해는 화재보험에 가입해야 한다는 점을 기억하시기 바랍니다.'
+      }
+    ]
+  },
+  {
+    id: 'course-third-1',
+    moduleCode: '제3보험 01',
+    duration: '25분',
+    category: 'third',
+    categoryLabel: '상해 3요소 · 후유장해 · 암보험',
+    title: '상해보험 성립 3요소(급격·우연·외래)와 암보험 90일 면책 예외',
+    subtitle: '5년 이상 한시적 장해 20% 인정 기준과 만 15세 미만·4대 유사암 즉시 보장',
+    scenes: [
+      {
+        sceneNumber: 1,
+        timeCode: '00:00 - 13:00',
+        chapterTitle: '제1절. 상해보험 3요소와 한시적 장해',
+        mainKeyword: '5년 이상 한시적 장해는 해당 장해지급률의 20%를 인정한다',
+        subHeadline: '상해사고는 급격성·우연성·외래성 3요소를 동시에 충족해야 보상합니다.',
+        visualCards: [
+          {
+            tag: '상해보험 성립 3요소',
+            title: '급격성 + 우연성 + 외래성',
+            highlight: '질병수술 · 제왕절개 · 다이빙 면책',
+            point: '신체 내부 원인이나 외과적 수술, 임신·출산, 스카이다이빙 중 사고는 상해 면책 사유'
+          },
+          {
+            tag: '후유장해 (13개 신체부위)',
+            title: '5년 이상 한시장해 ➔ 20% 인정',
+            highlight: '영구장해 원칙의 예외 인정',
+            point: '한시적으로 나타나는 장해라도 그 기간이 5년 이상이면 해당 장해지급률의 20%를 지급함'
+          }
+        ],
+        memoryFormula: '핵심 약관 기준: 상해는 급격·우연·외래 동시 충족 필수 / 5년 이상 한시적 장해는 장해지급률의 20% 인정',
+        avatarScript: '생명보험과 손해보험 공통 과목인 제3보험 첫 번째 강의입니다. 상해보험은 급격하고 우연하며 외래의 사고라는 세 가지 요건을 동시에 갖춰야 합니다. 또한 후유장해는 영구장해가 원칙이지만, 한시적 장해라도 그 기간이 5년 이상인 경우에는 해당 장해지급률의 20퍼센트를 후유장해보험금으로 지급합니다.'
+      },
+      {
+        sceneNumber: 2,
+        timeCode: '13:00 - 25:00',
+        chapterTitle: '제2절. 암보험 90일 면책기간과 즉시 보장 예외',
+        mainKeyword: '만 15세 미만자와 4대 유사암은 90일 면책 없이 첫날부터 보장한다',
+        subHeadline: '일반암은 계약일 또는 부활일로부터 90일 이내 진단 시 계약이 무효 처리됩니다.',
+        visualCards: [
+          {
+            tag: '일반암 90일 면책 (대기기간)',
+            title: '계약일·부활일로부터 90일 면책',
+            highlight: '90일 내 진단 시 무효 및 보험료 환급',
+            point: '역선택 방지를 위해 90일 이내 일반암 진단 시 보험금을 지급하지 않고 기납입보험료 반환'
+          },
+          {
+            tag: '면책기간 미적용 예외 대상',
+            title: '만 15세 미만자 + 4대 유사암',
+            highlight: '계약일 첫날부터 100% 보장 개시',
+            point: '갑상선암, 기타피부암, 제자리암(상피내암), 경계성종양 및 15세 미만은 대기기간 없음'
+          }
+        ],
+        memoryFormula: '핵심 약관 기준: 일반암은 90일 면책 적용 / 만 15세 미만자 및 갑상선·기타피부·제자리·경계성종양은 첫날부터 보장',
+        avatarScript: '두 번째 파트는 암보험 면책기간입니다. 일반암은 계약일이나 부활일로부터 90일이 지나야 보장이 시작되며 90일 이내 진단 시 계약은 무효가 됩니다. 하지만 만 15세 미만 어린이와 갑상선암, 기타피부암, 제자리암, 경계성종양 등 4대 유사암은 90일 면책기간 없이 계약 첫날부터 즉시 보장합니다.'
+      }
+    ]
+  },
+  {
+    id: 'course-third-2',
+    moduleCode: '제3보험 02',
+    duration: '20분',
+    category: 'third',
+    categoryLabel: '4세대 실손의료보험 완벽 정리',
+    title: '4세대 실손의료보험 구조(급여 20%·비급여 30%)와 3대 비급여 한도',
+    subtitle: '1년 갱신·5년 재가입 주기, 비급여 보험료 차등제, 비급여 MRI 횟수 무제한 특칙',
+    scenes: [
+      {
+        sceneNumber: 1,
+        timeCode: '00:00 - 10:00',
+        chapterTitle: '제1절. 4세대 실손 기본 구조와 자기부담금',
+        mainKeyword: '1년마다 보험료 갱신, 5년마다 재가입 / 급여 20% · 비급여 30% 공제',
+        subHeadline: '통원 최소공제금액은 급여 1만원(병·의원)·2만원(종합병원 이상), 비급여 3만원입니다.',
+        visualCards: [
+          {
+            tag: '급여 (주계약) 자기부담금',
+            title: '급여 본인부담금의 20% 공제',
+            highlight: '통원 최소 1만원 / 2만원 공제',
+            point: '의원·병원은 1만원, 종합·상급종합병원은 2만원과 급여 20% 중 큰 금액을 차감 후 지급'
+          },
+          {
+            tag: '비급여 (특약) 자기부담금',
+            title: '비급여 의료비의 30% 공제',
+            highlight: '통원 최소 3만원 공제',
+            point: '보험료는 매년(1년) 갱신되며 보장내용 변경 주기는 5년(최대 100세까지 재가입)'
+          }
+        ],
+        memoryFormula: '핵심 실손 기준: 1년 갱신 · 5년 재가입 / 급여 20%(통원 1·2만원) 공제 / 비급여 30%(통원 3만원) 공제',
+        avatarScript: '제3보험 두 번째 강의는 4세대 실손의료보험입니다. 4세대 실손은 1년마다 보험료가 갱신되고 5년마다 재가입합니다. 환자 자기부담금 비율은 급여 항목이 20퍼센트, 비급여 항목이 30퍼센트이며, 통원 시 최소 공제금액은 급여가 1만 원 또는 2만 원, 비급여는 3만 원입니다.'
+      },
+      {
+        sceneNumber: 2,
+        timeCode: '10:00 - 20:00',
+        chapterTitle: '제2절. 비급여 차등제와 3대 비급여 특약 한도',
+        mainKeyword: '비급여 MRI/MRA는 연간 300만원 한도만 있고 횟수 제한이 없다',
+        subHeadline: '도수치료(350만원·50회)와 비급여주사(250만원·50회)는 연간 횟수 제한이 적용됩니다.',
+        visualCards: [
+          {
+            tag: '비급여 보험료 차등제 (1~5단계)',
+            title: '무사고 할인 / 100만원 이상 할증',
+            highlight: '암·심장·장기요양 1~2등급 제외',
+            point: '직전 1년간 비급여 보험금 수령액에 따라 할인~최대 300% 할증 (산정특례 대상자는 제외)'
+          },
+          {
+            tag: '3대 비급여 특약 연간 한도',
+            title: '도수 350만 / 주사 250만 / MRI 300만',
+            highlight: '비급여 MRI는 연간 횟수 무제한',
+            point: '도수치료(연 50회)와 비급여주사(연 50회)와 달리 비급여 MRI/MRA는 횟수 제한이 없음'
+          }
+        ],
+        memoryFormula: '핵심 실손 기준: 도수치료 350만(50회) · 비급여주사 250만(50회) · 비급여 MRI 300만(횟수 제한 없음)',
+        avatarScript: '두 번째 파트는 3대 비급여 특약 한도입니다. 도수치료는 연 350만 원에 50회, 비급여 주사료는 연 250만 원에 50회로 제한됩니다. 반면 비급여 MRI와 MRA는 연간 300만 원이라는 금액 한도만 있을 뿐 연간 횟수 제한이 없다는 점이 가장 중요한 출제 포인트입니다.'
+      }
+    ]
+  },
+  {
+    id: 'course-third-3',
+    moduleCode: '제3보험 03',
+    duration: '20분',
+    category: 'third',
+    categoryLabel: '생·손보 취급 차이 및 치매보험',
+    title: '손해보험사 질병사망 제한(80세·2억) 및 치매보험 CDR 척도',
+    subtitle: '업권별 사망담보 설계 기준과 임상치매척도(CDR 1·2·3점) 및 1년 면책기간',
+    scenes: [
+      {
+        sceneNumber: 1,
+        timeCode: '00:00 - 10:00',
+        chapterTitle: '제1절. 생보사와 손보사의 제3보험 취급 차이',
+        mainKeyword: '손해보험사의 질병사망은 특약으로만 80세 만기·2억원 이내로 제한된다',
+        subHeadline: '일반사망은 생명보험사만 취급할 수 있으며 손해보험사는 상해사망이 중심입니다.',
+        visualCards: [
+          {
+            tag: '생명보험사 사망 담보',
+            title: '일반사망 주계약 무제한 설계',
+            highlight: '종신 만기 · 가입한도 제한 없음',
+            point: '질병·재해 불문 모든 사망을 보장하는 일반사망을 주계약으로 종신까지 설계 가능'
+          },
+          {
+            tag: '손해보험사 질병사망 제한',
+            title: '질병사망은 특약으로만 부가 가능',
+            highlight: '80세 만기 이하 · 2억원 한도 이내',
+            point: '손해보험사는 일반사망 취급 불가하며 질병사망도 80세 만기·개인당 2억원 이내로 제한됨'
+          }
+        ],
+        memoryFormula: '핵심 업권 기준: 손해보험사 질병사망 = 주계약 불가, 특약으로만 만기 80세 이하 · 개인당 2억원 이내 제한',
+        avatarScript: '전체 커리큘럼의 마지막 강의인 제3보험 3강입니다. 생명보험사는 일반사망을 주계약으로 종신까지 무제한 설계할 수 있지만, 손해보험사는 일반사망을 취급할 수 없고 질병사망도 특약으로만 넣을 수 있습니다. 또한 손해보험사의 질병사망 특약은 만기 80세 이하, 개인당 2억 원 이내로만 가입할 수 있습니다.'
+      },
+      {
+        sceneNumber: 2,
+        timeCode: '10:00 - 20:00',
+        chapterTitle: '제2절. 치매간병보험 CDR 척도와 면책기간',
+        mainKeyword: '임상치매척도 CDR 1점은 경도, 2점은 중등도, 3점 이상은 중증 치매',
+        subHeadline: '치매보장 개시일은 역선택 방지를 위해 계약일로부터 통상 1년 후입니다.',
+        visualCards: [
+          {
+            tag: '임상치매척도 (CDR 판정)',
+            title: '1점 경도 / 2점 중등도 / 3점 중증',
+            highlight: '전문의 진단 + 뇌영상검사 기초',
+            point: '신경과 또는 정신건강의학과 전문의가 CDR 검사 및 뇌 CT·MRI 결과를 바탕으로 판정'
+          },
+          {
+            tag: '치매보장 면책기간',
+            title: '계약일로부터 통상 1년 적용',
+            highlight: '태아보험 보장개시는 출생 시점',
+            point: '치매는 서서히 진행되는 질환이므로 암보험(90일)보다 긴 1년의 면책기간을 설정함'
+          }
+        ],
+        memoryFormula: '핵심 약관 기준: 치매 CDR 척도는 1점(경도)·2점(중등도)·3점(중증) / 치매보장 면책기간은 계약일로부터 1년',
+        avatarScript: '마지막 파트는 치매보험입니다. 치매의 중증도를 나타내는 임상치매척도 CDR 점수는 1점이 경도 치매, 2점이 중등도 치매, 3점 이상이 중증 치매입니다. 또한 치매보험의 면책기간은 계약일로부터 1년입니다. 이상으로 13강 전체 이론 강의를 마칩니다. 수고 많으셨습니다.'
+      }
+    ]
+  }
+];
+const ACADEMY_QUESTIONS = [
+  {
+    id: 101,
+    category: 'life',
+    subject: '보험업법 및 모집질서',
+    question: '보험설계사의 법적 권한 및 모집 준수사항에 대한 설명으로 옳지 않은 것은?',
+    options: [
+      '보험설계사는 보험계약 체결을 중개하는 자이므로 고지수령권과 계약체결 대리권이 없다.',
+      '기존 계약 소멸 전후 6개월 이내에 새로운 계약을 청약하게 할 때는 중요사항 비교안내가 필수이다.',
+      '보험설계사에게 구두로 과거 병력을 알린 경우에도 상법상 적법하게 고지의무를 이행한 것으로 인정된다.',
+      '특별이익 제공 한도는 연간 납입보험료의 10%와 3만원 중 적은 금액 이내이다.'
+    ],
+    correctAnswer: 2,
+    explanation: '보험설계사는 단순 중개인이므로 고지수령권이 없습니다. 따라서 설계사에게 구두로 알린 것은 효력이 없으며 청약서 질문표에 서면으로 기재해야 합니다.'
+  },
+  {
+    id: 102,
+    category: 'life',
+    subject: '생명보험 수리 및 약관',
+    question: '생명보험 보험료 산출 3이원방식과 계약 전 알릴 의무(고지의무)에 대한 설명으로 가장 올바른 것은?',
+    options: [
+      '예정이율이 인상되면 고객이 납입해야 할 영업보험료도 비례하여 인상된다.',
+      '보험회사는 고지의무 위반 사실을 안 날로부터 1개월 내에, 계약체결일로부터 3년 내에 계약을 해지할 수 있다.',
+      '고지의무 위반 사실과 보험사고 발생 사이에 인과관계가 없더라도 보험금은 절대 지급되지 않는다.',
+      '변액보험은 실적배당형 상품이므로 최저사망보험금 보증 부분도 예금자보호법이 적용되지 않는다.'
+    ],
+    correctAnswer: 1,
+    explanation: '예정이율은 유일하게 보험료와 반비례(예정이율↑ = 보험료↓)합니다. 인과관계가 없으면 보험금은 지급해야 하며, 변액보험의 최저보증 부분은 5천만원 한도로 예금자보호가 적용됩니다.'
+  },
+  {
+    id: 201,
+    category: 'property',
+    subject: '손해보험 원리 및 계산',
+    question: '보험가액 1억원인 건물에 보험가입금액 6천만원으로 화재보험(일반물건)을 가입한 후 화재로 2천만원의 손해가 발생했을 때 지급될 보험금은?',
+    options: [
+      '2,000만원 전액 지급',
+      '1,600만원 지급',
+      '1,200만원 지급 (일부보험 비례보상)',
+      '1,000만원 지급'
+    ],
+    correctAnswer: 2,
+    explanation: '보험가액(1억)보다 가입금액(6천만)이 작은 일부보험(60%)이므로 손해액 2,000만원의 60%인 1,200만원을 비례보상합니다.'
+  },
+  {
+    id: 202,
+    category: 'property',
+    subject: '자동차·보증·해상보험',
+    question: '손해보험 각 상품별 핵심 법리에 대한 설명으로 틀린 것은?',
+    options: [
+      '자동차손해배상 보장법상 정부보장사업은 뺑소니·무보험차 사고로 인한 대인 피해만 보상하고 대물 피해는 보상하지 않는다.',
+      '보증보험에서는 일반 손해보험과 달리 보험계약자(채무자)의 고의로 인한 사고도 피보험자(채권자)에게 보상한 후 계약자에게 구상권을 행사한다.',
+      '해상보험의 위부(Abandonment)는 현실전손, 추정전손, 분손 모든 경우에 피보험자가 자유롭게 행사할 수 있다.',
+      '주택화재보험에서는 가스 폭발·파열 손해를 특약 가입 없이 기본계약에서 보상한다.'
+    ],
+    correctAnswer: 2,
+    explanation: '해상보험의 위부(Abandonment)는 오직 추정전손에서만 행사할 수 있으며 현실전손이나 분손에서는 행사할 수 없습니다.'
+  },
+  {
+    id: 301,
+    category: 'third',
+    subject: '제3보험 및 4세대 실손',
+    question: '제3보험 및 4세대 실손의료보험에 대한 설명으로 옳은 것은?',
+    options: [
+      '4세대 실손의료보험에서 비급여 MRI/MRA 특약은 연간 300만원 금액 한도만 있고 별도의 횟수 제한은 없다.',
+      '손해보험회사도 제3보험에서 질병사망을 주계약으로 하여 종신만기 무제한 금액으로 설계할 수 있다.',
+      '암보험의 90일 면책기간은 만 15세 미만 어린이와 갑상선암·제자리암에도 예외 없이 동일하게 적용된다.',
+      '상해보험에서 5년 이상의 한시적 장해는 영구장해가 아니므로 후유장해보험금이 전혀 지급되지 않는다.'
+    ],
+    correctAnswer: 0,
+    explanation: '4세대 실손 3대 비급여 중 비급여 MRI/MRA는 연 300만원 한도만 있고 횟수 제한이 없습니다. 손보사 질병사망은 특약(80세 만기, 2억 한도)으로만 가능합니다.'
+  }
+];
+
+/* ── 영속 상태 (개선: 원본은 새로고침 시 소멸 → localStorage 보존) ── */
+const STORE_KEY = 'n-academy-state-v1';
+const state = {
+  loggedIn: true, userName: '채우혁 단장',
+  activeTab: 'lect', category: 'all', courseId: ACADEMY_COURSES[0].id,
+  sceneIdx: 0, completed: [], isPlaying: false, muted: false, speed: 1.0, sentIdx: 0,
+  examCategory: 'all', answers: {}, submitted: false,
+  history: [
+    { date: '2026.10.14', cat: '생명보험 실전 모의고사 1회', score: 85, passed: true },
+    { date: '2026.10.12', cat: '손해보험 핵심 기출 1회', score: 80, passed: true }
+  ],
+  schedules: [
+    { id: 1, type: '생명보험협회 자격시험 (수도권)', date: '2026.10.20', time: '10:00', loc: '서울/고양 고사장', applied: true },
+    { id: 2, type: '손해보험협회 자격시험 (수도권)', date: '2026.10.22', time: '14:00', loc: '상설 시험장', applied: false },
+    { id: 3, type: '제3보험 통합 자격시험', date: '2026.10.25', time: '10:00', loc: '협회 고사장', applied: false }
+  ]
+};
+function saveState() {
+  try {
+    localStorage.setItem(STORE_KEY, JSON.stringify({
+      completed: state.completed, history: state.history,
+      schedules: state.schedules, courseId: state.courseId, speed: state.speed
+    }));
+  } catch (e) { /* file:// 제한 등 — 무시 */ }
+}
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (!raw) return;
+    const s = JSON.parse(raw);
+    if (Array.isArray(s.completed)) state.completed = s.completed;
+    if (Array.isArray(s.history)) state.history = s.history;
+    if (Array.isArray(s.schedules)) state.schedules = s.schedules;
+    if (typeof s.courseId === 'string' && ACADEMY_COURSES.some(c => c.id === s.courseId)) state.courseId = s.courseId;
+    if (typeof s.speed === 'number') state.speed = s.speed;
+  } catch (e) { /* 손상 시 무시 */ }
+}
+
+const CATS = { all: '전체', life: '생보', property: '손보', third: '제3' };
+const CAT_LABEL = { life: '생명보험', property: '손해보험', third: '제3보험' };
+const $ = (sel) => document.querySelector(sel);
+let toastTimer = null;
+function toast(msg) {
+  const el = $('#toast');
+  el.textContent = msg; el.style.display = 'block';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.style.display = 'none'; }, 3000);
+}
+function esc(s) {
+  return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+}
+
+/* ── 음성 강의 엔진 (Web Speech API + 폴백 타이머) ── */
+let speechTimer = null, speechSafety = null;
+const synthSupported = typeof window !== 'undefined' && 'speechSynthesis' in window;
+function cancelSpeech() {
+  if (synthSupported) window.speechSynthesis.cancel();
+  clearTimeout(speechTimer); clearTimeout(speechSafety);
+}
+function courseById(id) { return ACADEMY_COURSES.find(c => c.id === id) || ACADEMY_COURSES[0]; }
+function sentencesOf(scene) {
+  return scene.avatarScript.split(/(?<=[.?!])\s+/).map(s => s.trim()).filter(Boolean);
+}
+function currentCourse() { return courseById(state.courseId); }
+function currentScene() { return currentCourse().scenes[state.sceneIdx] || currentCourse().scenes[0]; }
+
+function advanceSentence() {
+  const sents = sentencesOf(currentScene());
+  if (state.sentIdx < sents.length - 1) {
+    state.sentIdx++;
+    renderTeleprompter(); renderPresenter(); speakCurrent();
+    return;
+  }
+  // 파트 자동 이동 → 마지막이면 수강 완료
+  const course = currentCourse();
+  if (state.sceneIdx < course.scenes.length - 1) {
+    state.sceneIdx++; state.sentIdx = 0;
+    renderSlide(); renderTeleprompter(); renderPresenter(); speakCurrent();
+  } else {
+    state.isPlaying = false;
+    if (!state.completed.includes(course.id)) state.completed.push(course.id);
+    saveState();
+    toast(course.moduleCode + ' 수강이 완료되었습니다.');
+    renderAll();
+  }
+}
+function speakCurrent() {
+  const sents = sentencesOf(currentScene());
+  const text = sents[state.sentIdx] || '';
+  if (!text || !state.isPlaying) return;
+  if (!state.muted && synthSupported) {
+    try {
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = 'ko-KR'; u.pitch = 0.92; u.rate = state.speed;
+      const voices = window.speechSynthesis.getVoices();
+      const kor = voices.filter(v => v.lang.includes('ko') || v.lang.includes('KR'));
+      const pick = kor.find(v => /InJoon|Minsu|Male|Online|Natural/i.test(v.name)) || kor[0];
+      if (pick) u.voice = pick;
+      let finished = false;
+      const done = () => {
+        if (finished) return;
+        finished = true;
+        speechTimer = setTimeout(advanceSentence, 350);
+      };
+      u.onend = done;
+      u.onerror = () => {
+        if (!finished) { finished = true; speechTimer = setTimeout(advanceSentence, Math.max(2500, text.length * 140)); }
+      };
+      window.speechSynthesis.speak(u);
+      speechSafety = setTimeout(done, Math.max(4000, (text.length * 190) / state.speed));
+    } catch (e) {
+      speechTimer = setTimeout(advanceSentence, Math.max(3000, text.length * 150));
+    }
+  } else {
+    speechTimer = setTimeout(advanceSentence, Math.max(3000, (text.length * 140) / state.speed));
+  }
+}
+function togglePlay() {
+  const next = !state.isPlaying;
+  if (!next) cancelSpeech();
+  state.isPlaying = next;
+  if (next) speakCurrent();
+  renderPlayControls(); renderPresenter();
+}
+function selectScene(idx) {
+  cancelSpeech(); state.isPlaying = false;
+  state.sceneIdx = idx; state.sentIdx = 0;
+  renderSlide(); renderTeleprompter(); renderPresenter(); renderPlayControls();
+}
+function selectCourse(id) {
+  cancelSpeech(); state.isPlaying = false;
+  state.courseId = id; state.sceneIdx = 0; state.sentIdx = 0;
+  saveState();
+  renderCurrList(); renderSlide(); renderTeleprompter(); renderPresenter(); renderPlayControls(); renderProgress();
+}
+
+/* ── 렌더링 ── */
+function renderProgress() {
+  $('#progress-line').textContent =
+    '수강 진도율 ' + Math.round((state.completed.length / ACADEMY_COURSES.length) * 100) + '% (' + state.completed.length + '/13강)';
+}
+function renderCurrList() {
+  const list = state.category === 'all' ? ACADEMY_COURSES : ACADEMY_COURSES.filter(c => c.category === state.category);
+  $('#curr-list').innerHTML = list.map(c => {
+    const done = state.completed.includes(c.id);
+    return '<button class="course-row' + (c.id === state.courseId ? ' on' : '') + '" data-course="' + c.id + '">' +
+      '<div><div><span class="code">' + esc(c.moduleCode) + '</span>' +
+      '<span style="font-size:11px;color:' + (c.id === state.courseId ? '#94a3b8' : 'var(--ink3)') + '"> · ' + esc(c.duration) + '</span></div>' +
+      '<div class="cat">' + esc(c.categoryLabel) + '</div></div>' +
+      (done ? '<span class="done">✔</span>' : '') + '</button>';
+  }).join('');
+  document.querySelectorAll('[data-cat-course]').forEach(b => b.classList.toggle('on', b.dataset.catCourse === state.category));
+}
+function renderSlide() {
+  const c = currentCourse(), s = currentScene();
+  $('#lect-sub').innerHTML = '<span class="pill tag-lab">' + esc(c.moduleCode) + '</span><span>' + esc(c.subtitle) + '</span>';
+  $('#lect-title').textContent = c.title;
+  $('#parts').innerHTML = c.scenes.map((sc, i) =>
+    '<button class="' + (i === state.sceneIdx ? 'on' : '') + '" data-part="' + i + '">파트 ' + sc.sceneNumber + '</button>').join('');
+  $('#slide-chap').textContent = s.chapterTitle;
+  $('#slide-time').textContent = '강의 구간 ' + s.timeCode;
+  $('#slide-keyword').textContent = s.mainKeyword;
+  $('#slide-sub').textContent = s.subHeadline;
+  $('#slide-cards').innerHTML = s.visualCards.map(card =>
+    '<div class="vcard"><div><div class="tag">' + esc(card.tag) + '</div>' +
+    '<div class="ttl">' + esc(card.title) + '</div>' +
+    '<div class="hi">' + esc(card.highlight) + '</div></div>' +
+    '<div class="pt">' + esc(card.point) + '</div></div>').join('');
+  $('#slide-formula').textContent = s.memoryFormula;
+}
+function renderTeleprompter() {
+  const sents = sentencesOf(currentScene());
+  $('#tele-body').innerHTML = sents.map((t, i) =>
+    '<span class="s' + (i === state.sentIdx ? ' cur' : '') + '" data-sent="' + i + '">' + esc(t) + '</span>').join(' ');
+}
+function renderPresenter() {
+  $('#state-chip').textContent = state.isPlaying ? '음성 브리핑 중' : '일시정지';
+  $('#state-chip').classList.toggle('speaking', state.isPlaying);
+  $('#avatar-ring').classList.toggle('speaking', state.isPlaying && !state.muted);
+  const bars = document.querySelectorAll('.eq span');
+  bars.forEach((b, i) => {
+    const hot = state.isPlaying && !state.muted;
+    b.classList.toggle('hot', hot);
+    b.style.height = hot ? (6 + ((i * 11 + state.sentIdx * 7) % 18)) + 'px' : '4px';
+  });
+  $('#pres-hint').textContent = state.isPlaying
+    ? '문장 브리핑 진행 중 (' + (state.sentIdx + 1) + ' / ' + Math.max(1, sentencesOf(currentScene()).length) + ')'
+    : '하단 재생 버튼을 누르면 음성 강의가 시작됩니다';
+  const mb = $('#mute-btn');
+  mb.className = 'mute-btn' + (state.muted ? ' muted' : '');
+  mb.textContent = state.muted ? '🔇 음소거 해제' : '🔊 음성 켜짐';
+  document.querySelectorAll('[data-speed]').forEach(b =>
+    b.classList.toggle('on', Math.abs(state.speed - parseFloat(b.dataset.speed)) < 0.03));
+}
+function renderPlayControls() {
+  $('#play-btn').className = 'play-btn ' + (state.isPlaying ? 'danger' : 'accent');
+  $('#play-btn').innerHTML = state.isPlaying ? '⏸ <span>강의 일시정지</span>' : '▶ <span>음성 강의 재생</span>';
+}
+function renderExam() {
+  const qs = state.examCategory === 'all' ? ACADEMY_QUESTIONS : ACADEMY_QUESTIONS.filter(q => q.category === state.examCategory);
+  $('#exam-catbar').innerHTML =
+    '<button data-xcat="all" class="' + (state.examCategory === 'all' ? 'on' : '') + '">전체 문항 (' + qs.length + '문항)</button>' +
+    ['life', 'property', 'third'].map(k =>
+      '<button data-xcat="' + k + '" class="' + (state.examCategory === k ? 'on' : '') + '">' + CAT_LABEL[k] + '</button>').join('');
+  $('#exam-list').innerHTML = qs.map((q, idx) => {
+    const sel = state.answers[q.id];
+    const correct = sel === q.correctAnswer;
+    return '<div class="panel q"><div class="head"><span class="mini"><b>제 ' + (idx + 1) + ' 문항</b> · ' + esc(q.subject) + '</span>' +
+      (state.submitted ? (correct ? '<span class="pill tag-ok">✔ 정답</span>' : '<span class="pill tag-bad">✘ 오답</span>') : '') + '</div>' +
+      '<h3>' + esc(q.question) + '</h3>' +
+      q.options.map((opt, oi) => {
+        let cls = 'opt';
+        if (sel === oi) cls += ' sel';
+        if (state.submitted) {
+          if (q.correctAnswer === oi) cls = 'opt ans';
+          else if (sel === oi) cls = 'opt wrong';
+        }
+        return '<button class="' + cls + '" data-q="' + q.id + '" data-o="' + oi + '"' + (state.submitted ? ' disabled' : '') + '>' +
+          '<span class="no">' + (oi + 1) + '</span><span>' + esc(opt) + '</span></button>';
+      }).join('') +
+      (state.submitted ? '<div class="expl"><div class="lab">해설 (정답: ' + (q.correctAnswer + 1) + '번)</div><p>' + esc(q.explanation) + '</p></div>' : '') +
+      '</div>';
+  }).join('');
+  $('#exam-actions').innerHTML = state.submitted
+    ? '<button class="btn ghost" data-act="reset-exam">답안 초기화 및 재응시</button>'
+    : '<button class="btn" data-act="submit-exam">답안 제출 및 채점하기</button>';
+}
+function renderSchedule() {
+  $('#schedule-list').innerHTML = state.schedules.map(s =>
+    '<div class="sch-row"><div><div class="tt">' + esc(s.type) + '</div>' +
+    '<div class="dd">시험일시: ' + esc(s.date) + ' ' + esc(s.time) + ' · 장소: ' + esc(s.loc) + '</div></div>' +
+    '<button class="btn' + (s.applied ? ' ghost' : '') + '" data-applied="' + s.id + '">' +
+    (s.applied ? '접수 완료 (취소)' : '응시 접수') + '</button></div>').join('');
+}
+function renderResults() {
+  $('#results-panel').innerHTML = '<h3>모의고사 응시 및 성취도 이력</h3><div>' +
+    (state.history.length ? state.history.map(h =>
+      '<div class="res-row"><div><div class="cat">' + esc(h.cat) + '</div><div class="dt">' + esc(h.date) + '</div></div>' +
+      '<div style="display:flex;gap:12px;align-items:center"><span class="sc">' + h.score + '점</span>' +
+      '<span class="pill ' + (h.passed ? 'tag-ok' : 'tag-bad') + '">' + (h.passed ? '합격권' : '재응시 권장') + '</span></div></div>').join('')
+    : '<div class="empty">아직 응시 이력이 없습니다.</div>') + '</div>';
+}
+function renderAll() {
+  renderProgress(); renderCurrList(); renderSlide(); renderTeleprompter();
+  renderPresenter(); renderPlayControls(); renderExam(); renderSchedule(); renderResults();
+  document.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('on', b.dataset.tab === state.activeTab));
+  document.querySelectorAll('.tab-pane').forEach(p => { p.style.display = p.dataset.pane === state.activeTab ? '' : 'none'; });
+}
+
+/* ── 이벤트 ── */
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('[data-tab],[data-cat-course],[data-course],[data-part],[data-sent],[data-speed],[data-xcat],[data-q],[data-applied],[data-act]');
+  if (!t) return;
+  if (t.dataset.tab) {
+    state.activeTab = t.dataset.tab;
+    renderAll(); return;
+  }
+  if (t.dataset.course) { selectCourse(t.dataset.course); return; }
+  if (t.dataset.catCourse) {
+    state.category = t.dataset.catCourse;
+    const first = state.category === 'all' ? ACADEMY_COURSES[0] : ACADEMY_COURSES.find(c => c.category === state.category);
+    selectCourse(first.id); return;
+  }
+  if (t.dataset.part !== undefined && t.dataset.part !== '') { selectScene(parseInt(t.dataset.part, 10)); return; }
+  if (t.dataset.sent !== undefined && t.dataset.sent !== '') {
+    state.sentIdx = parseInt(t.dataset.sent, 10);
+    if (!state.isPlaying) { state.isPlaying = true; speakCurrent(); } else { cancelSpeech(); speakCurrent(); }
+    renderTeleprompter(); renderPresenter(); renderPlayControls(); return;
+  }
+  if (t.dataset.speed) {
+    state.speed = parseFloat(t.dataset.speed);
+    saveState(); renderPresenter(); return;
+  }
+  if (t.dataset.xcat) {
+    state.examCategory = t.dataset.xcat;
+    state.answers = {}; state.submitted = false;
+    renderExam(); return;
+  }
+  if (t.dataset.q && !state.submitted) {
+    state.answers[t.dataset.q] = parseInt(t.dataset.o, 10);
+    renderExam(); return;
+  }
+  if (t.dataset.applied) {
+    const id = parseInt(t.dataset.applied, 10);
+    state.schedules = state.schedules.map(s => s.id === id ? { ...s, applied: !s.applied } : s);
+    saveState(); renderSchedule(); toast('시험 접수 상태가 변경되었습니다.'); return;
+  }
+  if (t.dataset.act === 'submit-exam') {
+    const qs = state.examCategory === 'all' ? ACADEMY_QUESTIONS : ACADEMY_QUESTIONS.filter(q => q.category === state.examCategory);
+    if (Object.keys(state.answers).length < qs.length) { toast('모든 문항의 답안을 선택해 주십시오.'); return; }
+    state.submitted = true;
+    let correct = 0;
+    qs.forEach(q => { if (state.answers[q.id] === q.correctAnswer) correct++; });
+    const score = Math.round((correct / qs.length) * 100);
+    state.history.unshift({ date: '2026.10.15', cat: '실전 기출 모의고사', score, passed: score >= 60 });
+    saveState(); renderExam(); renderResults(); toast('채점이 완료되었습니다. 취득 점수: ' + score + '점');
+    return;
+  }
+  if (t.dataset.act === 'reset-exam') {
+    state.answers = {}; state.submitted = false;
+    renderExam(); return;
+  }
+});
+
+$('#play-btn').addEventListener('click', togglePlay);
+$('#rewind-btn').addEventListener('click', () => {
+  cancelSpeech(); state.sentIdx = 0; state.isPlaying = true;
+  renderTeleprompter(); renderPresenter(); renderPlayControls(); speakCurrent();
+});
+$('#prev-part').addEventListener('click', () => selectScene(Math.max(0, state.sceneIdx - 1)));
+$('#next-part').addEventListener('click', () => selectScene(Math.min(currentCourse().scenes.length - 1, state.sceneIdx + 1)));
+$('#mute-btn').addEventListener('click', () => {
+  state.muted = !state.muted;
+  if (state.isPlaying) { cancelSpeech(); speakCurrent(); }
+  renderPresenter();
+});
+$('#copy-btn').addEventListener('click', () => {
+  const c = currentCourse();
+  const body = c.scenes.map(s => '[' + s.timeCode + '] ' + s.chapterTitle + '\n핵심요약: ' + s.mainKeyword + '\n대본: ' + s.avatarScript).join('\n\n');
+  const text = '# ' + c.moduleCode + ' ' + c.title + '\n\n' + body;
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text);
+  toast('현재 강의 전체 대본이 클립보드에 복사되었습니다.');
+});
+$('#exam-link-btn').addEventListener('click', () => {
+  state.isPlaying = false; cancelSpeech();
+  state.examCategory = currentCourse().category;
+  state.answers = {}; state.submitted = false;
+  state.activeTab = 'exam'; renderAll();
+});
+$('#logout-btn').addEventListener('click', () => {
+  cancelSpeech(); state.isPlaying = false;
+  state.loggedIn = false; renderAuth();
+});
+$('#kakao-btn').addEventListener('click', () => { state.loggedIn = true; renderAuth(); });
+
+function renderAuth() {
+  if (state.loggedIn) {
+    $('#login-view').style.display = 'none';
+    $('#app-view').style.display = '';
+    renderAll();
+  } else {
+    $('#app-view').style.display = 'none';
+    $('#login-view').style.display = 'flex';
+  }
+}
+
+/* 초기화 */
+loadState();
+if (synthSupported) window.speechSynthesis.getVoices();
+window.addEventListener('beforeunload', () => cancelSpeech());
+renderAuth();
+</script>
+</body>
+</html>
