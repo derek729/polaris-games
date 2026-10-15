@@ -299,6 +299,24 @@ main { max-width: 1200px; width: 100%; margin: 0 auto; padding: 22px 20px 60px; 
 .res-row .dt { font-size: 11px; color: var(--ink3); margin-top: 3px; }
 .res-row .sc { font-size: 13px; font-weight: 800; }
 .empty { padding: 30px; text-align: center; color: var(--ink3); font-size: 12.5px; }
+/* 시험 정보 셀 · 핵심요약 */
+.info-cell { background: var(--chip); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 3px; }
+.info-cell b { font-size: 11px; color: var(--ink2); }
+.info-cell span { font-size: 13px; font-weight: 800; }
+.sum-card { padding: 16px 18px; margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+.sum-card .head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.sum-card .formula-line {
+  background: var(--dark); color: #fff; border-radius: 8px; padding: 11px 14px;
+  font-size: 12.5px; font-weight: 700; line-height: 1.7;
+}
+.tele .body.scale-s { font-size: 11.5px; }
+.tele .body.scale-l { font-size: 15.5px; }
+.subscale { display: flex; gap: 3px; }
+.subscale button {
+  width: 26px; height: 24px; border-radius: 6px; border: 1px solid var(--line);
+  font-size: 10.5px; font-weight: 800; color: var(--ink2); background: #fff;
+}
+.subscale button.on { background: var(--dark); color: #fff; border-color: var(--dark); }
 </style>
 </head>
 
@@ -328,8 +346,9 @@ main { max-width: 1200px; width: 100%; margin: 0 auto; padding: 22px 20px 60px; 
       </div>
       <nav>
         <button data-tab="lect" class="on">이론 강의실 (13강)</button>
+        <button data-tab="summary">핵심요약 (벼락치기)</button>
         <button data-tab="exam">기출 모의고사 (27문항)</button>
-        <button data-tab="schedule">시험 일정·접수</button>
+        <button data-tab="schedule">시험 일정·정보</button>
         <button data-tab="results">수강·합격 현황</button>
       </nav>
       <div class="huser">
@@ -491,7 +510,14 @@ main { max-width: 1200px; width: 100%; margin: 0 auto; padding: 22px 20px 60px; 
             <div class="frame">
               <div class="head">
                 <span style="font-size:12px;font-weight:800">강의 대본 및 실시간 음성 자막</span>
-                <span class="mini">문장을 클릭하면 해당 위치부터 읽어줍니다</span>
+                <span style="display:flex;gap:10px;align-items:center">
+                  <span class="subscale">
+                    <button data-subscale="0" title="자막 작게">가-</button>
+                    <button data-subscale="1" class="on" title="자막 기본">가</button>
+                    <button data-subscale="2" title="자막 크게">가+</button>
+                  </span>
+                  <span class="mini">문장 클릭 시 해당 위치부터 읽어줍니다</span>
+                </span>
               </div>
               <div class="body" id="tele-body"></div>
             </div>
@@ -512,7 +538,16 @@ main { max-width: 1200px; width: 100%; margin: 0 auto; padding: 22px 20px 60px; 
       </div>
     </div>
 
-    <!-- TAB 2: 모의고사 -->
+    <!-- TAB 2: 핵심요약 (유튜브 '핵심요약 몰아보기·벼락치기' 수요 반영) -->
+    <div class="tab-pane" data-pane="summary" style="display:none">
+      <div class="panel exam-top">
+        <div class="exam-cats" id="sum-catbar"></div>
+        <span class="mini">13강 암기 공식 전체 — 시험 직전 빠르게 훑기용</span>
+      </div>
+      <div id="summary-list"></div>
+    </div>
+
+    <!-- TAB 3: 모의고사 -->
     <div class="tab-pane" data-pane="exam" style="display:none">
       <div class="panel exam-top">
         <div class="exam-cats" id="exam-catbar"></div>
@@ -522,8 +557,18 @@ main { max-width: 1200px; width: 100%; margin: 0 auto; padding: 22px 20px 60px; 
       <div class="exam-submit" id="exam-actions-bottom"></div>
     </div>
 
-    <!-- TAB 3: 시험 일정 -->
+    <!-- TAB 4: 시험 일정·정보 -->
     <div class="tab-pane" data-pane="schedule" style="display:none">
+      <div class="panel" style="padding:18px 20px;margin-bottom:14px;border-left:4px solid var(--accent)">
+        <div style="font-weight:800;font-size:14px;margin-bottom:8px">📋 자격시험 핵심 정보 (협회 공시 기준)</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">
+          <div class="info-cell"><b>합격 기준</b><span>100점 만점 · 60점 이상</span></div>
+          <div class="info-cell"><b>시험 시간</b><span>차수당 50분 (통합 70분)</span></div>
+          <div class="info-cell"><b>문항 구성</b><span>과목당 10문항</span></div>
+          <div class="info-cell"><b>합격 발표</b><span>시험 당일 오후 8시 전후</span></div>
+        </div>
+        <p class="mini" style="margin-top:10px">※ 실전 감각: 20문항 50분이면 문항당 2분 30초 — 모의고사도 시간 재고 풀면 실전 도움이 됩니다. 합격 후 협회 등록을 해야 설계사 활동이 가능합니다.</p>
+      </div>
       <div class="panel">
         <div class="sch-head">생명보험 및 손해보험 협회 자격시험 일정</div>
         <div id="schedule-list"></div>
@@ -1723,6 +1768,7 @@ const state = {
   activeTab: 'lect', category: 'all', courseId: ACADEMY_COURSES[0].id,
   sceneIdx: 0, completed: [], isPlaying: false, muted: false, speed: 1.0, sentIdx: 0,
   examCategory: 'all', answers: {}, submitted: false, voiceName: '', wrongIds: [],
+  progress: {}, subScale: 1,
   history: [
     { date: '2026.10.14', cat: '생명보험 실전 모의고사 1회', score: 85, passed: true },
     { date: '2026.10.12', cat: '손해보험 핵심 기출 1회', score: 80, passed: true }
@@ -1738,7 +1784,8 @@ function saveState() {
     localStorage.setItem(STORE_KEY, JSON.stringify({
       completed: state.completed, history: state.history,
       schedules: state.schedules, courseId: state.courseId, speed: state.speed,
-      voiceName: state.voiceName, wrongIds: state.wrongIds
+      voiceName: state.voiceName, wrongIds: state.wrongIds,
+      progress: state.progress, subScale: state.subScale
     }));
   } catch (e) { /* file:// 제한 등 — 무시 */ }
 }
@@ -1754,6 +1801,8 @@ function loadState() {
     if (typeof s.speed === 'number') state.speed = s.speed;
     if (typeof s.voiceName === 'string') state.voiceName = s.voiceName;
     if (Array.isArray(s.wrongIds)) state.wrongIds = s.wrongIds;
+    if (s.progress && typeof s.progress === 'object') state.progress = s.progress;
+    if (typeof s.subScale === 'number') state.subScale = s.subScale;
   } catch (e) { /* 손상 시 무시 */ }
 }
 
@@ -1810,21 +1859,30 @@ function advanceSentence() {
   const sents = sentencesOf(currentScene());
   if (state.sentIdx < sents.length - 1) {
     state.sentIdx++;
-    renderTeleprompter(); renderPresenter(); speakCurrent();
+    saveProgress(); renderTeleprompter(); renderPresenter(); speakCurrent();
     return;
   }
   // 파트 자동 이동 → 마지막이면 수강 완료
   const course = currentCourse();
   if (state.sceneIdx < course.scenes.length - 1) {
     state.sceneIdx++; state.sentIdx = 0;
-    renderSlide(); renderTeleprompter(); renderPresenter(); speakCurrent();
+    saveProgress(); renderSlide(); renderTeleprompter(); renderPresenter(); speakCurrent();
   } else {
     state.isPlaying = false;
     if (!state.completed.includes(course.id)) state.completed.push(course.id);
+    delete state.progress[course.id];  // 완강 — 이어보기 위치 제거
     saveState();
     toast(course.moduleCode + ' 수강이 완료되었습니다.');
     renderAll();
   }
+}
+/* 진도 저장·이어보기 — 마지막 파트·문장 위치 보관 (유튜브 이어보기 UX) */
+function saveProgress() {
+  const c = currentCourse();
+  if (state.completed.includes(c.id)) return;
+  if (state.sceneIdx === 0 && state.sentIdx === 0) return;
+  state.progress[c.id] = { sceneIdx: state.sceneIdx, sentIdx: state.sentIdx };
+  saveState();
 }
 function speakCurrent() {
   const sents = sentencesOf(currentScene());
@@ -1873,9 +1931,21 @@ function selectScene(idx) {
 }
 function selectCourse(id) {
   cancelSpeech(); state.isPlaying = false;
-  state.courseId = id; state.sceneIdx = 0; state.sentIdx = 0;
+  state.courseId = id;
+  // 진도 이어보기 — 저장된 파트·문장 위치 복원
+  const prog = state.progress[id];
+  const course = courseById(id);
+  let resumed = false;
+  if (prog && !state.completed.includes(id) &&
+      prog.sceneIdx < course.scenes.length && prog.sentIdx < sentencesOf(course.scenes[prog.sceneIdx]).length) {
+    state.sceneIdx = prog.sceneIdx; state.sentIdx = prog.sentIdx;
+    resumed = true;
+  } else {
+    state.sceneIdx = 0; state.sentIdx = 0;
+  }
   saveState();
   renderCurrList(); renderSlide(); renderTeleprompter(); renderPresenter(); renderPlayControls(); renderProgress();
+  if (resumed) toast('이전 학습 위치에서 이어합니다 (파트 ' + (prog.sceneIdx + 1) + ' · 문장 ' + (prog.sentIdx + 1) + ')');
 }
 
 /* ── 렌더링 ── */
@@ -1887,10 +1957,12 @@ function renderCurrList() {
   const list = state.category === 'all' ? ACADEMY_COURSES : ACADEMY_COURSES.filter(c => c.category === state.category);
   $('#curr-list').innerHTML = list.map(c => {
     const done = state.completed.includes(c.id);
+    const resume = !done && state.progress[c.id];
     return '<button class="course-row' + (c.id === state.courseId ? ' on' : '') + '" data-course="' + c.id + '">' +
       '<div><div><span class="code">' + esc(c.moduleCode) + '</span>' +
       '<span style="font-size:11px;color:' + (c.id === state.courseId ? '#94a3b8' : 'var(--ink3)') + '"> · ' + esc(c.duration) + '</span></div>' +
-      '<div class="cat">' + esc(c.categoryLabel) + '</div></div>' +
+      '<div class="cat">' + esc(c.categoryLabel) + '</div>' +
+      (resume ? '<div style="font-size:10px;font-weight:800;color:#38bdf8;margin-top:3px">▶ 이어보기 · 파트 ' + (resume.sceneIdx + 1) + '</div>' : '') + '</div>' +
       (done ? '<span class="done">✔</span>' : '') + '</button>';
   }).join('');
   document.querySelectorAll('[data-cat-course]').forEach(b => b.classList.toggle('on', b.dataset.catCourse === state.category));
@@ -1970,6 +2042,19 @@ function renderExam() {
     ? '<button class="btn ghost" data-act="reset-exam">답안 초기화 및 재응시</button>'
     : '<button class="btn" data-act="submit-exam">답안 제출 및 채점하기</button>';
 }
+function renderSummary() {
+  const list = state.category === 'all' ? ACADEMY_COURSES : ACADEMY_COURSES.filter(c => c.category === state.category);
+  $('#sum-catbar').innerHTML =
+    '<button data-sumcat="all" class="' + (state.category === 'all' ? 'on' : '') + '">전체</button>' +
+    ['life', 'property', 'third'].map(k =>
+      '<button data-sumcat="' + k + '" class="' + (state.category === k ? 'on' : '') + '">' + CAT_LABEL[k] + '</button>').join('');
+  $('#summary-list').innerHTML = list.map(c =>
+    '<div class="panel sum-card"><div class="head"><div>' +
+    '<span class="pill tag-lab">' + esc(c.moduleCode) + '</span> <b style="font-size:13px">' + esc(c.title) + '</b></div>' +
+    (state.completed.includes(c.id) ? '<span class="pill tag-ok">수강 완료</span>' : '') + '</div>' +
+    c.scenes.map(s => '<div class="formula-line">' + esc(s.memoryFormula) + '</div>').join('') +
+    '</div>').join('');
+}
 function renderSchedule() {
   $('#schedule-list').innerHTML = state.schedules.map(s =>
     '<div class="sch-row"><div><div class="tt">' + esc(s.type) + '</div>' +
@@ -2001,9 +2086,19 @@ function renderResults() {
 }
 function renderAll() {
   renderProgress(); renderCurrList(); renderSlide(); renderTeleprompter();
-  renderPresenter(); renderPlayControls(); renderExam(); renderSchedule(); renderResults();
+  renderPresenter(); renderPlayControls(); renderExam(); renderSummary(); renderSchedule(); renderResults();
+  renderTeleScale();
   document.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('on', b.dataset.tab === state.activeTab));
   document.querySelectorAll('.tab-pane').forEach(p => { p.style.display = p.dataset.pane === state.activeTab ? '' : 'none'; });
+}
+/* 자막 크기 조절 — 텔레프롬프터 3단 */
+function renderTeleScale() {
+  const body = $('#tele-body');
+  body.classList.remove('scale-s', 'scale-l');
+  if (state.subScale === 0) body.classList.add('scale-s');
+  if (state.subScale === 2) body.classList.add('scale-l');
+  document.querySelectorAll('[data-subscale]').forEach(b =>
+    b.classList.toggle('on', parseInt(b.dataset.subscale, 10) === state.subScale));
 }
 
 /* ── 이벤트 ── */
@@ -2101,6 +2196,19 @@ $('#voice-select').addEventListener('change', (e) => {
   state.voiceName = e.target.value;
   saveState();
   toast('강사 보이스가 변경되었습니다.');
+});
+document.addEventListener('click', (e) => {
+  const sub = e.target.closest('[data-subscale]');
+  if (sub) {
+    state.subScale = parseInt(sub.dataset.subscale, 10);
+    saveState(); renderTeleScale(); return;
+  }
+  const sum = e.target.closest('[data-sumcat]');
+  if (sum) {
+    state.category = sum.dataset.sumcat;
+    renderSummary();
+    document.querySelectorAll('[data-cat-course]').forEach(b => b.classList.toggle('on', b.dataset.catCourse === state.category));
+  }
 });
 /* 한국어 보이스 목록 채우기 — 로드 시점이 늦은 브라우저 대비 재시도 */
 function populateVoices() {
