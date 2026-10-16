@@ -373,6 +373,21 @@ main { max-width: 1200px; width: 100%; margin: 0 auto; padding: 22px 20px 60px; 
   font-size: 10.5px; font-weight: 800; color: var(--ink2); background: #fff;
 }
 .subscale button.on { background: var(--navy); color: #fff; border-color: var(--navy); }
+/* 실전 모의고사 */
+.real-box {
+  background: linear-gradient(115deg, var(--gold-soft), #fffaf0);
+  border: 1px solid var(--gold-line); border-left: 4px solid var(--gold);
+  border-radius: 12px; padding: 15px 18px; margin-bottom: 14px;
+  display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;
+}
+.real-box .rb-title { font-size: 13.5px; font-weight: 800; color: #6f5810; }
+.btn.gold { background: linear-gradient(135deg, var(--gold), #b08e1e); color: var(--navy); }
+.btn.gold:hover { filter: brightness(1.05); }
+.exam-timer {
+  background: var(--navy); color: #fff; border-radius: 8px; padding: 7px 13px;
+  font-size: 13px; font-weight: 900; font-variant-numeric: tabular-nums; letter-spacing: .03em;
+}
+.exam-timer.urgent { background: var(--bad); animation: livePulse 1s ease-in-out infinite; }
 </style>
 </head>
 
@@ -622,10 +637,25 @@ main { max-width: 1200px; width: 100%; margin: 0 auto; padding: 22px 20px 60px; 
 
     <!-- TAB 3: 모의고사 -->
     <div class="tab-pane" data-pane="exam" style="display:none">
+      <!-- 실전 모의고사 — 협회 시험 형식 (과목별 10문항 · 50분 · 60점 합격) -->
+      <div class="real-box" id="real-box">
+        <div>
+          <div class="rb-title">🎓 실전 모의고사 — 협회 시험 형식 그대로</div>
+          <div class="mini" style="margin-top:3px">과목별 10문항씩 총 20문항 · 제한시간 50분 · 100점 만점 60점 합격 (문항당 5점)</div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn gold" data-real="life">생명보험 시험 (생10+제3 10)</button>
+          <button class="btn gold" data-real="property">손해보험 시험 (손10+제3 10)</button>
+        </div>
+      </div>
       <div class="panel exam-top">
         <div class="exam-cats" id="exam-catbar"></div>
-        <div id="exam-actions" style="display:flex;gap:8px"></div>
+        <div style="display:flex;gap:10px;align-items:center">
+          <span id="exam-timer" class="exam-timer" style="display:none"></span>
+          <div id="exam-actions" style="display:flex;gap:8px"></div>
+        </div>
       </div>
+      <div id="exam-breakdown"></div>
       <div id="exam-list"></div>
       <div class="exam-submit" id="exam-actions-bottom"></div>
     </div>
@@ -1831,8 +1861,136 @@ ACADEMY_QUESTIONS.push(
     ],
     correctAnswer: 1,
     explanation: '손보사는 일반사망 취급이 불가하며 질병사망도 특약으로만 80세 만기·2억원 한도입니다. 치매보험 면책기간은 통상 1년이고 CDR은 1점 경도·2점 중등도·3점 이상 중증입니다.'
+  },
+  {
+    id: 306, category: 'third', subject: '상해·후유장해',
+    question: '후유장해보험금 지급에 대한 설명으로 옳은 것은?',
+    options: [
+      '후유장해는 영구장해에만 지급되며 한시적 장해는 지급 대상이 아니다.',
+      '5년 이상 지속되는 한시적 장해도 해당 장해지급률의 20%를 지급한다.',
+      '한시적 장해는 지속 기간과 관계없이 100% 지급한다.',
+      '후유장해는 13개 신체부위 중 팔·다리만 인정된다.'
+    ],
+    correctAnswer: 1,
+    explanation: '후유장해는 13개 신체부위 전반을 대상으로 하며 영구장해가 원칙이지만, 5년 이상 지속되는 한시적 장해는 해당 장해지급률의 20%를 후유장해보험금으로 지급합니다.'
+  },
+  {
+    id: 307, category: 'third', subject: '상해 3요소',
+    question: '다음 중 상해보험의 급격성·우연성·외래성 3요소를 모두 충족하는 사고는?',
+    options: [
+      '음식을 먹다 유발된 급성 위염 수술',
+      '계단에서 넘어져 외과적 수술을 받은 경우 (자발적 골절 없음)',
+      '임신으로 인한 제왕절개 수술',
+      '스카이다이빙 강습 중 충격으로 인한 골절'
+    ],
+    correctAnswer: 1,
+    explanation: '계단 낙상으로 인한 외래적 수술은 3요소를 충족합니다. 질병 수술·제왕절개는 외래성이 결여되고, 스카이다이빙은 약관상 면책 사유입니다.'
+  },
+  {
+    id: 308, category: 'third', subject: '암보험 면책',
+    question: '암보험 가입 후 90일 이내 일반암 진단을 받았을 때의 처리로 옳은 것은?',
+    options: [
+      '보험금을 지급하고 계약은 유지된다.',
+      '계약이 무효가 되며 기납입보험료를 반환한다.',
+      '보험금의 50%만 지급한다.',
+      '90일 경과 후 자동적으로 보장이 시작된다.'
+    ],
+    correctAnswer: 1,
+    explanation: '역선택 방지를 위한 90일 면책기간 내 일반암 진단 시 계약은 무효가 되며 기납입보험료를 반환합니다. 단, 만 15세 미만과 4대 유사암은 면책 없이 첫날부터 보장합니다.'
+  },
+  {
+    id: 309, category: 'third', subject: '4세대 실손',
+    question: '4세대 실손의료보험의 3대 비급여 특약 한도로 옳은 것은?',
+    options: [
+      '도수치료 연 350만원·50회 / 비급여주사 연 250만원·50회 / 비급여 MRI 연 300만원·횟수 제한 없음',
+      '도수치료 연 300만원·무제한 / 비급여주사 연 200만원·30회 / 비급여 MRI 연 250만원·50회',
+      '도수치료 연 250만원·50회 / 비급여주사 연 350만원·무제한 / 비급여 MRI 연 300만원·30회',
+      '세 특약 모두 연 300만원·50회로 동일하다.'
+    ],
+    correctAnswer: 0,
+    explanation: '도수치료는 연 350만원(50회), 비급여주사는 연 250만원(50회) 제한이 있지만, 비급여 MRI/MRA는 연 300만원 금액 한도만 있고 횟수 제한이 없는 것이 핵심 출제 포인트입니다.'
+  },
+  {
+    id: 310, category: 'third', subject: '비급여 차등제',
+    question: '4세대 실손의료보험의 비급여 보험료 차등제에 대한 설명으로 옳은 것은?',
+    options: [
+      '직전 1년간 비급여 보험금 수령액에 따라 무사고 할인부터 최대 300% 할증까지 적용된다.',
+      '암·심장질환·장기요양 1~2등급 환자도 차등 할증이 그대로 적용된다.',
+      '차등제는 비급여가 아닌 급여 항목에만 적용된다.',
+      '무사고여도 보험료 할인은 적용되지 않는다.'
+    ],
+    correctAnswer: 0,
+    explanation: '직전 1년 비급여 보험금 수령액에 따라 무사고 할인~최대 300% 할증(5단계)이 적용됩니다. 단, 산정특례 대상(암·심장·장기요양 1~2등급)은 제외됩니다.'
   }
 );
+
+/* ── 실전 모의고사 엔진 — 협회 형식 (과목별 10문항 · 50분 · 문항당 5점) ── */
+let examTimerId = null;
+function pickRandom(arr, n) {
+  const copy = arr.slice();
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy.slice(0, n);
+}
+function startExamMode(type) {
+  cancelSpeech(); state.isPlaying = false;
+  renderPlayControls(); renderPresenter();
+  const main = type === 'life'
+    ? pickRandom(ACADEMY_QUESTIONS.filter(q => q.category === 'life'), 10)
+    : pickRandom(ACADEMY_QUESTIONS.filter(q => q.category === 'property'), 10);
+  const third = pickRandom(ACADEMY_QUESTIONS.filter(q => q.category === 'third'), 10);
+  state.examMode = type;
+  state.examSet = main.concat(third);
+  state.answers = {}; state.submitted = false;
+  state.examRemain = 50 * 60;
+  clearInterval(examTimerId);
+  examTimerId = setInterval(() => {
+    state.examRemain--;
+    if (state.examRemain <= 0) {
+      submitRealExam();
+      return;
+    }
+    updateExamTimer();
+  }, 1000);
+  state.activeTab = 'exam';
+  renderAll();
+  toast('실전 모의고사 시작 — 제한시간 50분');
+}
+function exitExamMode() {
+  clearInterval(examTimerId); examTimerId = null;
+  state.examMode = 'practice'; state.examSet = []; state.examRemain = 0;
+  state.answers = {}; state.submitted = false;
+}
+function updateExamTimer() {
+  const timerEl = document.getElementById('exam-timer');
+  if (!timerEl || state.submitted || state.examMode === 'practice') return;
+  const m = Math.floor(state.examRemain / 60), s = state.examRemain % 60;
+  timerEl.textContent = '⏱ ' + m + ':' + String(s).padStart(2, '0');
+  timerEl.classList.toggle('urgent', state.examRemain <= 300);
+}
+function submitRealExam() {
+  clearInterval(examTimerId); examTimerId = null;
+  if (state.submitted || !state.examSet.length) return;
+  const qs = state.examSet;
+  state.submitted = true;
+  let correct = 0;
+  const wrong = [];
+  qs.forEach(q => {
+    if (state.answers[q.id] === q.correctAnswer) correct++;
+    else wrong.push(q.id);
+  });
+  const score = Math.round((correct / qs.length) * 100);
+  state.history.unshift({
+    date: '2026.10.16',
+    cat: '실전 모의고사 — ' + (state.examMode === 'life' ? '생명보험' : '손해보험') + ' 시험 형식',
+    score, passed: score >= 60
+  });
+  state.wrongIds = [...new Set(wrong.concat(state.wrongIds))];
+  saveState(); renderExam(); renderResults(); renderProgress();
+  toast('채점 완료: ' + score + '점 — ' + (score >= 60 ? '합격선 통과' : '60점 미달'));
+}
 
 /* ── 영속 상태 (개선: 원본은 새로고침 시 소멸 → localStorage 보존) ── */
 const STORE_KEY = 'n-academy-state-v1';
@@ -1842,6 +2000,7 @@ const state = {
   sceneIdx: 0, completed: [], isPlaying: false, muted: false, speed: 1.0, sentIdx: 0,
   examCategory: 'all', answers: {}, submitted: false, voiceName: '', wrongIds: [],
   progress: {}, subScale: 1,
+  examMode: 'practice', examSet: [], examRemain: 0,
   history: [
     { date: '2026.10.14', cat: '생명보험 실전 모의고사 1회', score: 85, passed: true },
     { date: '2026.10.12', cat: '손해보험 핵심 기출 1회', score: 80, passed: true }
@@ -2097,15 +2256,33 @@ function renderPlayControls() {
   $('#play-btn').innerHTML = state.isPlaying ? '⏸ <span>강의 일시정지</span>' : '▶ <span>음성 강의 재생</span>';
 }
 function renderExam() {
-  const qs = state.examCategory === 'all' ? ACADEMY_QUESTIONS : ACADEMY_QUESTIONS.filter(q => q.category === state.examCategory);
-  $('#exam-catbar').innerHTML =
-    '<button data-xcat="all" class="' + (state.examCategory === 'all' ? 'on' : '') + '">전체 문항 (' + qs.length + '문항)</button>' +
-    ['life', 'property', 'third'].map(k =>
-      '<button data-xcat="' + k + '" class="' + (state.examCategory === k ? 'on' : '') + '">' + CAT_LABEL[k] + '</button>').join('');
+  const real = state.examMode !== 'practice' && state.examSet.length > 0;
+  const qs = real ? state.examSet
+    : (state.examCategory === 'all' ? ACADEMY_QUESTIONS : ACADEMY_QUESTIONS.filter(q => q.category === state.examCategory));
+  // 상단 바 — 실전 모드는 배지+타이머, 연습 모드는 카테고리 필터
+  $('#exam-catbar').innerHTML = real
+    ? '<span class="pill tag-gold">🎓 실전 모의고사 — ' + (state.examMode === 'life' ? '생명보험' : '손해보험') + ' 시험 형식 (20문항)</span>' +
+      (state.submitted ? '' : '<button class="btn ghost" data-act="exit-real">실전 모드 종료</button>')
+    : '<button data-xcat="all" class="' + (state.examCategory === 'all' ? 'on' : '') + '">전체 문항 (' + qs.length + '문항)</button>' +
+      ['life', 'property', 'third'].map(k =>
+        '<button data-xcat="' + k + '" class="' + (state.examCategory === k ? 'on' : '') + '">' + CAT_LABEL[k] + '</button>').join('');
+  // 타이머
+  const timerEl = $('#exam-timer');
+  if (real && !state.submitted) {
+    timerEl.style.display = '';
+    const m = Math.floor(state.examRemain / 60), s = state.examRemain % 60;
+    timerEl.textContent = '⏱ ' + m + ':' + String(s).padStart(2, '0');
+    timerEl.classList.toggle('urgent', state.examRemain <= 300);
+  } else {
+    timerEl.style.display = 'none';
+    timerEl.classList.remove('urgent');
+  }
+  // 실전 박스 — 응시 중에는 숨김
+  $('#real-box').style.display = real ? 'none' : '';
   $('#exam-list').innerHTML = qs.map((q, idx) => {
     const sel = state.answers[q.id];
     const correct = sel === q.correctAnswer;
-    return '<div class="panel q"><div class="head"><span class="mini"><b>제 ' + (idx + 1) + ' 문항</b> · ' + esc(q.subject) + '</span>' +
+    return '<div class="panel q"><div class="head"><span class="mini"><b>제 ' + (idx + 1) + ' 문항</b> · [' + CAT_LABEL[q.category] + '] ' + esc(q.subject) + '</span>' +
       (state.submitted ? (correct ? '<span class="pill tag-ok">✔ 정답</span>' : '<span class="pill tag-bad">✘ 오답</span>') : '') + '</div>' +
       '<h3>' + esc(q.question) + '</h3>' +
       q.options.map((opt, oi) => {
@@ -2121,9 +2298,40 @@ function renderExam() {
       (state.submitted ? '<div class="expl"><div class="lab">해설 (정답: ' + (q.correctAnswer + 1) + '번)</div><p>' + esc(q.explanation) + '</p></div>' : '') +
       '</div>';
   }).join('');
+  // 액션 버튼 + 과목별 분해
+  if (real && state.submitted) {
+    $('#exam-breakdown').innerHTML = renderBreakdown(qs);
+  } else {
+    $('#exam-breakdown').innerHTML = '';
+  }
   $('#exam-actions').innerHTML = state.submitted
-    ? '<button class="btn ghost" data-act="reset-exam">답안 초기화 및 재응시</button>'
-    : '<button class="btn" data-act="submit-exam">답안 제출 및 채점하기</button>';
+    ? '<button class="btn ghost" data-act="reset-exam">' + (real ? '새 실전 모의고사 응시' : '답안 초기화 및 재응시') + '</button>'
+    : (real ? '<button class="btn danger" data-act="submit-real-exam">답안 제출 및 채점하기</button>' : '');
+  $('#exam-actions-bottom').innerHTML = (!state.submitted && !real)
+    ? '<button class="btn" data-act="submit-exam">답안 제출 및 채점하기</button>' : '';
+}
+/* 실전 모의고사 결과 — 과목별 분해 (과목당 10문항 · 문항당 5점) */
+function renderBreakdown(qs) {
+  const score = Math.round(qs.filter(q => state.answers[q.id] === q.correctAnswer).length / qs.length * 100);
+  const passed = score >= 60;
+  const byCat = {};
+  qs.forEach(q => {
+    byCat[q.category] = byCat[q.category] || { total: 0, correct: 0 };
+    byCat[q.category].total++;
+    if (state.answers[q.id] === q.correctAnswer) byCat[q.category].correct++;
+  });
+  const rows = Object.keys(byCat).map(k => {
+    const b = byCat[k];
+    return '<div class="hstat"><div class="v">' + b.correct + '<em>/' + b.total + '</em></div>' +
+      '<div class="l">' + CAT_LABEL[k] + ' (' + b.correct * 5 + '점)</div></div>';
+  }).join('');
+  return '<div class="panel" style="padding:20px;margin-bottom:14px;border-left:4px solid ' + (passed ? 'var(--ok)' : 'var(--bad)') + '">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">' +
+    '<div><div class="mini">실전 모의고사 결과</div>' +
+    '<div style="font-size:24px;font-weight:900">' + score + '<span style="font-size:13px;color:var(--ink2)"> / 100점</span></div></div>' +
+    '<span class="pill ' + (passed ? 'tag-ok' : 'tag-bad') + '" style="font-size:13px;padding:7px 14px">' +
+    (passed ? '🏆 합격 (60점 이상)' : '불합격 — 60점 이상 필요') + '</span></div>' +
+    '<div class="hstats" style="color:var(--ink)">' + rows.replace(/color:#aebadd/g, 'color:var(--ink2)').replace(/color:#fff/g, 'color:var(--ink)') + '</div></div>';
 }
 function renderSummary() {
   const list = state.category === 'all' ? ACADEMY_COURSES : ACADEMY_COURSES.filter(c => c.category === state.category);
@@ -2209,6 +2417,7 @@ document.addEventListener('click', (e) => {
     saveState(); renderPresenter(); return;
   }
   if (t.dataset.xcat) {
+    if (state.examMode !== 'practice') exitExamMode();
     state.examCategory = t.dataset.xcat;
     state.answers = {}; state.submitted = false;
     renderExam(); return;
@@ -2221,6 +2430,11 @@ document.addEventListener('click', (e) => {
     const id = parseInt(t.dataset.applied, 10);
     state.schedules = state.schedules.map(s => s.id === id ? { ...s, applied: !s.applied } : s);
     saveState(); renderSchedule(); toast('시험 접수 상태가 변경되었습니다.'); return;
+  }
+  if (t.dataset.real) { startExamMode(t.dataset.real); return; }
+  if (t.dataset.act === 'submit-real-exam') { submitRealExam(); return; }
+  if (t.dataset.act === 'exit-real') {
+    exitExamMode(); renderExam(); toast('실전 모드를 종료하고 연습 모드로 전환했습니다.'); return;
   }
   if (t.dataset.act === 'submit-exam') {
     const qs = state.examCategory === 'all' ? ACADEMY_QUESTIONS : ACADEMY_QUESTIONS.filter(q => q.category === state.examCategory);
@@ -2240,6 +2454,7 @@ document.addEventListener('click', (e) => {
     return;
   }
   if (t.dataset.act === 'reset-exam') {
+    if (state.examMode !== 'practice') exitExamMode();
     state.answers = {}; state.submitted = false;
     renderExam(); return;
   }
