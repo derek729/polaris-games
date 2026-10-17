@@ -1963,6 +1963,40 @@ function exitExamMode() {
   state.examMode = 'practice'; state.examSet = []; state.examRemain = 0;
   state.answers = {}; state.submitted = false;
 }
+/* 오답 재도전 — 틀린 문항만 다시 풀기, 전부 정답 시 오답노트 해제 (SM-2 단순 적용) */
+function startRetryMode() {
+  cancelSpeech(); state.isPlaying = false;
+  renderPlayControls(); renderPresenter();
+  if (!state.wrongIds.length) { toast('오답 문항이 없습니다.'); return; }
+  exitExamMode();
+  state.examMode = 'retry';
+  state.examSet = state.wrongIds
+    .map(id => ACADEMY_QUESTIONS.find(q => q.id === id))
+    .filter(Boolean);
+  state.answers = {}; state.submitted = false;
+  state.activeTab = 'exam';
+  renderAll();
+  toast('오답 재도전 시작 — ' + state.examSet.length + '문항');
+}
+function submitRetryExam() {
+  if (state.submitted || !state.examSet.length || state.examMode !== 'retry') return;
+  state.submitted = true;
+  const qs = state.examSet;
+  const correct = qs.filter(q => state.answers[q.id] === q.correctAnswer).length;
+  // 전부 정답이면 오답노트에서 해제, 일부 오답이면 틀린 것만 유지
+  const stillWrong = qs.filter(q => state.answers[q.id] !== q.correctAnswer).map(q => q.id);
+  state.wrongIds = stillWrong;
+  state.history.unshift({
+    date: '2026.10.16',
+    cat: '오답 재도전 — ' + correct + '/' + qs.length + ' 정답',
+    score: Math.round((correct / qs.length) * 100),
+    passed: correct === qs.length
+  });
+  saveState(); renderExam(); renderResults(); renderProgress();
+  toast(correct === qs.length
+    ? '완벽합니다! 오답노트를 전부 해제했습니다.'
+    : correct + '/' + qs.length + ' 정답 — 남은 문항으로 다시 도전하세요');
+}
 function updateExamTimer() {
   const timerEl = document.getElementById('exam-timer');
   if (!timerEl || state.submitted || state.examMode === 'practice') return;
@@ -2257,18 +2291,21 @@ function renderPlayControls() {
 }
 function renderExam() {
   const real = state.examMode !== 'practice' && state.examSet.length > 0;
+  const retry = state.examMode === 'retry';
   const qs = real ? state.examSet
     : (state.examCategory === 'all' ? ACADEMY_QUESTIONS : ACADEMY_QUESTIONS.filter(q => q.category === state.examCategory));
-  // 상단 바 — 실전 모드는 배지+타이머, 연습 모드는 카테고리 필터
+  // 상단 바 — 실전 모드는 배지+타이머, 재도전은 배지, 연습 모드는 카테고리 필터
   $('#exam-catbar').innerHTML = real
-    ? '<span class="pill tag-gold">🎓 실전 모의고사 — ' + (state.examMode === 'life' ? '생명보험' : '손해보험') + ' 시험 형식 (20문항)</span>' +
-      (state.submitted ? '' : '<button class="btn ghost" data-act="exit-real">실전 모드 종료</button>')
+    ? '<span class="pill ' + (retry ? 'tag-gold' : 'tag-gold') + '">' +
+      (retry ? '🔁 오답 재도전 — 틀린 문항만 다시 풀기 (' + qs.length + '문항 · 시간 제한 없음)'
+             : '🎓 실전 모의고사 — ' + (state.examMode === 'life' ? '생명보험' : '손해보험') + ' 시험 형식 (20문항)') + '</span>' +
+      (state.submitted ? '' : '<button class="btn ghost" data-act="exit-real">모드 종료</button>')
     : '<button data-xcat="all" class="' + (state.examCategory === 'all' ? 'on' : '') + '">전체 문항 (' + qs.length + '문항)</button>' +
       ['life', 'property', 'third'].map(k =>
         '<button data-xcat="' + k + '" class="' + (state.examCategory === k ? 'on' : '') + '">' + CAT_LABEL[k] + '</button>').join('');
-  // 타이머
+  // 타이머 — 실전 모드만
   const timerEl = $('#exam-timer');
-  if (real && !state.submitted) {
+  if (real && !retry && !state.submitted) {
     timerEl.style.display = '';
     const m = Math.floor(state.examRemain / 60), s = state.examRemain % 60;
     timerEl.textContent = '⏱ ' + m + ':' + String(s).padStart(2, '0');
@@ -2299,14 +2336,25 @@ function renderExam() {
       '</div>';
   }).join('');
   // 액션 버튼 + 과목별 분해
-  if (real && state.submitted) {
+  if (real && state.submitted && !retry) {
     $('#exam-breakdown').innerHTML = renderBreakdown(qs);
+  } else if (real && state.submitted && retry) {
+    const correct = qs.filter(q => state.answers[q.id] === q.correctAnswer).length;
+    const cleared = state.wrongIds.filter(id => !qs.some(q => q.id === id)).length;
+    $('#exam-breakdown').innerHTML = '<div class="panel" style="padding:18px;margin-bottom:14px;border-left:4px solid ' +
+      (correct === qs.length ? 'var(--ok)' : 'var(--gold)') + '">' +
+      '<div style="font-size:15px;font-weight:800">' + correct + '/' + qs.length + ' 정답 — ' +
+      (correct === qs.length ? '🎉 오답 전부 해제! 오답노트가 비워졌습니다.' :
+        '오답 ' + (qs.length - correct) + '문항은 오답노트에 유지됩니다. 다시 도전!') + '</div></div>';
   } else {
     $('#exam-breakdown').innerHTML = '';
   }
   $('#exam-actions').innerHTML = state.submitted
-    ? '<button class="btn ghost" data-act="reset-exam">' + (real ? '새 실전 모의고사 응시' : '답안 초기화 및 재응시') + '</button>'
-    : (real ? '<button class="btn danger" data-act="submit-real-exam">답안 제출 및 채점하기</button>' : '');
+    ? '<button class="btn ghost" data-act="reset-exam">' + (retry ? '재도전 종료' : real ? '새 실전 모의고사 응시' : '답안 초기화 및 재응시') + '</button>'
+    : (real ? (retry
+        ? '<button class="btn danger" data-act="submit-retry-exam">답안 제출 및 채점하기</button>'
+        : '<button class="btn danger" data-act="submit-real-exam">답안 제출 및 채점하기</button>')
+      : '');
   $('#exam-actions-bottom').innerHTML = (!state.submitted && !real)
     ? '<button class="btn" data-act="submit-exam">답안 제출 및 채점하기</button>' : '';
 }
@@ -2372,7 +2420,9 @@ function renderResults() {
     : '<div class="empty">아직 응시 이력이 없습니다.</div>') + '</div>' +
     '<div style="display:flex;justify-content:space-between;align-items:center;margin:22px 0 12px">' +
     '<h3 style="margin:0">📖 오답노트 (' + wrongQs.length + '문항)</h3>' +
-    (wrongQs.length ? '<button class="btn ghost" data-act="clear-wrong">오답노트 비우기</button>' : '') +
+    (wrongQs.length
+      ? '<button class="btn gold" data-act="start-retry">▶ 오답 재도전 — 다시 풀기</button>'
+      : '') +
     '</div>' + wrongHtml;
 }
 function renderAll() {
@@ -2433,8 +2483,10 @@ document.addEventListener('click', (e) => {
   }
   if (t.dataset.real) { startExamMode(t.dataset.real); return; }
   if (t.dataset.act === 'submit-real-exam') { submitRealExam(); return; }
+  if (t.dataset.act === 'start-retry') { startRetryMode(); return; }
+  if (t.dataset.act === 'submit-retry-exam') { submitRetryExam(); return; }
   if (t.dataset.act === 'exit-real') {
-    exitExamMode(); renderExam(); toast('실전 모드를 종료하고 연습 모드로 전환했습니다.'); return;
+    exitExamMode(); renderExam(); renderResults(); toast('모드를 종료하고 연습 모드로 전환했습니다.'); return;
   }
   if (t.dataset.act === 'submit-exam') {
     const qs = state.examCategory === 'all' ? ACADEMY_QUESTIONS : ACADEMY_QUESTIONS.filter(q => q.category === state.examCategory);
