@@ -373,6 +373,30 @@ main { max-width: 1200px; width: 100%; margin: 0 auto; padding: 22px 20px 60px; 
   font-size: 10.5px; font-weight: 800; color: var(--ink2); background: #fff;
 }
 .subscale button.on { background: var(--navy); color: #fff; border-color: var(--navy); }
+/* 강의 전체 검색 */
+.searchbar {
+  display: flex; align-items: center; gap: 10px; padding: 11px 16px; margin-bottom: 14px;
+}
+.search-ico { font-size: 15px; }
+.searchbar input {
+  flex: 1; border: none; outline: none; background: transparent;
+  font-family: inherit; font-size: 13.5px; color: var(--ink); font-weight: 600;
+}
+.searchbar input::placeholder { color: var(--ink3); font-weight: 500; }
+.search-hint { white-space: nowrap; }
+#search-results { margin-bottom: 14px; }
+.sr-head { padding: 10px 16px 0; font-size: 11.5px; font-weight: 800; color: var(--ink2); }
+.sr-row {
+  width: 100%; text-align: left; padding: 12px 16px; margin-top: 8px;
+  display: flex; flex-direction: column; gap: 5px;
+  border-left: 3px solid var(--gold); cursor: pointer;
+}
+.sr-row:hover { background: #f7f9fd; }
+.sr-row .sr-meta { font-size: 11px; font-weight: 800; color: var(--ink3); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.sr-row .sr-meta .fld { background: var(--gold-soft); color: #8a6d14; border: 1px solid var(--gold-line); padding: 1px 7px; border-radius: 5px; }
+.sr-row .sr-tit { font-size: 13px; font-weight: 800; }
+.sr-row .sr-snip { font-size: 12px; color: var(--ink2); line-height: 1.65; }
+.sr-row mark { background: var(--gold-soft); color: #6f5810; font-weight: 800; padding: 0 2px; border-radius: 3px; }
 /* 실전 모의고사 */
 .real-box {
   background: linear-gradient(115deg, var(--gold-soft), #fffaf0);
@@ -437,6 +461,14 @@ main { max-width: 1200px; width: 100%; margin: 0 auto; padding: 22px 20px 60px; 
   <main>
     <!-- TAB 1: 이론 강의실 -->
     <div class="tab-pane" data-pane="lect">
+      <!-- 강의 전체 검색 — 대본·암기공식·핵심키워드 통합 -->
+      <div class="searchbar panel">
+        <span class="search-ico">🔍</span>
+        <input id="lecture-search" type="text" autocomplete="off"
+               placeholder="13강 전체에서 검색 — 예: 예정이율, 청약철회, CDR, 가불금 …">
+        <span class="mini search-hint">대본 · 암기공식 · 핵심키워드 통합</span>
+      </div>
+      <div id="search-results"></div>
       <!-- 학습 현황 히어로 스트립 -->
       <div class="hero">
         <div>
@@ -1924,6 +1956,7 @@ ACADEMY_QUESTIONS.push(
   }
 );
 
+/* ── 강의 전체 검색 — 대본·암기공식·핵심키워드 통합 (flexsearch 참고: 소규모 문서엔 순수 includes 충분) ── */
 /* ── 실전 모의고사 엔진 — 협회 형식 (과목별 10문항 · 50분 · 문항당 5점) ── */
 let examTimerId = null;
 function pickRandom(arr, n) {
@@ -2075,6 +2108,97 @@ function loadState() {
 const CATS = { all: '전체', life: '생보', property: '손보', third: '제3' };
 const CAT_LABEL = { life: '생명보험', property: '손해보험', third: '제3보험' };
 const $ = (sel) => document.querySelector(sel);
+
+const SEARCH_FIELDS = [
+  { key: 'mainKeyword', label: '핵심키워드' },
+  { key: 'memoryFormula', label: '암기공식' },
+  { key: 'chapterTitle', label: '챕터' },
+  { key: 'subHeadline', label: '요약' },
+  { key: 'avatarScript', label: '대본' }
+];
+function makeSnippet(text, q) {
+  const idx = text.toLowerCase().indexOf(q.toLowerCase());
+  if (idx < 0) return esc(text.slice(0, 70)) + '…';
+  const start = Math.max(0, idx - 32);
+  const end = Math.min(text.length, idx + q.length + 42);
+  const frag = (start > 0 ? '…' : '') + text.slice(start, end) + (end < text.length ? '…' : '');
+  const safe = esc(frag);
+  const safeQ = esc(q);
+  return safe.split(safeQ).join('<mark>' + safeQ + '</mark>');
+}
+function searchLectures(q) {
+  const out = [];
+  const ql = q.toLowerCase();
+  for (const c of ACADEMY_COURSES) {
+    const courseMatch = (c.title + ' ' + c.subtitle + ' ' + c.moduleCode + ' ' + c.categoryLabel).toLowerCase().includes(ql);
+    for (let si = 0; si < c.scenes.length; si++) {
+      const s = c.scenes[si];
+      let hit = null;
+      for (const f of SEARCH_FIELDS) {
+        const v = String(s[f.key] || '');
+        if (v.toLowerCase().includes(ql)) { hit = { field: f.label, text: v }; break; }
+      }
+      if (!hit) {
+        for (const card of (s.visualCards || [])) {
+          const v = card.tag + ' ' + card.title + ' ' + card.highlight + ' ' + card.point;
+          if (v.toLowerCase().includes(ql)) { hit = { field: '비교카드', text: card.point || card.title }; break; }
+        }
+      }
+      if (hit || courseMatch) {
+        out.push({
+          courseId: c.id, sceneIdx: si,
+          course: c.moduleCode, courseTitle: c.title,
+          part: s.sceneNumber, chapter: s.chapterTitle,
+          field: hit ? hit.field : '강의 제목',
+          snippet: makeSnippet(hit ? hit.text : c.title, q)
+        });
+        if (out.length >= 12) return out;  // 상한 — 과다 매칭 방지
+      }
+    }
+  }
+  return out;
+}
+let searchDebounce = null;
+function runLectureSearch() {
+  const q = $('#lecture-search').value.trim();
+  const box = $('#search-results');
+  if (q.length < 2) { box.innerHTML = ''; return; }
+  const results = searchLectures(q);
+  box.innerHTML = results.length
+    ? '<div class="panel" style="padding-top:8px;padding-bottom:8px"><div class="sr-head">검색 결과 ' + results.length + '건 — 클릭하면 해당 파트로 이동</div>' +
+      results.map((r, i) =>
+        '<button class="sr-row panel" data-sr="' + i + '" style="box-shadow:none">' +
+        '<div class="sr-meta"><span>' + esc(r.course) + ' · 파트 ' + r.part + '</span>' +
+        '<span class="fld">' + esc(r.field) + '</span><span>' + esc(r.chapter) + '</span></div>' +
+        '<div class="sr-tit">' + esc(r.courseTitle) + '</div>' +
+        '<div class="sr-snip">' + r.snippet + '</div></button>').join('') + '</div>'
+    : '<div class="panel" style="padding:16px"><div class="empty" style="padding:8px">검색 결과가 없습니다 — 다른 키워드로 찾아보세요.</div></div>';
+  box.dataset.q = q;
+  box.dataset.payload = JSON.stringify(results.map(r => ({ courseId: r.courseId, sceneIdx: r.sceneIdx })));
+}
+
+$('#lecture-search').addEventListener('input', () => {
+  clearTimeout(searchDebounce);
+  searchDebounce = setTimeout(runLectureSearch, 120);
+});
+document.addEventListener('click', (e) => {
+  const sr = e.target.closest('[data-sr]');
+  if (!sr) return;
+  try {
+    const payload = JSON.parse($('#search-results').dataset.payload || '[]');
+    const r = payload[parseInt(sr.dataset.sr, 10)];
+    if (!r) return;
+    $('#lecture-search').value = '';
+    $('#search-results').innerHTML = '';
+    state.activeTab = 'lect';
+    selectCourse(r.courseId);
+    selectScene(r.sceneIdx);
+    renderAll();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  } catch (err) { /* 손상된 결과 — 무시 */ }
+});
+
+
 let toastTimer = null;
 function toast(msg) {
   const el = $('#toast');
