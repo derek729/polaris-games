@@ -476,6 +476,7 @@ main { max-width: 1200px; width: 100%; margin: 0 auto; padding: 22px 20px 60px; 
           <div class="hname" id="hero-name"></div>
         </div>
         <div class="hstats">
+          <div class="hstat"><div class="v" id="hs-streak">🔥 0<em>일</em></div><div class="l">연속 학습</div></div>
           <div class="hstat"><div class="v" id="hs-progress">0<em>%</em></div><div class="l">수강 진도</div></div>
           <div class="hstat"><div class="v" id="hs-done">0<em>/13</em></div><div class="l">완강</div></div>
           <div class="hstat"><div class="v" id="hs-best">-<em>점</em></div><div class="l">모의고사 최고</div></div>
@@ -2019,6 +2020,7 @@ function submitRetryExam() {
   // 전부 정답이면 오답노트에서 해제, 일부 오답이면 틀린 것만 유지
   const stillWrong = qs.filter(q => state.answers[q.id] !== q.correctAnswer).map(q => q.id);
   state.wrongIds = stillWrong;
+  markActivity();
   state.history.unshift({
     date: '2026.10.16',
     cat: '오답 재도전 — ' + correct + '/' + qs.length + ' 정답',
@@ -2055,6 +2057,7 @@ function submitRealExam() {
     score, passed: score >= 60
   });
   state.wrongIds = [...new Set(wrong.concat(state.wrongIds))];
+  markActivity();
   saveState(); renderExam(); renderResults(); renderProgress();
   toast('채점 완료: ' + score + '점 — ' + (score >= 60 ? '합격선 통과' : '60점 미달'));
 }
@@ -2066,7 +2069,7 @@ const state = {
   activeTab: 'lect', category: 'all', courseId: ACADEMY_COURSES[0].id,
   sceneIdx: 0, completed: [], isPlaying: false, muted: false, speed: 1.0, sentIdx: 0,
   examCategory: 'all', answers: {}, submitted: false, voiceName: '', wrongIds: [],
-  progress: {}, subScale: 1,
+  progress: {}, subScale: 1, activity: {},
   examMode: 'practice', examSet: [], examRemain: 0,
   history: [
     { date: '2026.10.14', cat: '생명보험 실전 모의고사 1회', score: 85, passed: true },
@@ -2084,7 +2087,7 @@ function saveState() {
       completed: state.completed, history: state.history,
       schedules: state.schedules, courseId: state.courseId, speed: state.speed,
       voiceName: state.voiceName, wrongIds: state.wrongIds,
-      progress: state.progress, subScale: state.subScale
+      progress: state.progress, subScale: state.subScale, activity: state.activity
     }));
   } catch (e) { /* file:// 제한 등 — 무시 */ }
 }
@@ -2102,6 +2105,7 @@ function loadState() {
     if (Array.isArray(s.wrongIds)) state.wrongIds = s.wrongIds;
     if (s.progress && typeof s.progress === 'object') state.progress = s.progress;
     if (typeof s.subScale === 'number') state.subScale = s.subScale;
+    if (s.activity && typeof s.activity === 'object') state.activity = s.activity;
   } catch (e) { /* 손상 시 무시 */ }
 }
 
@@ -2256,11 +2260,13 @@ function advanceSentence() {
   const course = currentCourse();
   if (state.sceneIdx < course.scenes.length - 1) {
     state.sceneIdx++; state.sentIdx = 0;
-    saveProgress(); renderSlide(); renderTeleprompter(); renderPresenter(); speakCurrent();
+    saveProgress(); markActivity();
+    renderSlide(); renderTeleprompter(); renderPresenter(); speakCurrent();
   } else {
     state.isPlaying = false;
     if (!state.completed.includes(course.id)) state.completed.push(course.id);
     delete state.progress[course.id];  // 완강 — 이어보기 위치 제거
+    markActivity();
     saveState();
     toast(course.moduleCode + ' 수강이 완료되었습니다.');
     renderAll();
@@ -2339,6 +2345,30 @@ function selectCourse(id) {
 }
 
 /* ── 렌더링 ── */
+/* 학습 스트릭 — 파트 진행·모의고사 응시를 날짜별 기록, 연속 학습일 산출 (Duolingo streak 패턴) */
+function localDateKey(d) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function markActivity() {
+  const key = localDateKey(new Date());
+  state.activity[key] = (state.activity[key] || 0) + 1;
+  saveState();
+}
+function calcStreak() {
+  if (!Object.keys(state.activity).length) return 0;
+  const cursor = new Date();
+  if (!state.activity[localDateKey(cursor)]) {
+    cursor.setDate(cursor.getDate() - 1);
+    if (!state.activity[localDateKey(cursor)]) return 0;  // 오늘·어제 모두 기록 없음
+  }
+  let streak = 0;
+  while (state.activity[localDateKey(cursor)]) {
+    streak++;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return streak;
+}
+
 function renderProgress() {
   const pct = Math.round((state.completed.length / ACADEMY_COURSES.length) * 100);
   $('#progress-line').textContent = '수강 진도율 ' + pct + '% (' + state.completed.length + '/13강)';
@@ -2351,6 +2381,7 @@ function renderProgress() {
   const next = state.schedules.filter(s => !s.applied)
     .sort((a, b) => (a.date > b.date ? 1 : -1))[0] || state.schedules[0];
   $('#hs-exam').innerHTML = next ? next.date.slice(5) + '<em></em>' : '-<em></em>';
+  $('#hs-streak').innerHTML = '🔥 ' + calcStreak() + '<em>일</em>';
   $('#hero-name').textContent = state.userName + ' · N-FINANCE ACADEMY 학습 현황';
 }
 function renderCurrList() {
@@ -2625,6 +2656,7 @@ document.addEventListener('click', (e) => {
     const score = Math.round((correct / qs.length) * 100);
     state.history.unshift({ date: '2026.10.15', cat: '실전 기출 모의고사', score, passed: score >= 60 });
     state.wrongIds = [...new Set(wrong.concat(state.wrongIds))];  // 오답노트 — 중복 없이 누적
+    markActivity();
     saveState(); renderExam(); renderResults();
     toast('채점이 완료되었습니다. 취득 점수: ' + score + '점');
     return;
