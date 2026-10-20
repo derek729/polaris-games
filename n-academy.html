@@ -373,6 +373,17 @@ main { max-width: 1200px; width: 100%; margin: 0 auto; padding: 22px 20px 60px; 
   font-size: 10.5px; font-weight: 800; color: var(--ink2); background: #fff;
 }
 .subscale button.on { background: var(--navy); color: #fff; border-color: var(--navy); }
+/* 학습 캘린더 히트맵 — GitHub 잔디 스타일 (골드 톤) */
+.heatmap-wrap { padding: 18px 20px; }
+.heatmap-wrap h3 { font-size: 15px; margin-bottom: 4px; }
+.heatmap-wrap .hm-desc { font-size: 11.5px; color: var(--ink2); margin-bottom: 12px; }
+.hm-grid { display: grid; grid-auto-flow: column; grid-template-rows: repeat(7, 13px); gap: 3.5px; overflow-x: auto; padding-bottom: 6px; }
+.hm-cell { width: 13px; height: 13px; border-radius: 3px; background: #e8ecf4; }
+.hm-cell.l1 { background: #f0e3b4; }
+.hm-cell.l2 { background: var(--gold); }
+.hm-cell.l3 { background: #9a7a12; }
+.hm-legend { display: flex; align-items: center; gap: 5px; margin-top: 10px; font-size: 10.5px; color: var(--ink3); }
+.hm-legend .hm-cell { display: inline-block; }
 /* 강의 전체 검색 */
 .searchbar {
   display: flex; align-items: center; gap: 10px; padding: 11px 16px; margin-bottom: 14px;
@@ -714,6 +725,7 @@ main { max-width: 1200px; width: 100%; margin: 0 auto; padding: 22px 20px 60px; 
     <!-- TAB 4: 수강·합격 현황 -->
     <div class="tab-pane" data-pane="results" style="display:none">
       <div class="panel res-panel" id="results-panel"></div>
+      <div class="panel heatmap-wrap" style="margin-top:14px" id="heatmap-panel"></div>
     </div>
   </main>
 </div>
@@ -2556,6 +2568,35 @@ function renderSchedule() {
     '<button class="btn' + (s.applied ? ' ghost' : '') + '" data-applied="' + s.id + '">' +
     (s.applied ? '접수 완료 (취소)' : '응시 접수') + '</button></div>').join('');
 }
+/* 학습 캘린더 히트맵 — 지난 10주 활동 그리드 (calendar-heatmap ★2k 패턴 참고, 순수 DOM) */
+function renderHeatmap() {
+  const panel = document.getElementById('heatmap-panel');
+  if (!panel) return;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  // 오늘이 속한 주의 일요일부터 시작(열 = 주, 행 = 일~토) — 총 10주
+  const end = new Date(today);
+  end.setDate(end.getDate() + (6 - end.getDay()));  // 이번 주 토요일
+  const cells = [];
+  const cursor = new Date(end);
+  cursor.setDate(cursor.getDate() - 69);
+  for (let i = 0; i < 70; i++) {
+    const key = localDateKey(cursor);
+    const cnt = state.activity[key] || 0;
+    let level = 0;
+    if (cnt >= 4) level = 3;
+    else if (cnt >= 2) level = 2;
+    else if (cnt >= 1) level = 1;
+    cells.push('<div class="hm-cell l' + level + '" title="' + key + ' · ' + cnt + '회 학습"></div>');
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  const totalDays = Object.keys(state.activity).filter(k => state.activity[k] > 0).length;
+  panel.innerHTML = '<h3>📅 학습 캘린더 — 최근 10주</h3>' +
+    '<div class="hm-desc">총 ' + totalDays + '일 학습 · 진한 칸일수록 많이 학습 (셀에 마우스를 올리면 날짜 확인)</div>' +
+    '<div class="hm-grid">' + cells.join('') + '</div>' +
+    '<div class="hm-legend">적음 <span class="hm-cell"></span><span class="hm-cell l1"></span><span class="hm-cell l2"></span><span class="hm-cell l3"></span> 많음</div>';
+}
+
 function renderResults() {
   const wrongQs = state.wrongIds
     .map(id => ACADEMY_QUESTIONS.find(q => q.id === id))
@@ -2583,6 +2624,7 @@ function renderResults() {
 function renderAll() {
   renderProgress(); renderCurrList(); renderSlide(); renderTeleprompter();
   renderPresenter(); renderPlayControls(); renderExam(); renderSummary(); renderSchedule(); renderResults();
+  renderHeatmap();
   renderTeleScale();
   document.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('on', b.dataset.tab === state.activeTab));
   document.querySelectorAll('.tab-pane').forEach(p => { p.style.display = p.dataset.pane === state.activeTab ? '' : 'none'; });
