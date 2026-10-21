@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
+<title>⬡ 헥스트리스 — 폴라리스 게임 센터</title>
+<meta name="description" content="육각형을 회전시켜 같은 색 블록 3개를 모아 터뜨리는 반사신 퍼즐. 콤보를 쌓아 최고기록에 도전!">
+<meta name="theme-color" content="#0d1021">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="헥스트리스">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/favicon-64.png">
+<link rel="stylesheet" href="game-assets/fonts/fonts.css">
+<style>
+  :root{--bg:#0d1021;--panel:#171b33;--panel2:#1f2445;--line:#333a66;--accent:#e8b64c;
+        --accent2:#4fd1c5;--text:#ece6f7;--dim:#9aa0c8;}
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{background:radial-gradient(900px 500px at 70% -10%,#1b2145 0%,var(--bg) 55%);color:var(--text);
+       font-family:"Galmuri11","Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+       display:flex;flex-direction:column;align-items:center;padding:12px;
+       -webkit-user-select:none;user-select:none;overflow:hidden;}
+  header{width:min(92vw,470px);display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;}
+  header h1{font-size:clamp(22px,5.5vw,30px);letter-spacing:.08em;
+            background:linear-gradient(90deg,#9f8cff,#4fd1c5);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .scores{display:flex;gap:8px;}
+  .scorebox{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:5px 12px;text-align:center;min-width:70px;}
+  .scorebox .lbl{font-size:10px;color:var(--dim);letter-spacing:.12em;}
+  .scorebox .val{font-size:18px;font-weight:900;color:var(--accent);font-variant-numeric:tabular-nums;}
+  #stage{position:relative;width:min(92vw,470px);}
+  #game{display:block;width:100%;aspect-ratio:1/1;touch-action:none;}
+  .overlay{position:absolute;inset:0;z-index:5;display:none;flex-direction:column;align-items:center;justify-content:center;
+           gap:14px;background:rgba(13,16,33,.85);border-radius:16px;backdrop-filter:blur(2px);text-align:center;padding:20px;}
+  .overlay.show{display:flex;animation:fade .25s ease;}
+  @keyframes fade{from{opacity:0;}to{opacity:1;}}
+  .overlay h2{font-size:clamp(24px,6vw,32px);letter-spacing:.04em;}
+  .overlay .msg{color:var(--dim);font-size:13px;line-height:1.8;}
+  .overlay .msg b{color:var(--accent2);}
+  .overlay .msg .keys{color:var(--text);}
+  .overlay button{background:var(--accent);color:#0d1021;border:0;border-radius:9px;padding:11px 26px;
+                  font-family:inherit;font-size:14px;font-weight:900;cursor:pointer;letter-spacing:.05em;}
+  .overlay button:active{transform:scale(.96);}
+  #selftest{width:min(92vw,470px);margin-top:8px;font-size:12px;color:var(--accent2);white-space:pre-wrap;display:none;}
+  footer{margin-top:10px;color:var(--dim);font-size:11px;line-height:1.7;text-align:center;}
+  footer a{color:var(--dim);}
+</style>
+</head>
+<body>
+<header>
+  <h1>⬡ 헥스트리스</h1>
+  <div class="scores">
+    <div class="scorebox"><div class="lbl">점수</div><div class="val" id="score">0</div></div>
+    <div class="scorebox"><div class="lbl">최고</div><div class="val" id="best">0</div></div>
+  </div>
+</header>
+<div id="stage">
+  <canvas id="game"></canvas>
+  <div class="overlay show" id="startOv">
+    <h2>헥스트리스</h2>
+    <p class="msg">육각형을 회전시켜 같은 색 블록 <b>3개</b>를 모아 터뜨려라!<br>
+    블록이 중심까지 차오르면 게임 오버.<br>
+    <span class="keys">← → 회전 · ↓ 빠른 낙하 · P 일시정지<br>모바일: 화면 좌/우 탭</span></p>
+    <button id="btnStart">게임 시작</button>
+  </div>
+  <div class="overlay" id="overOv">
+    <h2>게임 오버</h2>
+    <p class="msg" id="overMsg"></p>
+    <button id="btnRetry">다시하기</button>
+  </div>
+  <div class="overlay" id="pauseOv">
+    <h2>일시정지</h2>
+    <p class="msg">P 또는 화면을 눌러 계속</p>
+    <button id="btnResume">계속하기</button>
+  </div>
+</div>
+<div id="selftest"></div>
+<footer>폴라리스 게임 센터 · <a href="index.html">포털로 돌아가기</a><br>
+원작 메커니즘 참조: hextris/hextris (MIT) — 자체 재구현</footer>
+<script>
+(function () {
+  'use strict';
+  var SIDES = 6, MAX_STACK = 5, COMBO_TIME = 2000;
+  var PALETTE = ['#f1c40f', '#e74c3c', '#3498db', '#2ecc71'];
+  var LS_BEST = 'polaris-hextris-best';
+  var canvas = document.getElementById('game');
+  var ctx = canvas.getContext('2d');
+  var scoreEl = document.getElementById('score');
+  var bestEl = document.getElementById('best');
+
+  var W = 0, R0 = 0, BH = 0, CX = 0, CY = 0;   // 캔버스 크기, 바깥 육각 반경, 블록 높이
+  var state = 'ready';                          // ready | play | over | pause
+  var hexAngle = -Math.PI / 2, angleTarget = hexAngle;
+  var stacks;                                   // stacks[side] = [{color,dist,fromDist?}]
+  var falling;                                  // [{color, side, dist, speed}]
+  var score, best, combo, comboLeft, lastClearAt;
+  var waveTimer, waveGap, difficulty, spawnCount;
+  var effects, popups;
+  var lastT = 0;
+
+  function resize() {
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var cssW = canvas.clientWidth;
+    canvas.width = Math.round(cssW * dpr);
+    canvas.height = Math.round(cssW * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    W = cssW;
+    CX = CY = W / 2;
+    R0 = W * 0.435;
+    BH = R0 / MAX_STACK;
+  }
+  window.addEventListener('resize', function () { resize(); });
+
+  function sideAngle(side) { return hexAngle + side * Math.PI / 3; }
+  function stackDist(n) { return R0 - (n + 0.5) * BH; }   // n번째(바깥부터) 블록의 중심 거리
+  function randColor() { return PALETTE[(Math.random() * PALETTE.length) | 0]; }
+
+  /* ---------- 게임 상태 ---------- */
+  function reset() {
+    stacks = [];
+    for (var i = 0; i < SIDES; i++) stacks.push([]);
+    falling = [];
+    score = 0; combo = 0; comboLeft = 0;
+    difficulty = 0; waveTimer = 0; waveGap = 1; spawnCount = 0;
+    effects = []; popups = [];
+    hexAngle = angleTarget = -Math.PI / 2;
+    updateHud();
+  }
+  function updateHud() {
+    scoreEl.textContent = score;
+    if (best < score) { best = score; try { localStorage.setItem(LS_BEST, String(best)); } catch (e) {} }
+    bestEl.textContent = best;
+  }
+
+  /* ---------- 웨이브 생성 (레퍼런스 wavegen: 간격 점진 감소) ---------- */
+  function spawnWave() {
+    difficulty += 0.35;
+    waveGap = Math.max(2.8 - difficulty * 0.14, 0.7);      // 초
+    var n = 1 + (Math.random() < 0.45 ? 1 : 0) + (difficulty > 5 && Math.random() < 0.35 ? 1 : 0);
+    var sides = [0, 1, 2, 3, 4, 5];
+    for (var i = sides.length - 1; i > 0; i--) {           // 섞기
+      var j = (Math.random() * (i + 1)) | 0;
+      var t = sides[i]; sides[i] = sides[j]; sides[j] = t;
+    }
+    var speed = R0 * (0.34 + difficulty * 0.02);
+    for (var k = 0; k < n; k++) {
+      falling.push({ color: randColor(), side: sides[k], dist: R0 + BH * 1.2, speed: speed });
+    }
+    spawnCount++;
+  }
+
+  /* ---------- 낙하 · 착지 ---------- */
+  function stepFall(dt) {
+    var boost = fastDrop ? 5 : 1;
+    for (var i = falling.length - 1; i >= 0; i--) {
+      var b = falling[i];
+      b.dist -= b.speed * dt * boost;
+      var land = stackDist(stacks[b.side].length);
+      if (b.dist <= land) {
+        falling.splice(i, 1);
+        stacks[b.side].push({ color: b.color, dist: land, fromDist: b.dist });
+        if (stacks[b.side].length >= MAX_STACK) { gameOver(); return; }
+        checkClear(b.side, stacks[b.side].length - 1);
+      }
+    }
+  }
+
+  /* ---------- 매치 판정 (레퍼런스 checking.js flood-fill 재구현) ---------- */
+  function floodFill(side, idx, color, seen) {
+    if (side < 0) side += SIDES;
+    side %= SIDES;
+    var key = side + ',' + idx;
+    if (seen[key]) return;
+    if (!stacks[side][idx] || stacks[side][idx].color !== color) return;
+    seen[key] = [side, idx];
+    var deltas = [[1, 0], [-1, 0], [0, 1], [0, -1]];       // 직교 인접(옆 변/위아래)
+    for (var d = 0; d < 4; d++) floodFill(side + deltas[d][0], idx + deltas[d][1], color, seen);
+  }
+  function checkClear(side, idx) {
+    var seen = {};
+    floodFill(side, idx, stacks[side][idx].color, seen);
+    var group = Object.keys(seen).map(function (k) { return seen[k]; });
+    if (group.length < 3) return;
+    // 콤보: COMBO_TIME 안에 연속 제거면 배수 증가 (레퍼런스 comboTimer)
+    var now = performance.now();
+    if (now - lastClearAt < COMBO_TIME) combo = Math.min(combo + 1, 8); else combo = 1;
+    lastClearAt = now;
+    comboLeft = COMBO_TIME;
+    var gained = group.length * 10 * combo;
+    score += gained;
+    popups.push({ text: '+' + gained + (combo > 1 ? ' ×' + combo : ''), t: 0,
+                  a: sideAngle(side), d: R0 - (idx + 1) * BH });
+    group.forEach(function (p) {
+      var st = stacks[p[0]][p[1]];
+      effects.push({ a: sideAngle(p[0]), d: st.dist, color: st.color, t: 0 });
+      st.removed = true;
+    });
+    // 중력: 제거 후 각 변 압축 — 남은 블록 재낙하 (레퍼런스 update.js settled=0 재현)
+    for (var s = 0; s < SIDES; s++) {
+      var remain = stacks[s].filter(function (b) { return !b.removed; });
+      remain.forEach(function (b, i2) {
+        var target = stackDist(i2);
+        if (Math.abs(b.dist - target) > 0.5) b.fromDist = b.dist; else b.fromDist = null;
+        b.dist = target;
+      });
+      stacks[s] = remain;
+    }
+    updateHud();
+  }
+
+  /* ---------- 회전 (60° 스텝, 부드러운 트윈) ---------- */
+  function rotate(dir) {
+    if (state !== 'play') return;
+    angleTarget += dir * Math.PI / 3;
+  }
+
+  /* ---------- 렌더링 ---------- */
+  function drawBlock(a, d, color, alpha, scale) {
+    var x = CX + Math.cos(a) * d, y = CY + Math.sin(a) * d;
+    var halfW = d * Math.tan(Math.PI / 6) * 0.88;
+    var halfH = BH * 0.42 * (scale || 1);
+    halfW *= (scale || 1);
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(a);
+    ctx.globalAlpha = alpha == null ? 1 : alpha;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(-halfW, -halfH);
+    ctx.lineTo(halfW, -halfH);
+    ctx.lineTo(halfW, halfH);
+    ctx.lineTo(-halfW, halfH);
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalAlpha = (alpha == null ? 1 : alpha) * 0.35;
+    ctx.fillStyle = 'rgba(255,255,255,.5)';
+    ctx.fillRect(-halfW, -halfH, halfW * 2, halfH * 0.28);
+    ctx.restore();
+  }
+  function hexPath(r) {
+    ctx.beginPath();
+    for (var i = 0; i < SIDES; i++) {
+      var a = hexAngle + i * Math.PI / 3;
+      var x = CX + Math.cos(a) * r, y = CY + Math.sin(a) * r;
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+  }
+  function render() {
+    ctx.clearRect(0, 0, W, W);
+    // 바깥 육각형(경계)
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#333a66';
+    hexPath(R0 + 7);
+    ctx.stroke();
+    // 콤보 타이머 — 남은 시간을 육각형 둘레의 색 호로 표시 (레퍼런스 comboTimer 라인 재현)
+    if (comboLeft > 0 && combo > 1) {
+      var frac = comboLeft / COMBO_TIME;
+      ctx.lineWidth = 5;
+      ctx.strokeStyle = PALETTE[combo % PALETTE.length];
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.arc(CX, CY, R0 + 16, hexAngle, hexAngle + Math.PI * 2 * frac);
+      ctx.stroke();
+      ctx.lineCap = 'butt';
+    }
+    // 내부 배경
+    ctx.fillStyle = 'rgba(255,255,255,.03)';
+    hexPath(R0);
+    ctx.fill();
+    // 착지 블록 (압축 애니메이션: fromDist → dist)
+    for (var s = 0; s < SIDES; s++) {
+      for (var i = 0; i < stacks[s].length; i++) {
+        var b = stacks[s][i];
+        var d = b.dist;
+        if (b.fromDist != null) {
+          b.mix = Math.min((b.mix || 0) + 0.16, 1);
+          var e = 1 - Math.pow(1 - b.mix, 3);
+          d = b.fromDist + (b.dist - b.fromDist) * e;
+          if (b.mix >= 1) b.fromDist = null;
+        }
+        drawBlock(sideAngle(s), d, b.color);
+      }
+    }
+    // 낙하 중 블록
+    for (var f = 0; f < falling.length; f++) {
+      var fb = falling[f];
+      ctx.save();
+      ctx.shadowColor = fb.color;
+      ctx.shadowBlur = 10;
+      drawBlock(sideAngle(fb.side), fb.dist, fb.color);
+      ctx.restore();
+    }
+    // 제거 이펙트
+    for (var e2 = effects.length - 1; e2 >= 0; e2--) {
+      var ef = effects[e2];
+      ef.t += 0.09;
+      if (ef.t >= 1) { effects.splice(e2, 1); continue; }
+      drawBlock(ef.a, ef.d, ef.color, 1 - ef.t, 1 + ef.t * 0.8);
+    }
+    // 점수 팝업
+    ctx.textAlign = 'center';
+    for (var p = popups.length - 1; p >= 0; p--) {
+      var pp = popups[p];
+      pp.t += 0.02;
+      if (pp.t >= 1) { popups.splice(p, 1); continue; }
+      ctx.globalAlpha = 1 - pp.t;
+      ctx.fillStyle = '#e8b64c';
+      ctx.font = '900 ' + Math.round(W * 0.045) + 'px "Galmuri11", sans-serif';
+      ctx.fillText(pp.text, CX + Math.cos(pp.a) * pp.d * 0.5, CY + Math.sin(pp.a) * pp.d * 0.5 - pp.t * 26);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  /* ---------- 메인 루프 ---------- */
+  var fastDrop = false;
+  function loop(t) {
+    requestAnimationFrame(loop);
+    var dt = Math.min((t - lastT) / 1000, 0.05);
+    lastT = t;
+    // 회전 트윈
+    var diff = angleTarget - hexAngle;
+    if (Math.abs(diff) > 0.0001) {
+      hexAngle += diff * Math.min(dt * 14, 1);
+      if (Math.abs(angleTarget - hexAngle) < 0.002) hexAngle = angleTarget;
+    }
+    if (state === 'play') {
+      if (comboLeft > 0) { comboLeft -= dt * 1000; if (comboLeft <= 0) combo = 0; }
+      waveTimer += dt;
+      if (falling.length === 0 && waveTimer >= waveGap) { waveTimer = 0; spawnWave(); }
+      stepFall(dt);
+    }
+    render();
+  }
+
+  /* ---------- 상태 전환 ---------- */
+  function startGame() {
+    reset();
+    document.getElementById('startOv').classList.remove('show');
+    document.getElementById('overOv').classList.remove('show');
+    document.getElementById('pauseOv').classList.remove('show');
+    state = 'play';
+  }
+  function gameOver() {
+    state = 'over';
+    document.getElementById('overMsg').innerHTML =
+      '점수 <b>' + score + '</b> · 최고 기록 <b>' + best + '</b>' + (combo > 1 ? '<br>최고 콤보 ×' + combo : '');
+    document.getElementById('overOv').classList.add('show');
+  }
+  function togglePause() {
+    if (state === 'play') { state = 'pause'; document.getElementById('pauseOv').classList.add('show'); }
+    else if (state === 'pause') { state = 'play'; document.getElementById('pauseOv').classList.remove('show'); }
+  }
+  document.getElementById('btnStart').addEventListener('click', startGame);
+  document.getElementById('btnRetry').addEventListener('click', startGame);
+  document.getElementById('btnResume').addEventListener('click', togglePause);
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden && state === 'play') togglePause();
+  });
+
+  /* ---------- 입력 ---------- */
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') { e.preventDefault(); rotate(-1); }
+    else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') { e.preventDefault(); rotate(1); }
+    else if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') { e.preventDefault(); fastDrop = true; }
+    else if (e.key === 'p' || e.key === 'P') togglePause();
+  });
+  document.addEventListener('keyup', function (e) {
+    if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') fastDrop = false;
+  });
+  canvas.addEventListener('pointerdown', function (e) {
+    if (state !== 'play') return;
+    var rect = canvas.getBoundingClientRect();
+    rotate(e.clientX - rect.left < rect.width / 2 ? -1 : 1);   // 좌/우 탭 회전
+  });
+
+  /* ---------- 셀프 테스트 (#selftest) ---------- */
+  function selfTest() {
+    var box = document.getElementById('selftest');
+    box.style.display = 'block';
+    var fails = [];
+    try {
+      var seed = 66201021;
+      Math.random = function () {
+        seed = (seed + 0x6D2B79F5) | 0;
+        var t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+      startGame();
+      // 1) 강제 회전 30회 — 각도가 60° 배수로 수렴하는지
+      for (var i = 0; i < 30; i++) rotate(i % 2 ? 1 : -1);
+      // 2) 시간 가속 — 8웨이브 착지까지
+      var landings = 0, ticks = 0;
+      var prevStackTotal = 0;
+      while (landings < 8 && ticks < 20000 && state === 'play') {
+        var before = 0;
+        for (var s = 0; s < SIDES; s++) before += stacks[s].length;
+        stepFall(0.05);
+        waveTimer = 99;
+        if (falling.length === 0) spawnWave();
+        var after = 0;
+        for (var s2 = 0; s2 < SIDES; s2++) after += stacks[s2].length;
+        if (after < before) landings += 0;   // 제거 발생 — 문제 없음
+        if (after > before) landings++;
+        // 불변식: 인덱스 연속성(중력 압축 후 빈 구멍 없음) + 최대 적층 초과 없음
+        for (var s3 = 0; s3 < SIDES; s3++) {
+          if (stacks[s3].length > MAX_STACK) fails.push('적층 초과 side=' + s3);
+          for (var i2 = 0; i2 < stacks[s3].length; i2++) {
+            var expect = stackDist(i2);
+            if (Math.abs(stacks[s3][i2].dist - expect) > 1) fails.push('거리 불일치 side=' + s3 + ' idx=' + i2);
+          }
+        }
+        if (score < 0 || (score % 10 !== 0 && score !== 0)) fails.push('점수 이상: ' + score);
+        ticks++;
+      }
+      if (ticks >= 20000) fails.push('블록이 착지하지 않음(속도 0?)');
+      // 3) 매치·중력 직접 검증: 한 변에 같은 색 3개 배치 후 클리어
+      startGame();
+      var c = randColor();
+      stacks[2].push({ color: c, dist: stackDist(0) });
+      stacks[2].push({ color: c, dist: stackDist(1) });
+      stacks[2].push({ color: c, dist: stackDist(2) });
+      var scoreBefore = score;
+      checkClear(2, 2);
+      if (stacks[2].length !== 0) fails.push('3매치가 제거되지 않음: 남은 ' + stacks[2].length);
+      if (score <= scoreBefore) fails.push('제거 시 점수 미증가');
+      // 4) 2개는 제거되지 않아야 함
+      startGame();
+      stacks[1].push({ color: c, dist: stackDist(0) });
+      stacks[1].push({ color: c, dist: stackDist(1) });
+      scoreBefore = score;
+      checkClear(1, 1);
+      if (stacks[1].length !== 2) fails.push('2매치가 잘못 제거됨');
+      if (score !== scoreBefore) fails.push('2매치에서 점수 오증가');
+      box.textContent = fails.length ? 'SELFTEST FAIL\n' + fails.slice(0, 5).join('\n')
+        : 'SELFTEST PASS — 웨이브 착지 ' + landings + '회 · 3매치 제거·중력 압축·콤보 점수 검증 완료';
+      box.style.color = fails.length ? '#ff8f8f' : 'var(--accent2)';
+    } catch (err) {
+      box.textContent = 'SELFTEST FAIL — 예외: ' + (err && err.message || err);
+      box.style.color = '#ff8f8f';
+    }
+  }
+
+  /* ---------- 부팅 ---------- */
+  resize();
+  best = parseInt(localStorage.getItem(LS_BEST) || '0', 10) || 0;
+  reset();
+  requestAnimationFrame(function (t) { lastT = t; requestAnimationFrame(loop); });
+  if (location.hash === '#selftest') selfTest();
+})();
+</script>
+</body>
+</html>
