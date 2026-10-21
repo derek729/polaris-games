@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
+<title>🔢 2048 — 폴라리스 게임 센터</title>
+<meta name="description" content="같은 숫자를 밀어 합쳐 2048을 만드는 퍼즐. 방향키·스와이프 지원, 최고기록 저장, 이어하기.">
+<meta name="theme-color" content="#0d1021">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="2048">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/favicon-64.png">
+<link rel="stylesheet" href="game-assets/fonts/fonts.css">
+<style>
+  :root{--bg:#0d1021;--panel:#171b33;--panel2:#1f2445;--line:#333a66;--accent:#e8b64c;
+        --accent2:#4fd1c5;--text:#ece6f7;--dim:#9aa0c8;}
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{background:radial-gradient(900px 500px at 70% -10%,#1b2145 0%,var(--bg) 55%);color:var(--text);
+       font-family:"Galmuri11","Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+       display:flex;flex-direction:column;align-items:center;padding:16px 12px 32px;
+       -webkit-user-select:none;user-select:none;}
+  header{width:min(92vw,460px);display:flex;align-items:center;justify-content:space-between;gap:10px;margin:8px 0 6px;}
+  header h1{font-size:clamp(30px,8vw,44px);letter-spacing:.06em;
+            background:linear-gradient(90deg,#9f8cff,#4fd1c5);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .scores{display:flex;gap:8px;}
+  .scorebox{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 14px;text-align:center;min-width:74px;}
+  .scorebox .lbl{font-size:10.5px;color:var(--dim);letter-spacing:.12em;}
+  .scorebox .val{font-size:20px;font-weight:900;color:var(--accent);font-variant-numeric:tabular-nums;}
+  .sub{width:min(92vw,460px);display:flex;align-items:center;justify-content:space-between;gap:10px;margin:4px 0 14px;}
+  .sub .desc{font-size:12.5px;color:var(--dim);line-height:1.6;}
+  .sub .desc b{color:var(--accent2);}
+  #newGame{background:var(--accent);color:#0d1021;border:0;border-radius:9px;padding:9px 16px;
+           font-family:inherit;font-size:13px;font-weight:900;cursor:pointer;letter-spacing:.04em;}
+  #newGame:active{transform:scale(.96);}
+  /* ---------- 보드 ---------- */
+  #boardWrap{position:relative;width:min(92vw,460px);}
+  #board{position:relative;width:100%;aspect-ratio:1/1;background:var(--panel);
+         border:1px solid var(--line);border-radius:14px;touch-action:none;}
+  .bg{position:absolute;inset:10px;display:grid;grid-template:repeat(4,var(--cell))/repeat(4,var(--cell));gap:10px;}
+  .bg i{background:rgba(255,255,255,.055);border-radius:9px;}
+  .tile{position:absolute;top:10px;left:10px;width:var(--cell);height:var(--cell);border-radius:9px;
+        display:flex;align-items:center;justify-content:center;font-weight:900;
+        transform:translate(calc(var(--x)*(var(--cell) + 10px)),calc(var(--y)*(var(--cell) + 10px)));
+        transition:transform .12s ease;will-change:transform;z-index:2;}
+  .tile.new{animation:pop .16s ease;}
+  .tile.merged{animation:pop2 .18s ease .06s backwards;}
+  @keyframes pop{from{scale:.3;opacity:0;}to{scale:1;opacity:1;}}
+  @keyframes pop2{from{scale:1.25;}to{scale:1;}}
+  .tile.v1{background:#2e3550;color:#cfd6ff;font-size:calc(var(--cell)*.44);}
+  .tile.v2{background:#3a4270;color:#dfe6ff;font-size:calc(var(--cell)*.44);}
+  .tile.v3{background:#4a54a0;color:#fff;font-size:calc(var(--cell)*.44);}
+  .tile.v4{background:#6a55c0;color:#fff;font-size:calc(var(--cell)*.44);}
+  .tile.v5{background:#9a55c8;color:#fff;font-size:calc(var(--cell)*.44);}
+  .tile.v6{background:#c85fb0;color:#fff;font-size:calc(var(--cell)*.44);}
+  .tile.v7{background:#e86a8a;color:#fff;font-size:calc(var(--cell)*.40);box-shadow:0 0 12px rgba(232,106,138,.4);}
+  .tile.v8{background:#f08a5f;color:#fff;font-size:calc(var(--cell)*.36);box-shadow:0 0 12px rgba(240,138,95,.45);}
+  .tile.v9{background:#f0a54f;color:#3a2408;font-size:calc(var(--cell)*.34);box-shadow:0 0 14px rgba(240,165,79,.5);}
+  .tile.v10{background:#f1c40f;color:#3a2408;font-size:calc(var(--cell)*.30);box-shadow:0 0 16px rgba(241,196,15,.55);}
+  .tile.v11{background:linear-gradient(135deg,#f6d365,#e8b64c);color:#3a2408;font-size:calc(var(--cell)*.28);
+            box-shadow:0 0 22px rgba(232,182,76,.75);}
+  .tile.v12{background:linear-gradient(135deg,#ffe29a,#ffdf7e);color:#3a2408;font-size:calc(var(--cell)*.24);
+            box-shadow:0 0 30px rgba(255,223,126,.9);}
+  /* ---------- 오버레이 ---------- */
+  #overlay{position:absolute;inset:0;z-index:5;display:none;flex-direction:column;align-items:center;justify-content:center;
+           gap:14px;background:rgba(13,16,33,.82);border-radius:14px;backdrop-filter:blur(2px);text-align:center;padding:20px;}
+  #overlay.show{display:flex;animation:fade .25s ease;}
+  @keyframes fade{from{opacity:0;}to{opacity:1;}}
+  #overlay h2{font-size:clamp(24px,6vw,34px);letter-spacing:.04em;}
+  #overlay .msg{color:var(--dim);font-size:13.5px;line-height:1.7;}
+  #overlay .msg b{color:var(--accent);}
+  #overlay .btns{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;}
+  #overlay button{border:0;border-radius:9px;padding:10px 20px;font-family:inherit;font-size:13.5px;font-weight:900;cursor:pointer;}
+  #btnContinue{background:var(--accent2);color:#0d1021;}
+  #btnRestart{background:var(--panel2);color:var(--text);border:1px solid var(--line);}
+  #selftest{width:min(92vw,460px);margin-top:12px;font-size:12px;color:var(--accent2);white-space:pre-wrap;display:none;}
+  footer{margin-top:18px;color:var(--dim);font-size:11.5px;line-height:1.8;text-align:center;}
+  footer a{color:var(--dim);}
+</style>
+</head>
+<body>
+<header>
+  <h1>2048</h1>
+  <div class="scores">
+    <div class="scorebox"><div class="lbl">점수</div><div class="val" id="score">0</div></div>
+    <div class="scorebox"><div class="lbl">최고</div><div class="val" id="best">0</div></div>
+  </div>
+</header>
+<div class="sub">
+  <p class="desc">같은 숫자를 밀어 합쳐 <b>2048</b>을 만들어 보세요!<br>방향키 · WASD · 스와이프로 이동</p>
+  <button id="newGame">새 게임</button>
+</div>
+<div id="boardWrap">
+  <div id="board">
+    <div class="bg"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    <div id="tiles"></div>
+  </div>
+  <div id="overlay">
+    <h2 id="ovTitle"></h2>
+    <p class="msg" id="ovMsg"></p>
+    <div class="btns">
+      <button id="btnContinue">계속하기</button>
+      <button id="btnRestart">새 게임</button>
+    </div>
+  </div>
+</div>
+<div id="selftest"></div>
+<footer>
+  폴라리스 게임 센터 · <a href="index.html">포털로 돌아가기</a><br>
+  원작 메커니즘 참조: gabrielecirulli/2048 (MIT) — 자체 재구현
+</footer>
+<script>
+(function () {
+  'use strict';
+  var SIZE = 4, PAD = 10, GAP = 10;
+  var LS_BEST = 'polaris-2048-best', LS_STATE = 'polaris-2048-state';
+  var board = document.getElementById('board');
+  var tilesEl = document.getElementById('tiles');
+  var scoreEl = document.getElementById('score');
+  var bestEl = document.getElementById('best');
+  var overlay = document.getElementById('overlay');
+  var ovTitle = document.getElementById('ovTitle');
+  var ovMsg = document.getElementById('ovMsg');
+
+  var grid, score, best, won, over, keepPlaying, winShown, lockUntil = 0;
+
+  /* ---------- 레이아웃 ---------- */
+  function layout() {
+    var w = board.clientWidth;
+    board.style.setProperty('--cell', ((w - PAD * 2 - GAP * 3) / SIZE) + 'px');
+  }
+  window.addEventListener('resize', layout);
+
+  /* ---------- 그리드 ---------- */
+  function emptyGrid() {
+    var g = [];
+    for (var x = 0; x < SIZE; x++) { g.push([null, null, null, null]); }
+    return g;
+  }
+  function inside(x, y) { return x >= 0 && x < SIZE && y >= 0 && y < SIZE; }
+  function emptyCells() {
+    var out = [];
+    for (var x = 0; x < SIZE; x++) for (var y = 0; y < SIZE; y++) if (!grid[x][y]) out.push({ x: x, y: y });
+    return out;
+  }
+  function makeTile(x, y, value, cls) {
+    var el = document.createElement('div');
+    el.className = 'tile ' + (cls || 'new');
+    el.textContent = value;
+    var t = { x: x, y: y, value: value, el: el, mergedFrom: null };
+    position(t);
+    tilesEl.appendChild(el);
+    return t;
+  }
+  function position(t) {
+    t.el.style.setProperty('--x', t.x);
+    t.el.style.setProperty('--y', t.y);
+  }
+  function tier(v) {  // 값 → CSS 클래스 등급
+    var n = 1;
+    while (v > 2) { v /= 2; n++; }
+    return 'v' + Math.min(n, 12);
+  }
+  function addRandomTile() {
+    var cells = emptyCells();
+    if (!cells.length) return null;
+    var c = cells[Math.floor(Math.random() * cells.length)];
+    var value = Math.random() < 0.9 ? 2 : 4;   // 원본 메커니즘: 90%는 2, 10%는 4
+    var t = makeTile(c.x, c.y, value);
+    grid[c.x][c.y] = t;
+    return t;
+  }
+
+  /* ---------- 이동 (원본 game_manager.js 로직 재구현) ---------- */
+  function farthest(x, y, dx, dy) {
+    var px = x, py = y;
+    do { x += dx; y += dy; } while (inside(x, y) && !grid[x][y] && (px = x, py = y, true));
+    return { far: { x: px, y: py }, next: { x: x, y: y } };
+  }
+  function moveCore(dx, dy) {
+    if (over || (won && !keepPlaying)) return false;
+    var moved = false;
+    for (var cx = 0; cx < SIZE; cx++) for (var cy = 0; cy < SIZE; cy++) {
+      if (grid[cx][cy]) grid[cx][cy].mergedFrom = null;   // 이동당 병합 1회 — 원본 prepareTiles 재현
+    }
+    var xs = [], ys = [];
+    for (var i = 0; i < SIZE; i++) { xs.push(i); ys.push(i); }
+    if (dx === 1) xs.reverse();
+    if (dy === 1) ys.reverse();
+    xs.forEach(function (x) {
+      ys.forEach(function (y) {
+        var t = grid[x][y];
+        if (!t) return;
+        var r = farthest(x, y, dx, dy);
+        var n = grid[r.next.x] && grid[r.next.x][r.next.y];
+        if (n && n.value === t.value && !n.mergedFrom) {
+          // 병합: 이동당 각 타일 최대 1회
+          grid[t.x][t.y] = null;
+          grid[n.x][n.y] = null;
+          position(t);                       // 미끄러지는 애니메이션
+          t.x = n.x; t.y = n.y; position(t);
+          var m = makeTile(n.x, n.y, t.value * 2, 'merged ' + tier(t.value * 2));
+          m.el.style.opacity = '0';
+          m.mergedFrom = [t, n];
+          grid[n.x][n.y] = m;
+          score += m.value;
+          moved = true;
+          setTimeout(function () {           // 슬라이드 끝나면 소스 타일 정리 + 팝
+            t.el.remove(); n.el.remove();
+            m.el.style.opacity = '1';
+            if (m.value === 2048 && !winShown) { won = true; winShown = true; showWin(); }
+          }, 120);
+          if (m.value === 2048 && !winShown) { /* 위 setTimeout에서 처리 */ }
+        } else if (r.far.x !== t.x || r.far.y !== t.y) {
+          grid[t.x][t.y] = null;
+          t.x = r.far.x; t.y = r.far.y;
+          grid[t.x][t.y] = t;
+          position(t);
+          moved = true;
+        }
+      });
+    });
+    if (!moved) return false;
+    updateHud();
+    return true;
+  }
+  function move(dx, dy) {
+    var now = Date.now();
+    if (now < lockUntil) return false;
+    if (!moveCore(dx, dy)) return false;
+    lockUntil = now + 130;
+    setTimeout(function () {
+      addRandomTile();
+      save();
+      if (!movesAvailable()) { over = true; save(); showOver(); }
+    }, 60);
+    return true;
+  }
+  function movesAvailable() {
+    if (emptyCells().length) return true;
+    for (var x = 0; x < SIZE; x++) for (var y = 0; y < SIZE; y++) {
+      var v = grid[x][y].value;
+      if (inside(x + 1, y) && grid[x + 1][y].value === v) return true;
+      if (inside(x, y + 1) && grid[x][y + 1].value === v) return true;
+    }
+    return false;
+  }
+
+  /* ---------- 저장/복원 ---------- */
+  function save() {
+    try {
+      if (best < score) { best = score; }
+      localStorage.setItem(LS_BEST, String(best));
+      if (over) { localStorage.removeItem(LS_STATE); return; }
+      var cells = [];
+      for (var x = 0; x < SIZE; x++) for (var y = 0; y < SIZE; y++) {
+        if (grid[x][y]) cells.push({ x: x, y: y, v: grid[x][y].value });
+      }
+      localStorage.setItem(LS_STATE, JSON.stringify({ cells: cells, score: score, won: won, keepPlaying: keepPlaying, winShown: winShown }));
+    } catch (e) { /* 저장 실패는 무시 */ }
+  }
+  function restore() {
+    try {
+      var raw = localStorage.getItem(LS_STATE);
+      if (!raw) return false;
+      var s = JSON.parse(raw);
+      grid = emptyGrid();
+      s.cells.forEach(function (c) {
+        if (!inside(c.x, c.y)) return;
+        var t = makeTile(c.x, c.y, c.v, tier(c.v));
+        t.el.classList.remove('new');
+        grid[c.x][c.y] = t;
+      });
+      score = s.score || 0; won = !!s.won; keepPlaying = !!s.keepPlaying; winShown = !!s.winShown;
+      return true;
+    } catch (e) { return false; }
+  }
+
+  /* ---------- HUD/오버레이 ---------- */
+  function updateHud() {
+    scoreEl.textContent = score;
+    if (best < score) best = score;
+    bestEl.textContent = best;
+  }
+  function showOverlay(title, msg, showContinue) {
+    ovTitle.textContent = title;
+    ovMsg.innerHTML = msg;
+    document.getElementById('btnContinue').style.display = showContinue ? '' : 'none';
+    overlay.classList.add('show');
+  }
+  function hideOverlay() { overlay.classList.remove('show'); }
+  function showWin() {
+    save();
+    showOverlay('🎉 2048 달성!', '목표 달성! 점수 <b>' + score + '</b><br>더 큰 숫자에 도전해 보세요.', true);
+  }
+  function showOver() {
+    showOverlay('게임 오버', '최종 점수 <b>' + score + '</b> · 최고 기록 <b>' + best + '</b>', false);
+  }
+
+  /* ---------- 시작 ---------- */
+  function newGame() {
+    tilesEl.innerHTML = '';
+    hideOverlay();
+    grid = emptyGrid();
+    score = 0; won = false; over = false; keepPlaying = false; winShown = false; lockUntil = 0;
+    addRandomTile(); addRandomTile();   // 시작 타일 2개 (원본 동일)
+    updateHud();
+    save();
+  }
+  document.getElementById('newGame').addEventListener('click', newGame);
+  document.getElementById('btnRestart').addEventListener('click', newGame);
+  document.getElementById('btnContinue').addEventListener('click', function () {
+    keepPlaying = true;
+    hideOverlay();
+    save();
+  });
+
+  /* ---------- 입력: 키보드 ---------- */
+  var KEYS = {
+    ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1],
+    a: [-1, 0], d: [1, 0], w: [0, -1], s: [0, 1],
+    A: [-1, 0], D: [1, 0], W: [0, -1], S: [0, 1]
+  };
+  document.addEventListener('keydown', function (e) {
+    var v = KEYS[e.key];
+    if (!v) return;
+    e.preventDefault();
+    move(v[0], v[1]);
+  });
+  /* ---------- 입력: 스와이프 ---------- */
+  var touchStart = null;
+  board.addEventListener('touchstart', function (e) {
+    if (e.touches.length !== 1) return;
+    var t = e.touches[0];
+    touchStart = { x: t.clientX, y: t.clientY };
+  }, { passive: true });
+  board.addEventListener('touchmove', function (e) { e.preventDefault(); }, { passive: false });
+  board.addEventListener('touchend', function (e) {
+    if (!touchStart) return;
+    var t = e.changedTouches[0];
+    var dx = t.clientX - touchStart.x, dy = t.clientY - touchStart.y;
+    touchStart = null;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < 24) return;
+    if (Math.abs(dx) > Math.abs(dy)) move(dx > 0 ? 1 : -1, 0);
+    else move(0, dy > 0 ? 1 : -1);
+  }, { passive: true });
+
+  /* ---------- 셀프 테스트 (#selftest) — 불변식 검증 ---------- */
+  function selfTest() {
+    var box = document.getElementById('selftest');
+    box.style.display = 'block';
+    var fails = [];
+    try {
+      // 시드 고정 랜덤(mulberry32)으로 재현 가능하게
+      var seed = 20480421;
+      Math.random = function () {
+        seed = (seed + 0x6D2B79F5) | 0;
+        var t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+      newGame();
+      var dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+      var maxTile = 0, moves = 0;
+      for (var i = 0; i < 600 && !over; i++) {
+        var dir = dirs[(Math.random() * 4) | 0];
+        var before = countTiles();
+        if (moveCore(dir[0], dir[1])) {
+          addRandomTile();                   // 스폰도 동기 실행 — 원본 규칙(이동 성공 시 1개) 그대로
+          moves++;
+          if (countTiles() > before + 1) fails.push('이동 후 타일 수 이상: ' + before + '->' + countTiles());
+          if (!movesAvailable()) over = true;
+        }
+        var cnt = 0, occ = {};
+        for (var x = 0; x < SIZE; x++) for (var y = 0; y < SIZE; y++) {
+          var t = grid[x][y];
+          if (!t) continue;
+          cnt++;
+          if ((t.value & (t.value - 1)) !== 0) fails.push('2의 거듭제곱 아님: ' + t.value);
+          var k = x + ',' + y;
+          if (occ[k]) fails.push('셀 중복: ' + k);
+          occ[k] = 1;
+          if (t.value > maxTile) maxTile = t.value;
+        }
+        if (cnt > SIZE * SIZE) fails.push('타일 초과: ' + cnt);
+      }
+      if (moves === 0) fails.push('한 번도 이동하지 못함');
+      if (maxTile < 64) fails.push('600수에 최대 타일 64 미만: ' + maxTile);
+      box.textContent = (fails.length ? 'SELFTEST FAIL\n' + fails.slice(0, 5).join('\n')
+        : 'SELFTEST PASS — 이동 ' + moves + '회 · 최대 타일 ' + maxTile + ' · 점수 ' + score);
+      box.style.color = fails.length ? '#ff8f8f' : 'var(--accent2)';
+    } catch (err) {
+      box.textContent = 'SELFTEST FAIL — 예외: ' + (err && err.message || err);
+      box.style.color = '#ff8f8f';
+    }
+  }
+  function countTiles() {
+    var n = 0;
+    for (var x = 0; x < SIZE; x++) for (var y = 0; y < SIZE; y++) if (grid[x][y]) n++;
+    return n;
+  }
+
+  /* ---------- 부팅 ---------- */
+  layout();
+  best = parseInt(localStorage.getItem(LS_BEST) || '0', 10) || 0;
+  if (!restore()) newGame();
+  updateHud();
+  if (location.hash === '#selftest') selfTest();
+})();
+</script>
+</body>
+</html>
