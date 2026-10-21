@@ -478,10 +478,20 @@ const goServer = http.createServer((req, res) => {
     res.end(data);
   });
 });
+goServer.on('error', (err) => {
+  // 8793이 다른 프로세스(별도 no-cache 서버 등)에 선점돼도 자비스(8790)는 계속 구동 —
+  // uncaught 크래시 방지 (2026-10-19 기동 시 실츱된 EADDRINUSE 사례)
+  console.log('[gostop-web] 8793 선점됨(' + (err && err.code || err) + ') — 별도 서버가 서빙 중이므로 스킵');
+});
 goServer.listen(8793, '0.0.0.0', () => {
   console.log('[gostop-web] http://0.0.0.0:8793 — no-store 서빙');
 });
 
+server.on('error', (err) => {
+  // 8790 중복 기동 방지 — 이미 구동 중이면 이 인스턴스는 조용히 종료
+  console.log('[jarvis-service] ' + PORT + ' 바인딩 실패(' + (err && err.code || err) + ') — 이미 구동 중, 이 인스턴스는 종료');
+  process.exit(0);
+});
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`[jarvis-service v3] http://0.0.0.0:${PORT} — 세션 메모리·스킬(${SKILLS.size}종)·브리핑 실데이터 활성`);
 });

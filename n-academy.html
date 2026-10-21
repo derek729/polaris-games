@@ -485,6 +485,7 @@ main { max-width: 1200px; width: 100%; margin: 0 auto; padding: 22px 20px 60px; 
         <div>
           <div class="htitle">My Study Dashboard</div>
           <div class="hname" id="hero-name"></div>
+          <button id="resume-btn" class="btn gold" style="margin-top:10px;display:none"></button>
         </div>
         <div class="hstats">
           <div class="hstat"><div class="v" id="hs-streak">🔥 0<em>일</em></div><div class="l">연속 학습</div></div>
@@ -2197,6 +2198,14 @@ $('#lecture-search').addEventListener('input', () => {
   clearTimeout(searchDebounce);
   searchDebounce = setTimeout(runLectureSearch, 120);
 });
+document.getElementById('resume-btn').addEventListener('click', () => {
+  const target = document.getElementById('resume-btn').dataset.target;
+  if (!target) return;
+  state.activeTab = 'lect';
+  selectCourse(target);   // 진도 복원 토스트 포함 (파트·문장 복원)
+  renderAll();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+});
 document.addEventListener('click', (e) => {
   const sr = e.target.closest('[data-sr]');
   if (!sr) return;
@@ -2395,6 +2404,18 @@ function renderProgress() {
   $('#hs-exam').innerHTML = next ? next.date.slice(5) + '<em></em>' : '-<em></em>';
   $('#hs-streak').innerHTML = '🔥 ' + calcStreak() + '<em>일</em>';
   $('#hero-name').textContent = state.userName + ' · N-FINANCE ACADEMY 학습 현황';
+  // 이어서 학습 — 진도 저장된 강의(커리큘럼 순 첫 번째), 없으면 미완강 첫 강의
+  const resumeId = ACADEMY_COURSES.find(c => state.progress[c.id] && !state.completed.includes(c.id));
+  const nextId = ACADEMY_COURSES.find(c => !state.completed.includes(c.id));
+  const target = resumeId || nextId;
+  const rb = document.getElementById('resume-btn');
+  if (target) {
+    rb.style.display = '';
+    rb.dataset.target = target.id;
+    rb.textContent = (resumeId ? '▶ 이어서 학습 — ' : '▶ 다음 강의 — ') + target.moduleCode + ' ' + target.categoryLabel;
+  } else {
+    rb.style.display = 'none';  // 13강 전부 완강
+  }
 }
 function renderCurrList() {
   const list = state.category === 'all' ? ACADEMY_COURSES : ACADEMY_COURSES.filter(c => c.category === state.category);
