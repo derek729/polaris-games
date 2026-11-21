@@ -3,7 +3,7 @@
    Cache-first offline support for the whole game suite.
    Bump CACHE_VERSION whenever suite files change.
    ============================================================ */
-const CACHE_VERSION = 'polaris-v26';
+const CACHE_VERSION = 'polaris-v27'; // 뱀파이어 키우기: 신규 스프라이트 10종 + 실서비스 메타 (장비·강화 업데이트 포함)
 const PRECACHE = [
   // 통합 포털 + 아케이드 게임
   'index.html',
@@ -65,6 +65,17 @@ const PRECACHE = [
   'game-assets/vampire-survivors/item-chest.png',
   'game-assets/vampire-survivors/item-gem.png',
   'game-assets/vampire-survivors/item-potion.png',
+  // 자체 제작 픽셀 스프라이트 (gen_vs_sprites.py)
+  'game-assets/vampire-survivors/enemy-wolf.png',
+  'game-assets/vampire-survivors/enemy-golem.png',
+  'game-assets/vampire-survivors/enemy-stump.png',
+  'game-assets/vampire-survivors/enemy-ghost.png',
+  'game-assets/vampire-survivors/item-coin.png',
+  'game-assets/vampire-survivors/item-magnet.png',
+  'game-assets/vampire-survivors/item-bomb.png',
+  'game-assets/vampire-survivors/prop-candle.png',
+  'game-assets/vampire-survivors/icon-vampire-64.png',
+  'game-assets/vampire-survivors/icon-vampire-128.png',
   // AI 생성 에셋 — 사운드
   'game-assets/sfx/coin.wav',
   'game-assets/sfx/explosion.wav',

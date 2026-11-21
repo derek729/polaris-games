@@ -3,8 +3,21 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>🧛 뱀파이어 키우기</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧛</text></svg>">
+<title>🧛 뱀파이어 키우기 — 폴라리스 게임 센터</title>
+<meta name="description" content="뱀서라이크 생존 액션 — 10분을 버텨라! 무기 58종 · 방어구 210종 · 셋트 10종 · 스테이지 3종 · 영구 강화 상점. 모바일 터치 지원.">
+<meta name="theme-color" content="#100c18">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="뱀파이어 키우기">
+<meta property="og:type" content="website">
+<meta property="og:title" content="🧛 뱀파이어 키우기 — 폴라리스 게임 센터">
+<meta property="og:description" content="뱀서라이크 생존 액션 — 무기 58종 · 방어구 210종 · 셋트 10종 수집 강화. 브라우저에서 바로 플레이.">
+<meta property="og:image" content="game-assets/vampire-survivors/icon-vampire-128.png">
+<meta name="twitter:card" content="summary">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="game-assets/vampire-survivors/icon-vampire-64.png">
+<link rel="apple-touch-icon" href="game-assets/vampire-survivors/icon-vampire-128.png">
 <style>
   :root{--bg:#100c18;--panel:#221a33;--panel2:#2c2144;--line:#4a3a6b;--gold:#e8b64c;--text:#ece6f7;--dim:#a99cc4;}
   html,body{margin:0;padding:0;height:100%;background:var(--bg);overflow:hidden;color:var(--text);
@@ -62,6 +75,9 @@
   .charcard:hover{transform:translateY(-4px);border-color:var(--gold);}
   .charcard .ci{font-size:42px;}
   .charcard canvas{display:block;margin:0 auto;width:72px;height:75px;}
+  .charcard .ctrait{font-size:11px;color:#ffd76a;margin-top:6px;line-height:1.5;background:rgba(232,182,76,.08);
+                    border:1px solid rgba(232,182,76,.3);border-radius:6px;padding:4px 6px;font-weight:800;}
+  .charcard .ctrait span{color:var(--dim);font-weight:600;}
   .charcard .cn{font-weight:900;font-size:17px;margin:4px 0;}
   .charcard .cd{font-size:12px;color:var(--dim);min-height:32px;line-height:1.5;}
   .charcard .cw{font-size:12px;color:#7fd0ff;margin-top:4px;}
@@ -90,6 +106,17 @@
   .setrow .sn{font-weight:800;white-space:nowrap;}
   .setrow.done .sn{color:var(--gold);}
   .statline{font-size:12.5px;line-height:1.9;color:var(--text);}
+  /* 강화 상점 (영구 골드 은행) */
+  .shopgrid{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:12px;}
+  .shopitem{width:152px;background:var(--panel2);border:2px solid var(--line);border-radius:12px;padding:12px 10px;text-align:center;}
+  .shopitem .si{font-size:30px;}
+  .shopitem .sn{font-weight:900;margin:4px 0 2px;}
+  .shopitem .slv{color:var(--gold);font-size:11px;}
+  .shopitem .sbuy{margin-top:8px;padding:6px 14px;border:none;border-radius:8px;
+                  background:linear-gradient(180deg,#ffd97a,#e8b64c);font-weight:900;color:#1a1226;cursor:pointer;font-family:inherit;}
+  .shopitem .sbuy:disabled{background:#3a2d5c;color:var(--dim);cursor:default;}
+  .shopitem.maxed{opacity:.75;}
+  .shopitem .hint{font-size:11px;line-height:1.45;min-height:30px;}
   /* ---------- 메타 진행 (BACKLOG #11) ---------- */
   .metaChips{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-top:8px;}
   .chip{display:inline-block;padding:3px 10px;font-size:12px;font-weight:800;color:#7fd0ff;
@@ -144,13 +171,24 @@
     </p>
     <button class="btn" id="btnStart">⚔️ 게임 시작</button>
     <button class="btn ghost" id="btnMeta">🏆 업적</button>
+    <p class="hint" style="margin-top:14px;font-size:11px;opacity:.75">v1.0.0 · 스프라이트: AI 생성 + 자체 제작(PIL 픽셀아트) · © 폴라리스 소프트웨어</p>
   </div>
 
   <div id="scr-char" class="screen hidden">
     <h2>캐릭터 선택</h2>
     <div id="metaChips" class="metaChips"></div>
+    <div id="stagepick"></div>
     <div class="chargrid" id="chargrid"></div>
     <div id="wpick" class="hidden"></div>
+    <button class="btn ghost" id="btnShop">🪙 강화 상점</button>
+  </div>
+
+  <div id="scr-shop" class="screen hidden">
+    <h2>🪙 강화 상점</h2>
+    <p class="hint">런에서 모은 골드는 <b style="color:var(--gold)">영구 은행</b>에 누적된다 — 은행: <b id="shopBank" style="color:var(--gold)"></b> G</p>
+    <div class="shopgrid" id="shopgrid"></div>
+    <p class="hint">보너스는 <b style="color:var(--gold)">모든 런에 영구 적용</b>된다</p>
+    <button class="btn" id="btnShopClose">돌아가기</button>
   </div>
 
   <div id="scr-meta" class="screen hidden">
@@ -248,9 +286,17 @@ const SPRITES = {
   "boss-slimeking":  spriteImg("game-assets/vampire-survivors/boss-slimeking.png"),
   "boss-shroomking": spriteImg("game-assets/vampire-survivors/boss-shroomking.png"),
   "boss-reaper":     spriteImg("game-assets/vampire-survivors/boss-reaper.png"),
+  "enemy-wolf":      spriteImg("game-assets/vampire-survivors/enemy-wolf.png"),
+  "enemy-golem":     spriteImg("game-assets/vampire-survivors/enemy-golem.png"),
+  "enemy-stump":     spriteImg("game-assets/vampire-survivors/enemy-stump.png"),
+  "enemy-ghost":     spriteImg("game-assets/vampire-survivors/enemy-ghost.png"),
   "item-chest":      spriteImg("game-assets/vampire-survivors/item-chest.png"),
   "item-gem":        spriteImg("game-assets/vampire-survivors/item-gem.png"),
   "item-potion":     spriteImg("game-assets/vampire-survivors/item-potion.png"),
+  "item-coin":       spriteImg("game-assets/vampire-survivors/item-coin.png"),
+  "item-magnet":     spriteImg("game-assets/vampire-survivors/item-magnet.png"),
+  "item-bomb":       spriteImg("game-assets/vampire-survivors/item-bomb.png"),
+  "prop-candle":     spriteImg("game-assets/vampire-survivors/prop-candle.png"),
 };
 const spriteReady = im => !!im && im.complete && im.naturalWidth > 0;
 
@@ -342,14 +388,20 @@ function startBgm(){
 }
 function stopBgm(){ try { if (bgm){ bgm.pause(); bgm.currentTime = 0; } } catch (e) {} }
 
-/* ---------------- 데이터: 캐릭터 (메이플풍 치비 오리지널 아트) ---------------- */
+/* ---------------- 데이터: 캐릭터 (메이플풍 치비 오리지널 아트 + 고유 특성) ---------------- */
 const CHARS = {
-  hunter:   { icon:"🗡️", name:"헌터",     weapon:"whip",   hp:120, spd:100, regen:0,   desc:"두두둑! 체력이 높은 균형형" },
-  mage:     { icon:"🪄", name:"마도사",   weapon:"wand",   hp:100, spd:116, regen:0,   desc:"빠른 발놀림으로 몰림을 피한다" },
-  nun:      { icon:"🙏", name:"수녀",     weapon:"garlic", hp:100, spd:100, regen:0.8, desc:"강력한 재생으로 버티는 성자" },
-  warrior:  { icon:"🪓", name:"전사",     weapon:"axe",    hp:140, spd:95,  regen:0,   desc:"가장 두꺼운 체력으로 정면 돌파" },
-  paladin:  { icon:"🛡️", name:"성기사",   weapon:"bible",  hp:110, spd:100, regen:0.4, desc:"성서의 가호와 싸우는 방패 기사" },
-  alchemist:{ icon:"⚗️", name:"연금술사", weapon:"holy",   hp:100, spd:105, regen:0, area:1.25, desc:"약물이 넓게 번지는 범위 전문가" },
+  hunter:   { icon:"🗡️", name:"헌터",     weapon:"whip",   hp:120, spd:100, regen:0,   desc:"두두둑! 체력이 높은 균형형",
+              trait:"쌍두 채찍", traitDesc:"채찍이 Lv.1부터 전·후방 동시 공격" },
+  mage:     { icon:"🪄", name:"마도사",   weapon:"wand",   hp:100, spd:116, regen:0,   desc:"빠른 발놀림으로 몰림을 피한다",
+              trait:"마력 과부하", traitDesc:"발사체 명중 시 20% 확률 소형 폭발" },
+  nun:      { icon:"🙏", name:"수녀",     weapon:"garlic", hp:100, spd:100, regen:0.8, desc:"강력한 재생으로 버티는 성자",
+              trait:"정화의 기도", traitDesc:"오라 범위 +25% · 적중 시 체력 회복" },
+  warrior:  { icon:"🪓", name:"전사",     weapon:"axe",    hp:140, spd:95,  regen:0,   desc:"가장 두꺼운 체력으로 정면 돌파",
+              trait:"광전사", traitDesc:"체력 50% 이하 시 피해 +30% · 이동 +15%" },
+  paladin:  { icon:"🛡️", name:"성기사",   weapon:"bible",  hp:110, spd:100, regen:0.4, desc:"성서의 가호와 싸우는 방패 기사",
+              trait:"가호의 서약", traitDesc:"12초마다 2초간 무적 방어막" },
+  alchemist:{ icon:"⚗️", name:"연금술사", weapon:"holy",   hp:100, spd:105, regen:0, area:1.25, desc:"약물이 넓게 번지는 범위 전문가",
+              trait:"강화 용암", traitDesc:"장판 피해 +40% · 지속 +30%" },
 };
 /* 캐릭터별 치비 외형 팔레트 */
 const HERO_STYLE = {
@@ -619,6 +671,45 @@ const FLOCKS = [
 const ELITE_TIMES = [90, 200, 320, 440, 555];
 const GOAL = 600; // 10분 생존
 
+/* ---------------- 스테이지 3종 (바이옴 다각화 — Veloren 등 오픈소스의 바이옴 설계 참조) ---------------- */
+const STAGES = {
+  graveyard: { icon:"🌙", name:"저주받은 묘지", desc:"표준 밸런스의 기본 스테이지",
+    floorA:"#191329", floorB:"#1b1530", propTree:"#241c3a", propGrave:"#2c2542", propRock:"#2a2344", propBush:"#1d2c25",
+    eHp:1, eSpd:1 },
+  forest: { icon:"🍁", name:"핏빛 숲", desc:"적이 빠르고 약하다 (체력 −10% · 속도 +15%) — 처치 속도가 생명",
+    floorA:"#1c1220", floorB:"#20142a", propTree:"#3a1c28", propGrave:"#38202c", propRock:"#33202e", propBush:"#402226",
+    eHp:0.9, eSpd:1.15 },
+  glacier: { icon:"❄️", name:"서리 호수", desc:"적이 느리고 단단하다 (체력 +20% · 속도 −15%) — 화력이 필요",
+    floorA:"#101a2c", floorB:"#12203a", propTree:"#1c3048", propGrave:"#1e344e", propRock:"#24405c", propBush:"#1a3040",
+    eHp:1.2, eSpd:0.85 },
+};
+let selStage = "graveyard"; // 캐릭터 화면에서 선택
+
+/* ---------------- 파괴 오브젝트 (촛대 — VS의 파괴 장식 참조) + 저주 카드 ---------------- */
+const CURSES = {
+  blood:  { icon:"🩸", name:"피의 서약",   desc:"피해 +25% ⇆ 최대 체력 −15%" },
+  hunger: { icon:"🐺", name:"군주의 발톱", desc:"이동 속도 +20% ⇆ 재생 0" },
+  swift:  { icon:"⏳", name:"시간의 대가", desc:"쿨타임 −15% ⇆ 획득 범위 −40%" },
+  greed:  { icon:"💀", name:"죽음의 세금", desc:"골드 획득 +80% ⇆ 방어 −10" },
+};
+/* ---------------- 강화 상점 (영구 골드 은행 — VS 파워업 상점 참조) ---------------- */
+const SHOP_ITEMS = {
+  hp:     { icon:"❤️", name:"생명의 정수",   max:5, base:50,  eff:l=>`최대 체력 +${l*10}` },
+  dmg:    { icon:"⚔️", name:"전투의 각인",   max:5, base:80,  eff:l=>`피해 +${l*4}%` },
+  spd:    { icon:"👟", name:"질풍의 각인",   max:5, base:80,  eff:l=>`이동 속도 +${l*3}%` },
+  gold:   { icon:"💰", name:"탐욕의 인장",   max:5, base:60,  eff:l=>`골드 획득 +${l*10}%` },
+  reroll: { icon:"🎲", name:"운명의 주사위", max:2, base:150, eff:l=>`레벨업 리롤 +${l}` },
+  revive: { icon:"👼", name:"부활의 깃털",   max:1, base:400, eff:l=>"사망 시 1회 부활" },
+};
+function shopLevels(){ return META.shop || {}; }
+function shopCost(id){ const l = shopLevels()[id] || 0; return SHOP_ITEMS[id].base * (l + 1); }
+function shopBonus(){
+  const L = shopLevels(), b = {};
+  b.hp = (L.hp || 0) * 10; b.dmg = (L.dmg || 0) * 0.04; b.spd = (L.spd || 0) * 0.03; b.gold = (L.gold || 0) * 0.10;
+  b.reroll = L.reroll || 0; b.revive = L.revive || 0;
+  return b;
+}
+
 /* ---------------- 메타 진행 (BACKLOG #11 — 업적 9종 · 언락 보너스 · localStorage 영구 저장) ----------------
    - 업적 판정은 현재 런 상태(G) 기준, 해금 즉시 META로 영구 저장된다
    - 보너스는 "다음 런부터" 적용 — newGame()의 스탯 초기화 시 배수/가산으로 한 번만 반영 (기존 로직 불변)
@@ -651,7 +742,7 @@ function metaRecalc(m){
 }
 // localStorage("vs_meta") 로드 — 손상/변조 시 기본값으로 자가 수복
 function metaLoad(){
-  const def = { achievements:[], bonuses:{ damage:0, hp:0, gold:0, evo:0 } };
+  const def = { achievements:[], bonuses:{ damage:0, hp:0, gold:0, evo:0 }, bank:0, shop:{} };
   try {
     const raw = localStorage.getItem(META_KEY);
     if (!raw) return def;
@@ -659,11 +750,13 @@ function metaLoad(){
     return metaRecalc({
       achievements:[...new Set((Array.isArray(d.achievements) ? d.achievements : []).filter(id => META_ACH[id]))],
       bonuses:Object.assign({}, def.bonuses, d.bonuses),
+      bank: Math.max(0, Math.round(+d.bank || 0)),
+      shop: (d.shop && typeof d.shop === "object") ? d.shop : {},
     });
   } catch (e) { return def; }
 }
 function metaSave(){
-  try { localStorage.setItem(META_KEY, JSON.stringify({ achievements:META.achievements, bonuses:META.bonuses })); } catch (e) {}
+  try { localStorage.setItem(META_KEY, JSON.stringify({ achievements:META.achievements, bonuses:META.bonuses, bank:META.bank || 0, shop:META.shop || {} })); } catch (e) {}
 }
 // 활성 보너스 조회 (상한 클램프 보장) — newGame()에서 스탯 초기화에 사용
 function metaBonus(){
@@ -718,6 +811,29 @@ function buildMeta(){
     grid.appendChild(el);
   }
   $("achCount").textContent = `달성 ${got} / ${Object.keys(META_ACH).length}`;
+}
+// 강화 상점 (영구 골드 은행) — 구매 즉시 저장, 모든 런에 적용
+function buildShop(){
+  $("shopBank").textContent = (META.bank || 0).toLocaleString("en-US");
+  const grid = $("shopgrid");
+  grid.innerHTML = "";
+  for (const id of Object.keys(SHOP_ITEMS)){
+    const S = SHOP_ITEMS[id], l = shopLevels()[id] || 0, maxed = l >= S.max;
+    const cost = shopCost(id), can = !maxed && (META.bank || 0) >= cost;
+    const el = document.createElement("div");
+    el.className = "shopitem" + (maxed ? " maxed" : "");
+    el.innerHTML = `<div class="si">${S.icon}</div>
+      <div class="sn">${S.name} <span class="slv">${l}/${S.max}</span></div>
+      <div class="hint">${S.eff(l)}${maxed ? "" : ` → ${S.eff(l + 1)}`}</div>
+      <button class="sbuy" ${can ? "" : "disabled"}>${maxed ? "MAX" : cost + " G"}</button>`;
+    if (can) el.querySelector("button").addEventListener("click", () => {
+      META.bank -= cost;
+      META.shop = META.shop || {};
+      META.shop[id] = l + 1;
+      metaSave(); SFX.level(); buildShop();
+    });
+    grid.appendChild(el);
+  }
 }
 let META = metaLoad();      // 영구 메타 상태 { achievements:[], bonuses:{ damage,hp,gold,evo } }
 let META_NEW = [];          // 이번 런에서 새로 해금한 업적 (엔드 화면 표시용)
@@ -786,13 +902,16 @@ function newGame(charId){
     hitstop:0, rerollLeft:2, dmgDealt:0,
     p:{ x:0, y:0, hp:c.hp, baseHp:c.hp, maxHp:c.hp, baseSpd:c.spd, spd:c.spd, baseRegen:c.regen,
         regen:c.regen, cdm:1, baseArea:c.area || 1, area:c.area || 1, pickR:50, face:1, moving:false, anim:0, hurtT:0, iv:0,
-        might:1, crit:0, critDmg:2, dr:0, dodge:0, xpB:0, goldB:0, projSpd:0, setFx:{} },
+        might:1, crit:0, critDmg:2, dr:0, dodge:0, xpB:0, goldB:0, projSpd:0, setFx:{},
+        charId, shieldT:0, shieldCd:8 }, // 캐릭터 강화: 고유 특성 참조용 charId + 성기사 방어막 타이머
     passives:{}, armors:{}, // 방어구: 소유 조각 id 집합 (210종 풀, 최대 ARMOR_SLOTS 장착)
     weapons:[{ id:(metaStartWeapon || c.weapon), lv:1, grade:0, t:0.4, evolved:false, books:null, bT:0, bA:0 }], // 정복자 언락: 시작 무기 선택 (미선택 시 캐릭터 기본)
     enemies:[], bullets:[], pools:[], gems:[], pickups:[], texts:[], parts:[], effects:[],
     cam:{ x:0, y:0 }, shake:0, animT:0,
     spawnT:1.2, flockIdx:0, eliteIdx:0, bossIdx:0, boss:null,
     rushFlag:false, slotsDirty:true, chestData:null, chestPhase:"closed", chestApplied:false,
+    stage: selStage, // 스테이지 다각화: 캐릭터 화면에서 선택한 바이옴
+    props:[], propT:5, curses:{}, // 파괴 오브젝트(촛대) + 저주 카드
   };
   spinFx = null; // 슬롯 연출 오버레이 상태 초기화 (안전망)
   // BACKLOG #11: 메타 보너스 적용 — 스탯 초기화 시 1회 반영 (런 중 변동 없음)
@@ -800,6 +919,14 @@ function newGame(charId){
   G.p.dmgMult  = 1 + mb.damage;          // 학살자: 피해 +5% (wstats 배수)
   G.p.goldMult = 1 + mb.gold;            // 보물 사냥꾼: 상자 골드 +10% (openChest)
   G.p.evoBonus = mb.evo;                 // 진화론자: 진화 확률 +5% (openChest)
+  // 강화 상점 (영구 골드) 보너스
+  const sb = shopBonus();
+  G.p.baseHp += sb.hp; G.p.hp += sb.hp;
+  G.p.dmgMult += sb.dmg;
+  G.p.goldMult += sb.gold;
+  G.p.shopSpd = sb.spd;
+  G.rerollLeft += sb.reroll;
+  G.reviveLeft = sb.revive;
   META_NEW = [];                         // 이번 런 신규 업적 목록 초기화
   recalcStats();
   G.p.hp = G.p.maxHp;
@@ -845,16 +972,23 @@ function recalcStats(){
       else setFx[k] = v;
     }
   }
+  // 4) 저주 카드 (리스크-리워드 — 한 번 선택하면 런 동안 지속)
+  for (const id in G.curses){
+    if (id === "blood"){ mightPct += 25; hpFrac -= 0.15; }
+    else if (id === "hunger"){ spdPct += 20; regen = 0; }
+    else if (id === "swift"){ cdmPct += 15; pickPct -= 40; }
+    else if (id === "greed"){ goldPct += 80; dr -= 10; }
+  }
   P.maxHp = Math.round(P.baseHp * (1 + hpFrac));
-  P.spd   = P.baseSpd * (1 + spdPct / 100);
+  P.spd   = P.baseSpd * (1 + spdPct / 100 + (P.shopSpd || 0)); // 강화 상점 이동 보너스
   P.cdm   = Math.max(0.35, 1 - cdmPct / 100);
   P.area  = (P.baseArea || 1) * (1 + areaFrac);
-  P.pickR = 50 * (1 + pickPct / 100);
+  P.pickR = Math.max(14, 50 * (1 + pickPct / 100)); // 저주「시간의 대가」로 최소까지 깎일 수 있다
   P.regen = regen;
   P.might = 1 + mightPct / 100;
   P.crit  = Math.min(0.8, crit / 100);
   P.critDmg = 2 + critDmg / 100;
-  P.dr = dr; P.dodge = Math.min(0.5, dodge / 100);
+  P.dr = Math.max(-20, dr); P.dodge = Math.min(0.5, dodge / 100);
   P.xpB = xpPct / 100; P.goldB = goldPct / 100; P.projSpd = projPct / 100;
   P.setFx = setFx;
   P.hp = Math.min(P.hp, P.maxHp);
@@ -874,8 +1008,9 @@ function spawnPos(r){
 function spawnEnemy(type, pos, force){
   if (!force && G.enemies.length > 240) return null;
   const D = ENEMIES[type], pp = pos || spawnPos();
+  const ST = STAGES[G.stage] || STAGES.graveyard; // 스테이지 바이옴 보정 (체력/속도)
   const e = { id:++eid, type, icon:D.icon, x:pp.x, y:pp.y,
-    hp:D.hp * hpMult(G.t), spd:D.spd * rand(0.9, 1.1), dmg:D.dmg, xp:D.xp, r:D.r,
+    hp:D.hp * hpMult(G.t) * ST.eHp, spd:D.spd * ST.eSpd * rand(0.9, 1.1), dmg:D.dmg, xp:D.xp, r:D.r,
     flash:0, hitT:0, bibT:0, phase:rand(0, TAU), wob:!!D.wob, elite:false, boss:false, dead:false };
   e.maxHp = e.hp;
   G.enemies.push(e);
@@ -896,10 +1031,25 @@ function spawnFlock(f){
     }
   }
 }
+/* ---------------- 몬스터 강화: 정예 접두사 (엘리트가 랜덤 특성 보유) ---------------- */
+const AFFIXES = {
+  frenzy:   { name:"격노",   icon:"⚡", col:"#ff5b3d", apply(e){ e.spd *= 1.6; } },
+  giant:    { name:"거인",   icon:"🗿", col:"#c86aff", apply(e){ e.hp *= 2.2; e.maxHp = e.hp; e.r *= 1.3; e.dmg = Math.round(e.dmg * 1.5); } },
+  splitter: { name:"분열",   icon:"🧬", col:"#5ad46a", apply(e){} },
+  volatile: { name:"자폭",   icon:"💥", col:"#ff9a3d", apply(e){} },
+  mender:   { name:"치유자", icon:"💚", col:"#4dd2ff", apply(e){ e.healT = 3; } },
+  armored:  { name:"강철",   icon:"🛡️", col:"#a8b0c0", apply(e){ e.armor = 0.3; } },
+};
+function applyAffixes(e, n){
+  const keys = shuffle(Object.keys(AFFIXES)).slice(0, n);
+  e.affixes = [];
+  for (const k of keys){ AFFIXES[k].apply(e); e.affixes.push(k); }
+}
 function spawnElite(){
   const e = spawnEnemy(tierType(G.t), null, true);
   if (!e) return;
   e.elite = true; e.hp *= 9; e.maxHp = e.hp; e.r *= 1.45; e.spd *= 0.9; e.dmg = Math.round(e.dmg * 1.6); e.xp *= 12;
+  applyAffixes(e, G.t >= 300 && Math.random() < 0.35 ? 2 : 1); // 몬스터 강화: 후반엔 접두사 2개까지
 }
 function spawnBoss(def){
   const e = spawnEnemy("slime", null, true);
@@ -924,7 +1074,23 @@ function director(dt){
     const k = Math.min(1, t / GOAL);
     G.spawnT = 1.05 - 0.8 * k;
     const n = 1 + Math.floor(t / 140);
-    for (let i = 0; i < n; i++) spawnEnemy(tierType(t));
+    for (let i = 0; i < n; i++){
+      const e = spawnEnemy(tierType(t));
+      // 몬스터 강화: 4분 이후 일반 스폰도 확률적으로 정예화 (시간 비례)
+      if (e && t >= 240 && Math.random() < 0.02 + 0.04 * k){
+        e.elite = true; e.hp *= 6; e.maxHp = e.hp; e.xp *= 6;
+        applyAffixes(e, t >= 420 && Math.random() < 0.3 ? 2 : 1);
+      }
+    }
+  }
+  // 파괴 오브젝트(촛대) 주기 스폰 — 공격해 부수면 골드/아이템 드랍
+  G.propT -= dt;
+  if (G.propT <= 0){
+    G.propT = 6;
+    if (G.props.length < 10){
+      const a = rand(0, TAU), d = rand(180, 420);
+      G.props.push({ id:--eid, x:G.p.x + Math.cos(a)*d, y:G.p.y + Math.sin(a)*d, hp:60, maxHp:60, r:14, kind:"candle", flash:0 });
+    }
   }
 }
 
@@ -1080,6 +1246,8 @@ function dealDmg(e, dmg, opts){
   const cc = opts.crit !== undefined ? opts.crit : P.crit; // 치명타: 무기 전용 확률 우선, 없으면 방어구 합산 스탯
   if (cc > 0 && Math.random() < cc){ d *= P.critDmg; crit = true; }
   d *= P.might; // 방어구/셋트 피해량 % (메타 dmgMult는 wstats에서 이미 반영)
+  if (P.charId === "warrior" && P.hp < P.maxHp * 0.5) d *= 1.3; // 캐릭터 강화「광전사」
+  if (e.armor) d *= (1 - e.armor); // 몬스터 강화「강철」접두사 — 받는 피해 30% 감소
   e.hp -= d; e.flash = 0.13;
   G.dmgDealt += d; // 런 종료 요약용 누적 피해량 (무기·오라·웅덩이·폭탄 출처 불문)
   addText(e.x + rand(-9,9), e.y - e.r - 8, Math.round(d), crit ? "#ffd24a" : "#ffffff", crit);
@@ -1092,6 +1260,7 @@ function hitRect(cx, cy, hw, hh, dmg, opts){
     if (e.dead) continue;
     if (Math.abs(e.x - cx) < hw + e.r && Math.abs(e.y - cy) < hh + e.r){ dealDmg(e, dmg, opts); n++; }
   }
+  hitPropsRect(cx, cy, hw, hh, dmg);
   return n;
 }
 function hitRadius(x, y, r, dmg, opts){
@@ -1100,7 +1269,31 @@ function hitRadius(x, y, r, dmg, opts){
     if (e.dead) continue;
     if (dist2(x, y, e.x, e.y) < sq(r + e.r)){ dealDmg(e, dmg, opts); n++; }
   }
+  hitPropsCircle(x, y, r, dmg);
   return n;
+}
+/* 파괴 오브젝트(촛대) 피해 — 무기 판정에 함께 걸린다 */
+function hitPropsRect(cx, cy, hw, hh, dmg){
+  for (let i = G.props.length - 1; i >= 0; i--){
+    const p = G.props[i];
+    if (Math.abs(p.x - cx) < hw + p.r && Math.abs(p.y - cy) < hh + p.r){ p.hp -= dmg; p.flash = 0.15; if (p.hp <= 0) breakProp(i); }
+  }
+}
+function hitPropsCircle(x, y, r, dmg){
+  for (let i = G.props.length - 1; i >= 0; i--){
+    const p = G.props[i];
+    if (dist2(x, y, p.x, p.y) < sq(r + p.r)){ p.hp -= dmg; p.flash = 0.15; if (p.hp <= 0) breakProp(i); }
+  }
+}
+function breakProp(i){
+  const p = G.props[i];
+  burst(p.x, p.y, "#ffd76a", 10);
+  const roll = Math.random();
+  if (roll < 0.6) G.pickups.push({ x:p.x, y:p.y, kind:"coin", val:Math.round(rand(10, 25)), ph:rand(0, TAU) });
+  else if (roll < 0.85) G.pickups.push({ x:p.x, y:p.y, kind:"chicken", ph:rand(0, TAU) });
+  else G.pickups.push({ x:p.x, y:p.y, kind:"magnet", ph:rand(0, TAU) });
+  G.props.splice(i, 1);
+  SFX.pop();
 }
 function nearestEnemy(x, y, maxD){
   let best = null, bd = maxD * maxD;
@@ -1121,6 +1314,18 @@ function killEnemy(e){
   e.dead = true;
   G.kills++;
   if (G.p.setFx && G.p.setFx.healOnKill) G.p.hp = Math.min(G.p.maxHp, G.p.hp + 1); // 셋트「피의 계약」흡혈
+  // 몬스터 강화 접두사 효과
+  if (e.affixes && e.affixes.includes("splitter") && ENEMIES[e.type]){ // 분열: 하급 3마리로 갈라짐
+    for (let i = 0; i < 3; i++){
+      const c = spawnEnemy(e.type, { x:e.x + rand(-24,24), y:e.y + rand(-24,24) }, true);
+      if (c){ c.hp *= 0.15; c.maxHp = c.hp; c.r *= 0.7; c.xp = Math.max(1, Math.round(e.xp / 6)); }
+    }
+  }
+  if (e.affixes && e.affixes.includes("volatile")){ // 자폭: 사망 시 폭발
+    G.effects.push({ type:"ring", x:e.x, y:e.y, r:110, t:0.4, max:0.4 });
+    if (dist2(e.x, e.y, G.p.x, G.p.y) < sq(110)) damagePlayer(e.dmg * 2);
+    SFX.boom(); G.shake = Math.min(10, G.shake + 4);
+  }
   const col = (e.elite || e.boss) ? "#ff5b5b" : (ENEMIES[e.type] && ENEMIES[e.type].col) || "#b9a7e0";
   burst(e.x, e.y, col, e.boss ? 30 : e.elite ? 18 : 6);
   if (e.elite || e.boss){
@@ -1150,6 +1355,11 @@ function dropGem(x, y, v){
 function damagePlayer(d){
   const P = G.p;
   if (P.iv > 0 || P.hp <= 0) return;
+  if (P.shieldT > 0){ // 캐릭터 강화「가호의 서약」— 성기사 무적 방어막
+    addText(P.x, P.y - 26, "방어막!", "#ffe08a");
+    P.iv = 0.15;
+    return;
+  }
   if (P.dodge > 0 && Math.random() < P.dodge){ // 회피 (방어구 스탯)
     addText(P.x, P.y - 26, "회피!", "#a8f0e0");
     P.iv = 0.12;
@@ -1161,7 +1371,16 @@ function damagePlayer(d){
   G.shake = Math.min(10, G.shake + 3);
   addText(P.x, P.y - 26, "-" + d, "#ff6b6b");
   SFX.hurt(); playSfx("hit", { throttle: 200 });
-  if (P.hp <= 0){ P.hp = 0; setScene("over"); SFX.lose(); playSfx("gameover"); }
+  if (P.hp <= 0){
+    if ((G.reviveLeft || 0) > 0){ // 강화 상점「부활의 깃털」
+      G.reviveLeft--; P.hp = Math.round(P.maxHp * 0.5); P.iv = 2; P.hurtT = 0;
+      G.effects.push({ type:"ring", x:P.x, y:P.y, r:160, t:0.6, max:0.6 });
+      banner("👼 부활!", "주변 적들을 뿌리쳐라");
+      SFX.evo(); G.shake = 10;
+      return;
+    }
+    P.hp = 0; setScene("over"); SFX.lose(); playSfx("gameover");
+  }
 }
 
 /* ---------------- 무기 시스템 (12계열 × 58종 · 등급/레벨 스케일링) ---------------- */
@@ -1187,7 +1406,10 @@ function wstats(w){
     col: D.col || "#b8e0ff",
   };
 }
-function garlicRad(w){ return wstats(w).rad || 70; }
+function garlicRad(w){ // aura 계열 오라 반지름 (수녀「정화의 기도」+25% 포함 — 판정·그리기 동일 소스)
+  const r = wstats(w).rad || 70;
+  return G.p.charId === "nun" ? Math.round(r * 1.25) : r;
+}
 function nearestEnemyExcl(x, y, maxD, exclIds){
   let best = null, bd = maxD * maxD;
   for (const e of G.enemies){
@@ -1206,7 +1428,7 @@ function fireWeapon(w){
     const fx = P.x + P.face * hw;
     G.effects.push({ type:"slash", x:fx, y:P.y - 4, dir:P.face, area:S.area, col, t:0.2, max:0.2 });
     hitRect(fx, P.y - 4, hw, hh, S.dmg, opts);
-    if (w.lv >= 4 || w.evolved){
+    if (w.lv >= 4 || w.evolved || P.charId === "hunter"){ // 캐릭터 강화「쌍두 채찍」— 헌터는 Lv.1부터 양방향
       const bx = P.x - P.face * hw;
       G.effects.push({ type:"slash", x:bx, y:P.y - 4, dir:-P.face, area:S.area, col, t:0.2, max:0.2 });
       hitRect(bx, P.y - 4, hw, hh, S.dmg, opts);
@@ -1218,7 +1440,7 @@ function fireWeapon(w){
     for (let i = 0; i < S.count; i++){
       const a = baseA + (i - (S.count - 1) / 2) * 0.14;
       G.bullets.push({ kind:"wand", col, x:P.x, y:P.y - 6, vx:Math.cos(a)*S.spd, vy:Math.sin(a)*S.spd,
-                       r:6, dmg:S.dmg, pierce:0, t:1.6, hit:[] });
+                       r:6, dmg:S.dmg, pierce:0, t:1.6, hit:[], burst: P.charId === "mage" }); // 「마력 과부하」
     }
     SFX.shoot();
   }
@@ -1228,7 +1450,7 @@ function fireWeapon(w){
     for (let i = 0; i < S.count; i++){
       const a = baseA + (S.count > 1 ? (i / (S.count - 1) - 0.5) * 0.95 : 0);
       G.bullets.push({ kind:"wand", col, x:P.x, y:P.y - 6, vx:Math.cos(a)*S.spd*0.9, vy:Math.sin(a)*S.spd*0.9,
-                       r:5, dmg:S.dmg, pierce:0, t:0.55, hit:[] });
+                       r:5, dmg:S.dmg, pierce:0, t:0.55, hit:[], burst: P.charId === "mage" });
     }
     SFX.shoot();
   }
@@ -1255,7 +1477,7 @@ function fireWeapon(w){
       if (tgt){ tx = tgt.x; ty = tgt.y; }
       else { const a = rand(0, TAU), d = rand(130, 320); tx = P.x + Math.cos(a)*d; ty = P.y + Math.sin(a)*d; }
       G.bullets.push({ kind:"flask", col, sx:P.x, sy:P.y - 10, tx, ty, x:P.x, y:P.y - 10,
-                       dur:0.8, t:0, dmg:S.dmg, rad:S.rad, evolved:w.evolved });
+                       dur:0.8, t:0, dmg:S.dmg, rad:S.rad, evolved:w.evolved, amul: P.charId === "alchemist" }); // 「강화 용암」
     }
     SFX.axe();
   }
@@ -1360,15 +1582,17 @@ function updateWeapons(dt){
       if (w.t <= 0){
         const S = wstats(w);
         w.t = 0.45 * P.cdm;
-        const rad = S.rad || 70;
+        const rad = garlicRad(w); // 수녀「정화의 기도」범위 포함
         let hits = 0;
         for (const e of G.enemies){
           if (e.dead) continue;
           if (dist2(e.x, e.y, P.x, P.y) < sq(rad + e.r)){ dealDmg(e, S.dmg, {}); knockback(e, P.x, P.y, 22); hits++; }
         }
+        hitPropsCircle(P.x, P.y, rad, S.dmg); // 오라도 촛대를 태운다
         if (hits > 0){
           throttled("garlic", 200, () => tone(240, 120, 0.08, "sawtooth", 0.05));
           if (w.evolved) P.hp = Math.min(P.maxHp, P.hp + 2); // 영혼 포식자 흡수
+          if (P.charId === "nun") P.hp = Math.min(P.maxHp, P.hp + 0.5); // 「정화의 기도」회복
         }
       }
       continue;
@@ -1384,6 +1608,11 @@ function updatePlayer(dt){
   const P = G.p;
   P.hurtT = Math.max(0, P.hurtT - dt);
   P.iv = Math.max(0, P.iv - dt);
+  // 캐릭터 강화「가호의 서약」— 성기사 주기 무적 방어막
+  if (P.charId === "paladin"){
+    if (P.shieldT > 0) P.shieldT = Math.max(0, P.shieldT - dt);
+    else { P.shieldCd -= dt; if (P.shieldCd <= 0){ P.shieldT = 2; P.shieldCd = 12; SFX.pick(); addText(P.x, P.y - 34, "🛡️ 가호!", "#ffe08a"); } }
+  }
   P.hp = Math.min(P.maxHp, P.hp + P.regen * dt);
   let dx = 0, dy = 0;
   if (keys.KeyW || keys.ArrowUp) dy -= 1;
@@ -1395,7 +1624,8 @@ function updatePlayer(dt){
   P.moving = len > 0.01;
   if (P.moving){
     dx /= len; dy /= len;
-    P.x += dx * P.spd * dt; P.y += dy * P.spd * dt;
+    const berserk = (P.charId === "warrior" && P.hp < P.maxHp * 0.5) ? 1.15 : 1; // 캐릭터 강화「광전사」이동
+    P.x += dx * P.spd * berserk * dt; P.y += dy * P.spd * berserk * dt;
     if (dx > 0.1) P.face = 1; else if (dx < -0.1) P.face = -1;
     P.anim += dt;
   }
@@ -1407,6 +1637,17 @@ function updateEnemies(dt){
     e.flash = Math.max(0, e.flash - dt);
     e.hitT = Math.max(0, e.hitT - dt);
     e.bibT = Math.max(0, e.bibT - dt);
+    if (e.affixes && e.affixes.includes("mender")){ // 몬스터 강화「치유자」— 주변 아군 회복
+      e.healT -= dt;
+      if (e.healT <= 0){
+        e.healT = 3;
+        for (const o of es){
+          if (o === e || o.dead) continue;
+          if (dist2(o.x, o.y, e.x, e.y) < sq(150)){ o.hp = Math.min(o.maxHp, o.hp + o.maxHp * 0.1); o.flash = 0.1; }
+        }
+        G.effects.push({ type:"ring", x:e.x, y:e.y, r:150, t:0.3, max:0.3, col:"#4dd2ff" });
+      }
+    }
     let dx = P.x - e.x, dy = P.y - e.y;
     const d = Math.hypot(dx, dy) || 1;
     let spdMul = 1;
@@ -1442,7 +1683,9 @@ function updateBullets(dt){
       b.x = lerp(b.sx, b.tx, k);
       b.y = lerp(b.sy, b.ty, k) - Math.sin(k * Math.PI) * 90;
       if (k >= 1){
-        G.pools.push({ x:b.tx, y:b.ty, r:b.rad, dmg:b.dmg, life:b.evolved ? 3.0 : 2.5, tick:0, boom:b.evolved ? 120 : 0, col:b.col });
+        const alk = b.amul ? 1 : 0; // 캐릭터 강화「강화 용암」— 연금술사 장판 강화
+        G.pools.push({ x:b.tx, y:b.ty, r:b.rad, dmg:b.dmg * (1 + alk * 0.4),
+                       life:(b.evolved ? 3.0 : 2.5) * (1 + alk * 0.3), tick:0, boom:b.evolved ? 120 : 0, col:b.col });
         bs.splice(i, 1); SFX.splash();
       }
       continue;
@@ -1475,12 +1718,29 @@ function updateBullets(dt){
     b.x += b.vx * dt; b.y += b.vy * dt;
     let dead = b.t <= 0;
     if (!dead){
+      // 파괴 오브젝트(촛대) 판정 — 탄환당 1회, 관통 소모 없음
+      for (let j = G.props.length - 1; j >= 0; j--){
+        const pp = G.props[j];
+        b.pHit = b.pHit || [];
+        if (b.pHit.includes(pp.id)) continue;
+        if (dist2(b.x, b.y, pp.x, pp.y) < sq(b.r + pp.r)){
+          b.pHit.push(pp.id);
+          pp.hp -= b.dmg; pp.flash = 0.15;
+          SFX.hit();
+          if (pp.hp <= 0) breakProp(j);
+          break;
+        }
+      }
       for (const e of G.enemies){
         if (e.dead || b.hit.includes(e.id)) continue;
         const rr = b.r + e.r;
         if (dist2(b.x, b.y, e.x, e.y) < rr * rr){
           b.hit.push(e.id);
           dealDmg(e, b.dmg, {}); // 치명타는 플레이어 스탯으로 중앙 판정
+          if (b.burst && Math.random() < 0.2){ // 캐릭터 강화「마력 과부하」— 소형 폭발
+            G.effects.push({ type:"ring", x:b.x, y:b.y, r:48, t:0.25, max:0.25 });
+            hitRadius(b.x, b.y, 46, b.dmg * 0.5, {});
+          }
           if (b.kind === "axe" || b.kind === "knife" || b.kind === "lance") knockback(e, b.x, b.y, 30);
           SFX.hit();
           if (b.hit.length > b.pierce){ dead = true; break; }
@@ -1528,14 +1788,15 @@ function updatePickups(dt){
     }
     if (dist2(k.x, k.y, P.x, P.y) < sq(k.kind === "chest" ? 28 : 20)){
       ps.splice(i, 1);
-      applyPickup(k.kind);
+      applyPickup(k);
     }
   }
 }
-function applyPickup(kind){
-  const P = G.p;
+function applyPickup(k){
+  const P = G.p, kind = k.kind;
   if (kind === "magnet"){ for (const g of G.gems) g.att = true; SFX.pick(); addText(P.x, P.y - 30, "🧲 자석!", "#7fd0ff"); }
   else if (kind === "chicken"){ P.hp = Math.min(P.maxHp, P.hp + 40); SFX.pick(); addText(P.x, P.y - 30, "+40", "#6bff8f"); }
+  else if (kind === "coin"){ const v = k.val || 15; addGold(v); SFX.pick(); addText(P.x, P.y - 30, "+" + v + " 💰", "#ffd76a"); }
   else if (kind === "bomb"){
     SFX.boom(); G.shake = 10;
     G.effects.push({ type:"ring", x:P.x, y:P.y, r:Math.max(vw, vh) * 0.55, t:0.4, max:0.4 });
@@ -1548,6 +1809,7 @@ function applyPickup(kind){
   else if (kind === "chest") openChest();
 }
 function updateFx(dt){
+  for (const p of G.props) p.flash = Math.max(0, p.flash - dt); // 촛대 피격 플래시
   for (let i = G.texts.length - 1; i >= 0; i--){
     const t = G.texts[i]; t.t -= dt; t.y += t.vy * dt;
     if (t.t <= 0) G.texts.splice(i, 1);
@@ -1640,6 +1902,12 @@ function rollChoices(){
     out.push(c);
   }
   let fb = 0;
+  // 저주 카드: 18% 확률로 리스크-리워드 선택지 등장 (중복 선택 불가)
+  const avail = Object.keys(CURSES).filter(id => !G.curses[id]);
+  if (avail.length && out.length < 3 && Math.random() < 0.18){
+    const id = pick(avail);
+    if (!out.some(o => o.id === id)) out.push({ type:"curse", id });
+  }
   while (out.length < 3) out.push({ type: fb++ % 2 ? "gold" : "heal" });
   return out.slice(0, 3);
 }
@@ -1676,6 +1944,7 @@ function buildLevelUp(isReroll){
     else if (c.type === "pnew"){ const P = PASSIVES[c.id]; icon = P.icon; name = P.name; tag = "새 유물"; desc = P.desc; }
     else if (c.type === "pup"){ const P = PASSIVES[c.id]; icon = P.icon; name = P.name + " Lv." + ((G.passives[c.id] || 0) + 1); tag = "유물 강화"; desc = P.desc; }
     else if (c.type === "heal"){ icon = "🍗"; name = "치킨"; tag = "회복"; desc = "체력을 30 회복한다"; }
+    else if (c.type === "curse"){ const C = CURSES[c.id]; icon = C.icon; name = C.name; tag = "☠️ 저주"; desc = C.desc; gcol = "#ff4d6b"; cls += " evo"; }
     else { icon = "💰"; name = "골드"; tag = "재화"; desc = "골드 +60"; }
     // 진화 레시프 배지
     let badge = "";
@@ -1744,6 +2013,7 @@ function chooseCard(i){
   else if (c.type === "anew"){ G.armors[c.id] = true; recalcStats(); G.slotsDirty = true; SFX.pick(); }
   else if (c.type === "pnew" || c.type === "pup"){ G.passives[c.id] = (G.passives[c.id] || 0) + 1; recalcStats(); G.slotsDirty = true; }
   else if (c.type === "heal"){ G.p.hp = Math.min(G.p.maxHp, G.p.hp + 30); addText(G.p.x, G.p.y - 30, "+30", "#6bff8f"); }
+  else if (c.type === "curse"){ G.curses[c.id] = true; recalcStats(); G.slotsDirty = true; addText(G.p.x, G.p.y - 36, "저주:「" + CURSES[c.id].name + "」", "#ff8484"); tone(220, 70, 0.35, "sawtooth", 0.22); }
   else if (c.type === "gold"){ addGold(60); }
   G.luQueue--;
   if (G.luQueue > 0) buildLevelUp();
@@ -2005,6 +2275,7 @@ function setScene(s){
   for (const el of document.querySelectorAll(".screen")) el.classList.add("hidden");
   if (s === "play") { /* 화면 없음 */ }
   else if (s === "char"){ buildChar(); $("scr-char").classList.remove("hidden"); }
+  else if (s === "shop"){ buildShop(); $("scr-shop").classList.remove("hidden"); } // 강화 상점 (영구 골드)
   else if (s === "meta"){ buildMeta(); $("scr-meta").classList.remove("hidden"); } // BACKLOG #11: 업적 목록
   else if (s === "levelup"){ G.hitstop = 0; buildLevelUp(); $("scr-levelup").classList.remove("hidden"); }
   else if (s === "chest"){ G.hitstop = 0; buildChest(); $("scr-chest").classList.remove("hidden"); }
@@ -2017,6 +2288,18 @@ function buildChar(){
   grid.innerHTML = "";
   // BACKLOG #11: 메타 보너스 칩 + 정복자 시작 무기 선택
   $("metaChips").innerHTML = metaChipHtml() || `<span class="chip off">언락된 보너스 없음 — 업적 달성 시 해금</span>`;
+  // 스테이지 선택 (바이옴 다각화)
+  const sp = $("stagepick");
+  let sh = `<div class="wptitle">🗺️ 스테이지</div><div class="wplist">`;
+  for (const id of Object.keys(STAGES)){
+    const S = STAGES[id];
+    sh += `<span class="wchip${selStage === id ? " sel" : ""}" data-s="${id}">${S.icon} ${S.name}</span>`;
+  }
+  sh += `</div><div class="hint" style="margin-top:4px">${STAGES[selStage].icon} <b>${STAGES[selStage].name}</b> — ${STAGES[selStage].desc}</div>`;
+  sp.innerHTML = sh;
+  for (const b of sp.querySelectorAll(".wchip"))
+    b.addEventListener("click", () => { selStage = b.dataset.s; SFX.pick(); buildChar(); });
+  $("btnShop").innerHTML = `🪙 강화 상점 (${(META.bank || 0).toLocaleString("en-US")} G)`;
   const wp = $("wpick");
   if (META.achievements.includes("conquer")){
     wp.classList.remove("hidden");
@@ -2034,6 +2317,7 @@ function buildChar(){
     el.className = "charcard";
     el.innerHTML = `<canvas class="cprev" width="144" height="150"></canvas>
                     <div class="cn">${c.name}</div><div class="cd">${c.desc}</div>
+                    <div class="ctrait">✨ ${c.trait}<br><span>${c.traitDesc}</span></div>
                     <div class="cw">시작 무기 ${w.icon} ${w.name}</div>`;
     el.addEventListener("click", () => { newGame(id); setScene("play"); startBgm(); banner("생존하라!", "10분 동안 버텨라 — 이동: WASD/드래그", 3200); });
     grid.appendChild(el);
@@ -2091,6 +2375,7 @@ function buildPause(){
 }
 function buildEnd(s){
   const win = s === "win";
+  if (!G.banked){ G.banked = true; META.bank = (META.bank || 0) + G.gold; metaSave(); } // 강화 상점 은행 입금 (런당 1회)
   $("endIcon").textContent = win ? "🎉" : "💀";
   $("endTitle").textContent = win ? "생존 성공!" : "당신은 어둠에 삼켜졌다";
   $("endTitle").style.color = win ? "var(--gold)" : "#ff8484";
@@ -2108,6 +2393,7 @@ function buildEnd(s){
      <span>레벨<b>${G.level}</b></span>
      <span>처치<b>${G.kills}</b></span>
      <span>골드<b>${G.gold}</b></span>
+     <span>은행 누계<b style="color:var(--gold)">${(META.bank || 0).toLocaleString("en-US")}</b></span>
      <span>총 피해량<b>${Math.round(G.dmgDealt).toLocaleString("en-US")}</b></span>
      <span>DPS<b>${dps}</b></span>`;
   $("endSub").textContent = win ? "새벽이 밝았다. 뱀파이어의 밤은 끝났다." : "10분을 버티면 승리한다!";
@@ -2206,31 +2492,32 @@ function hexA(hex, a){ // "#rrggbb" → rgba() (무기별 발사체/오라/장�
 }
 const CELL = 140;
 function drawFloor(){
+  const ST = STAGES[(G && G.stage) || selStage] || STAGES.graveyard; // 스테이지 바이옴 팔레트
   const x0 = Math.floor((G.cam.x - vw/2) / CELL) - 1, x1 = Math.floor((G.cam.x + vw/2) / CELL) + 1;
   const y0 = Math.floor((G.cam.y - vh/2) / CELL) - 1, y1 = Math.floor((G.cam.y + vh/2) / CELL) + 1;
   for (let cy = y0; cy <= y1; cy++){
     for (let cx = x0; cx <= x1; cx++){
-      ctx.fillStyle = (cx + cy) % 2 ? "#191329" : "#1b1530";
+      ctx.fillStyle = (cx + cy) % 2 ? ST.floorA : ST.floorB;
       ctx.fillRect(cx * CELL, cy * CELL, CELL, CELL);
       const h = hash2(cx * 3 + 7, cy * 3 + 11);
       const px = cx * CELL + hash2(cx, cy * 5) * 90 + 25;
       const py = cy * CELL + hash2(cx * 5, cy) * 90 + 25;
       if (h < 0.035){ // 죽은 나무
-        ctx.strokeStyle = "#241c3a"; ctx.lineWidth = 5; ctx.lineCap = "round";
+        ctx.strokeStyle = ST.propTree; ctx.lineWidth = 5; ctx.lineCap = "round";
         ctx.beginPath(); ctx.moveTo(px, py + 26); ctx.lineTo(px, py - 16);
         ctx.moveTo(px, py - 4); ctx.lineTo(px - 13, py - 18);
         ctx.moveTo(px, py - 10); ctx.lineTo(px + 12, py - 24); ctx.stroke();
       } else if (h < 0.07){ // 묘비
-        ctx.fillStyle = "#2c2542";
+        ctx.fillStyle = ST.propGrave;
         ctx.beginPath(); ctx.roundRect(px - 9, py - 14, 18, 26, 7); ctx.fill();
         ctx.fillRect(px - 13, py + 10, 26, 5);
-        ctx.fillStyle = "#221b38"; ctx.fillRect(px - 2, py - 8, 4, 12); ctx.fillRect(px - 5, py - 5, 10, 4);
+        ctx.fillStyle = "rgba(0,0,0,0.25)"; ctx.fillRect(px - 2, py - 8, 4, 12); ctx.fillRect(px - 5, py - 5, 10, 4);
       } else if (h < 0.1){ // 바위
-        ctx.fillStyle = "#2a2344";
+        ctx.fillStyle = ST.propRock;
         ctx.beginPath(); ctx.moveTo(px - 12, py + 8); ctx.lineTo(px - 6, py - 9); ctx.lineTo(px + 7, py - 7);
         ctx.lineTo(px + 13, py + 8); ctx.closePath(); ctx.fill();
       } else if (h < 0.14){ // 수풀
-        ctx.fillStyle = "#1d2c25";
+        ctx.fillStyle = ST.propBush;
         circle(px - 6, py, 7); circle(px + 4, py - 3, 8); circle(px + 8, py + 3, 6);
       }
     }
@@ -2291,15 +2578,38 @@ function drawPickups(){
       circle(k.x, k.y + bob, 30);
     }
     // BACKLOG #8: 치유 아이템(chicken)도 물약 스프라이트 렌더 — 26px 유지, 미로딩 시 기존 이모지 폴백
-    const cimg = k.kind === "chest" ? SPRITES["item-chest"] : k.kind === "chicken" ? SPRITES["item-potion"] : null;
+    const cimg = k.kind === "chest" ? SPRITES["item-chest"]
+               : k.kind === "chicken" ? SPRITES["item-potion"]
+               : k.kind === "coin" ? SPRITES["item-coin"]
+               : k.kind === "magnet" ? SPRITES["item-magnet"]
+               : k.kind === "bomb" ? SPRITES["item-bomb"] : null;
     const csz = k.kind === "chest" ? 44 : 26;
     if (spriteReady(cimg)){
       ctx.save(); ctx.imageSmoothingEnabled = false;
       ctx.drawImage(cimg, k.x - csz / 2, k.y + bob - csz / 2, csz, csz);
       ctx.restore();
     } else
-      emoji(k.kind === "chest" ? "🎁" : k.kind === "magnet" ? "🧲" : k.kind === "chicken" ? "🍗" : "💣",
+      emoji(k.kind === "chest" ? "🎁" : k.kind === "magnet" ? "🧲" : k.kind === "chicken" ? "🍗" : k.kind === "coin" ? "🪙" : "💣",
             k.x, k.y + bob, k.kind === "chest" ? 34 : 26);
+  }
+}
+function drawProps(){ // 파괴 오브젝트(촛대) — 부수면 골드/아이템 드랍
+  const pimg = SPRITES["prop-candle"];
+  for (const p of G.props){
+    const glow = 0.18 + 0.1 * Math.sin(G.animT * 4 + p.x * 0.1);
+    ctx.fillStyle = "rgba(0,0,0,0.3)";
+    ellipse(p.x, p.y + 10, 10, 3.5);
+    ctx.fillStyle = hexA("#ffb84d", glow);
+    circle(p.x, p.y - 8, 17);
+    if (spriteReady(pimg)){
+      ctx.save(); ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(pimg, p.x - 13, p.y - 13, 26, 26);
+      ctx.restore();
+    } else emoji("🕯️", p.x, p.y, 24);
+    if (p.flash > 0){
+      ctx.fillStyle = `rgba(255,255,255,${Math.min(0.6, p.flash * 5)})`;
+      circle(p.x, p.y, p.r);
+    }
   }
 }
 /* ---------- 몬스터 치비 스프라이트 (g, s=반지름, t=시간, e=엔티티) ---------- */
@@ -2496,15 +2806,21 @@ const MOB_DRAW = {
   },
 };
 /* AI 생성 몬스터 스프라이트 ↔ 적 타입 매핑 (매칭 없는 타입·보스는 기존 벡터 드로잉 사용) */
-const ENEMY_SPRITE = { wolf:"enemy-hunter", shroom:"enemy-mage", ghost:"enemy-nun", stump:"enemy-warrior", golem:"enemy-paladin", slime:"enemy-alchemist", snail:"enemy-snail", bat:"enemy-bat", pig:"enemy-pig", slimeking:"boss-slimeking", shroomking:"boss-shroomking", reaper:"boss-reaper" };
+const ENEMY_SPRITE = { wolf:"enemy-wolf", shroom:"enemy-mage", ghost:"enemy-ghost", stump:"enemy-stump", golem:"enemy-golem", slime:"enemy-alchemist", snail:"enemy-snail", bat:"enemy-bat", pig:"enemy-pig", slimeking:"boss-slimeking", shroomking:"boss-shroomking", reaper:"boss-reaper" }; // 늑대·골렘·정령·유령 전용 스프라이트 신설 (기존 히어로 대용 제거)
 function drawEnemy(e){
   const t = G.animT + e.phase;
   const wob = e.wob ? Math.sin(G.animT * 6 + e.phase) * 4 : 0;
   ctx.fillStyle = "rgba(0,0,0,0.27)";
   ellipse(e.x + wob, e.y + e.r * 0.9, e.r * 0.85, e.r * 0.3);
   if (e.elite || e.boss){
-    ctx.fillStyle = "rgba(255,60,60,0.16)";
+    // 몬스터 강화: 접두사별 오라 색 (없으면 기본 붉은색)
+    const ac = (e.affixes && e.affixes.length) ? AFFIXES[e.affixes[0]].col : "#ff3c3c";
+    const pulse = 0.13 + 0.05 * Math.sin(G.animT * 5 + e.phase);
+    ctx.fillStyle = hexA(ac, pulse + 0.06);
     circle(e.x + wob, e.y, e.r * 1.5);
+    ctx.strokeStyle = hexA(ac, pulse + 0.2);
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(e.x + wob, e.y, e.r * 1.5, 0, TAU); ctx.stroke();
   }
   const f = G.p.x >= e.x ? 1 : -1;
   ctx.save();
@@ -2517,6 +2833,15 @@ function drawEnemy(e){
     ctx.drawImage(simg, -s / 2, -s / 2, s, s);
   } else (MOB_DRAW[e.type] || MOB_DRAW.slime)(ctx, e.r, t, e);
   ctx.restore();
+  // 몬스터 강화: 접두사 배지 (머리 위 아이콘)
+  if (e.affixes && e.affixes.length){
+    for (let i = 0; i < e.affixes.length; i++){
+      const A = AFFIXES[e.affixes[i]];
+      ctx.fillStyle = "rgba(0,0,0,0.55)";
+      circle(e.x + wob + (i - (e.affixes.length - 1) / 2) * 15, e.y - e.r - 14, 7.5);
+      emoji(A.icon, e.x + wob + (i - (e.affixes.length - 1) / 2) * 15, e.y - e.r - 14, 11);
+    }
+  }
   if (e.flash > 0){
     ctx.fillStyle = `rgba(255,255,255,${Math.min(0.6, e.flash * 5)})`;
     circle(e.x + wob, e.y, e.r * 0.85);
@@ -2657,6 +2982,14 @@ function drawPlayer(){
   ctx.fillStyle = "rgba(0,0,0,0.3)";
   ellipse(P.x, P.y + 18, 13, 4.5);
   drawHero(ctx, G.charId, P.x, P.y, P.face, P.anim, P.moving, 1);
+  if (P.shieldT > 0){ // 캐릭터 강화「가호의 서약」— 성스러운 방어막
+    ctx.strokeStyle = `rgba(255,224,138,${0.45 + 0.3 * Math.sin(G.animT * 8)})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(P.x, P.y, 25, 0, TAU); ctx.stroke();
+    ctx.strokeStyle = `rgba(255,224,138,0.15)`;
+    ctx.lineWidth = 8;
+    ctx.beginPath(); ctx.arc(P.x, P.y, 25, 0, TAU); ctx.stroke();
+  }
   if (P.hurtT > 0){
     ctx.fillStyle = `rgba(255,60,60,${P.hurtT * 1.4})`;
     circle(P.x, P.y + bob, 17);
@@ -2717,7 +3050,7 @@ function drawEffects(){
       ctx.restore();
     } else if (e.type === "ring"){
       const rr = e.r * (1 - k * k);
-      ctx.strokeStyle = `rgba(255,220,140,${0.8 * k})`;
+      ctx.strokeStyle = e.col ? hexA(e.col, 0.8 * k) : `rgba(255,220,140,${0.8 * k})`;
       ctx.lineWidth = 5;
       ctx.beginPath(); ctx.arc(e.x, e.y, rr, 0, TAU); ctx.stroke();
     } else if (e.type === "bolt"){ // 연쇄 번개 — 사전 계산된 지그재그 경로
@@ -2794,6 +3127,7 @@ function render(now){
   drawTelegraphs(); // BACKLOG #6: 보스 텔레그래프(경고 원·돌진 예고선) — 지면 레벨, 엔티티 렌더 전
   drawGems();
   drawPickups();
+  drawProps();
   const ents = G.enemies.slice();
   ents.push(G.p);
   ents.sort((a, b) => a.y - b.y);
@@ -2829,6 +3163,8 @@ function frame(now){
 $("btnStart").addEventListener("click", () => setScene("char"));
 $("btnMeta").addEventListener("click", () => setScene("meta"));       // BACKLOG #11: 업적 목록
 $("btnMetaClose").addEventListener("click", () => setScene("title")); // BACKLOG #11: 업적 화면 닫기
+$("btnShop").addEventListener("click", () => setScene("shop"));       // 강화 상점 (영구 골드)
+$("btnShopClose").addEventListener("click", () => setScene("char"));  // 상점 → 캐릭터 선택 복귀
 $("btnPause").addEventListener("click", () => { if (scene === "play") setScene("pause"); });
 $("btnMute").addEventListener("click", toggleMute);
 $("btnResume").addEventListener("click", () => setScene("play"));
