@@ -10,6 +10,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const crypto = require('crypto');
 
 const PORT = 8790;
@@ -464,8 +465,10 @@ const server = http.createServer(async (req, res) => {
 
 /* ── 고스톱 웹 서빙 (8793) — 캐시 방지 + 쿼리 버전닝 지원 ──
    Godot 웹 빌드는 브라우저 캐시(메모리·HTTP)가 pck를 계속 들고 있어 수정이 안 보이는
-   문제가 있음 → 모든 응답 no-store + index.html의 executable에 ?v= 붙여 캐시 우회. */
-const GO_WEB = '/tmp/gostop-web';
+   문제가 있음 → 모든 응답 no-store + index.html의 executable에 ?v= 붙여 캐시 우회.
+   #74 수리: /tmp 의존 제거 — 지속 경로 ~/.local/share/gostop-web 서빙(11-20 실증:
+   /tmp 정리 시 서비스 무너짐). 배포는 deploy-gostop-web.sh로 원자적 교체. */
+const GO_WEB = path.join(os.homedir(), '.local/share/gostop-web');
 const goServer = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://x');
   let p = url.pathname === '/' ? '/index.html' : url.pathname;
